@@ -25,8 +25,10 @@ async function check(current) {
   if (!res.ok) throw new Error(`检查更新失败 (${res.status})`);
   const rel = await res.json();
   const latest = String(rel.tag_name || '').replace(/^v/, '');
-  const asset = (rel.assets || []).find((a) => /\.dmg$/i.test(a.name)) ||
-    (rel.assets || []).find((a) => /\.(zip|exe|AppImage)$/i.test(a.name));
+  const assets = rel.assets || [];
+  const dmgs = assets.filter((a) => /\.dmg$/i.test(a.name));
+  const pickDmg = dmgs.find((a) => (process.arch === 'arm64' ? /arm64/i.test(a.name) : !/arm64/i.test(a.name))) || dmgs[0];
+  const asset = pickDmg || assets.find((a) => /\.(zip|exe|AppImage)$/i.test(a.name));
   return {
     hasUpdate: cmp(latest, current) > 0,
     latest,

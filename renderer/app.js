@@ -322,7 +322,11 @@ $('#btnGen').addEventListener('click', generateReport);
 $('#btnSave').addEventListener('click', saveReport);
 $('#btnCopy').addEventListener('click', async () => {
   if (!S.reportMd) return toast('还没有报告', true);
-  await navigator.clipboard.writeText(S.reportMd);
+  try {
+    await navigator.clipboard.writeText(S.reportMd);
+  } catch (e) {
+    await window.api.clipboard(S.reportMd);
+  }
   toast('已复制');
 });
 $('#btnReveal').addEventListener('click', () => {

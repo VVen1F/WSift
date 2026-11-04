@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld('api', {
     relaunch: () => ipcRenderer.invoke('update:relaunch')
   },
 
+  clipboard: (text) => ipcRenderer.invoke('clipboard:write', text),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),

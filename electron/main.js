@@ -208,6 +208,11 @@ ipcMain.handle('update:relaunch', () => {
   app.exit(0);
 });
 
+ipcMain.handle('clipboard:write', (_e, text) => {
+  require('electron').clipboard.writeText(String(text || ''));
+  return true;
+});
+
 ipcMain.handle('shell:openExternal', (_e, url) => shell.openExternal(url));
 ipcMain.handle('shell:showItem', (_e, p) => shell.showItemInFolder(p));
 ipcMain.handle('shell:openPath', (_e, p) => shell.openPath(p));

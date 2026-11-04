@@ -1,0 +1,60 @@
+{
+  "name": "refract",
+  "productName": "Refract",
+  "version": "0.1.0",
+  "description": "SRC 复测与报告工作台：发包、截图、LLM、模板、统一风格报告",
+  "main": "electron/main.js",
+  "author": "WenYifan",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node test/run.js",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^45.2.2",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.wenyifan.refract",
+    "productName": "Refract",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "renderer/**",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "darkModeSupport": true,
+      "hardenedRuntime": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "Refract ${version}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Development"
+    }
+  }
+}

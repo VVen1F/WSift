@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>shot</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: auto; background: #fff; }
+  body {
+    font: 13px/1.5 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    color: #212121;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { display: flex; }
+  .pane { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+  .pane + .pane { border-left: 1px solid #e2e2e2; }
+  .head {
+    height: 38px; display: flex; align-items: center; padding: 0 14px;
+    font-size: 13px; font-weight: 600; color: #111;
+  }
+  pre.code {
+    margin: 0; padding: 8px 14px 10px 60px;
+    font: 13px/20px ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    white-space: pre-wrap; overflow-wrap: anywhere; color: #212121;
+    background: #fff;
+    background-image: linear-gradient(to right, transparent 49px, #ececec 49px, #ececec 50px, transparent 50px);
+    background-repeat: no-repeat;
+    counter-reset: ln;
+  }
+  .ln { position: relative; min-height: 20px; }
+  .ln::before {
+    counter-increment: ln; content: counter(ln);
+    position: absolute; left: -46px; top: 0; width: 36px;
+    text-align: right; color: #9b9b9b;
+    font: 13px/20px ui-monospace, Menlo, Consolas, monospace;
+  }
+  .hn { color: #000080; }
+  .cv { color: #800000; }
+  .jk { color: #000080; }
+  .js { color: #008000; }
+  .jn { color: #0000cc; }
+</style>
+</head>
+<body>
+<div id="app">
+  <section class="pane">
+    <div class="head">Request</div>
+    <pre class="code" id="req"></pre>
+  </section>
+  <section class="pane">
+    <div class="head">Response</div>
+    <pre class="code" id="res"></pre>
+  </section>
+</div>
+
+<script>
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function jsonHL(src) {
+  const re = /"(?<str>(?:\\.|[^"\\])*)"(?<colon>\s*:)?|(?<num>-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(?<lit>\b(?:true|false|null)\b)/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(src))) {
+    out += esc(src.slice(last, m.index));
+    if (m.groups.str !== undefined) {
+      const colon = m.groups.colon || '';
+      const body = m[0].slice(0, m[0].length - colon.length);
+      out += '<span class="' + (colon ? 'jk' : 'js') + '">' + esc(body) + '</span>' + esc(colon);
+    } else {
+      out += '<span class="jn">' + esc(m[0]) + '</span>';
+    }
+    last = m.index + m[0].length;
+  }
+  return out + esc(src.slice(last));
+}
+function colorCookie(v, firstOnly) {
+  return v.split(';').map((seg, i) => {
+    if (i > 0 && firstOnly) return ';' + esc(seg);
+    const m = seg.match(/^(\s*)([^=]+)=(.*)$/);
+    if (!m) return (i ? ';' : '') + esc(seg);
+    return (i ? ';' : '') + esc(m[1]) + '<span class="hn">' + esc(m[2]) + '=</span><span class="cv">' + esc(m[3]) + '</span>';
+  }).join('');
+}
+function hl(text) {
+  if (!text) return '';
+  const sep = text.indexOf('\r\n\r\n') >= 0 ? '\r\n\r\n' : '\n\n';
+  const i = text.indexOf(sep);
+  const head = i >= 0 ? text.slice(0, i) : text;
+  const body = i >= 0 ? text.slice(i + sep.length) : '';
+
+  const headLines = head.split(/\r?\n/).map((ln, idx) => {
+    if (idx === 0 && /^(HTTP\/[\d.]+\s|GET\s|POST\s|PUT\s|DELETE\s|PATCH\s|HEAD\s|OPTIONS\s)/.test(ln)) return esc(ln);
+    const m = ln.match(/^([A-Za-z0-9!#$%&'*+.^_`|~-]+):(.*)$/);
+    if (!m) return esc(ln);
+    const lower = m[1].toLowerCase();
+    let v;
+    if (lower === 'cookie' || lower === 'set-cookie') {
+      const sp = (m[2].match(/^\s*/) || [''])[0];
+      v = esc(sp) + colorCookie(m[2].slice(sp.length), lower === 'set-cookie');
+    } else {
+      v = esc(m[2]);
+    }
+    return '<span class="hn">' + esc(m[1]) + '</span>:' + v;
+  });
+
+  let bodyLines = [];
+  if (body) {
+    const t = body.trim();
+    let isJson = false;
+    if (t && (t[0] === '{' || t[0] === '[')) { try { JSON.parse(t); isJson = true; } catch (e) {} }
+    bodyLines = body.split(/\r?\n/).map((ln) => (isJson ? jsonHL(ln) : esc(ln)));
+  }
+  return headLines.concat(bodyLines.length ? [''] : []).concat(bodyLines)
+    .map((h) => '<div class="ln">' + (h || '') + '</div>').join('');
+}
+
+window.render = function (data) {
+  document.getElementById('req').innerHTML = hl(data.request || '');
+  document.getElementById('res').innerHTML = hl(data.response || '');
+  return true;
+};
+</script>
+</body>
+</html>

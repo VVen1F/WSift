@@ -1,0 +1,146 @@
+'use strict';
+// 原始 HTTP 发送：直接写 socket，保证请求行、头顺序、body 与编辑器里看到的一致。
+const net = require('net');
+const tls = require('tls');
+const zlib = require('zlib');
+
+function parseRequest(raw) {
+  const text = raw.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+  const idx = text.indexOf('\r\n\r\n');
+  const head = idx >= 0 ? text.slice(0, idx) : text;
+  const body = idx >= 0 ? text.slice(idx + 4) : '';
+  const lines = head.split('\r\n');
+  const first = lines[0].split(/\s+/);
+  if (first.length < 2) throw new Error('请求行格式不对，需要 METHOD PATH HTTP/1.1');
+  const headers = [];
+  for (const line of lines.slice(1)) {
+    if (!line.trim()) continue;
+    const i = line.indexOf(':');
+    if (i < 0) continue;
+    headers.push([line.slice(0, i).trim(), line.slice(i + 1).trim()]);
+  }
+  return { method: first[0], target: first[1], version: first[2] || 'HTTP/1.1', headers, body };
+}
+
+function header(headers, name) {
+  const hit = headers.find(([k]) => k.toLowerCase() === name.toLowerCase());
+  return hit ? hit[1] : '';
+}
+
+async function send(raw, opts = {}) {
+  const timeout = opts.timeout || 30000;
+  const req = parseRequest(raw);
+
+  let scheme = opts.scheme || 'https';
+  let host = header(req.headers, 'host');
+  let path = req.target;
+
+  if (/^https?:\/\//i.test(path)) {
+    const u = new URL(path);
+    scheme = u.protocol.replace(':', '');
+    host = u.host;
+    path = u.pathname + u.search;
+  }
+  if (!host) throw new Error('缺少 Host 头');
+
+  const [hostname, portRaw] = host.startsWith('[')
+    ? [host, 443]
+    : host.includes(':') ? [host.slice(0, host.lastIndexOf(':')), host.slice(host.lastIndexOf(':') + 1)]
+                         : [host, 0];
+  const port = Number(portRaw) || (scheme === 'https' ? 443 : 80);
+
+  let bodyBuf = Buffer.from(req.body, 'utf8');
+  const drop = new Set(['content-length', 'transfer-encoding', 'connection', 'proxy-connection']);
+  const headers = req.headers.filter(([k]) => !drop.has(k.toLowerCase()));
+  if (bodyBuf.length || ['POST', 'PUT', 'PATCH'].includes(req.method.toUpperCase())) {
+    headers.push(['Content-Length', String(bodyBuf.length)]);
+  }
+  headers.push(['Connection', 'close']);
+
+  const head =
+    `${req.method} ${path} ${req.version}\r\n` +
+    headers.map(([k, v]) => `${k}: ${v}`).join('\r\n') +
+    '\r\n\r\n';
+
+  const started = Date.now();
+  const res = await new Promise((resolve, reject) => {
+    let socket;
+    const connect = () => {
+      socket = scheme === 'https'
+        ? tls.connect({ host: hostname, port, servername: hostname.replace(/^\[|\]$/g, ''), rejectUnauthorized: false })
+        : net.connect({ host: hostname, port });
+      socket.setTimeout(timeout);
+      socket.once(scheme === 'https' ? 'secureConnect' : 'connect', () => {
+        socket.write(head);
+        if (bodyBuf.length) socket.write(bodyBuf);
+      });
+      const chunks = [];
+      socket.on('data', (c) => chunks.push(c));
+      socket.on('end', () => resolve(Buffer.concat(chunks)));
+      socket.on('timeout', () => { socket.destroy(); reject(new Error('连接超时')); });
+      socket.on('error', reject);
+    };
+    connect();
+  });
+
+  return decodeResponse(res, Date.now() - started);
+}
+
+function decodeResponse(buf, ms) {
+  const sep = buf.indexOf('\r\n\r\n');
+  if (sep < 0) {
+    return { status: 0, ms, text: buf.toString('utf8'), raw: buf.toString('utf8') };
+  }
+  const headText = buf.slice(0, sep).toString('latin1');
+  let bodyBuf = buf.slice(sep + 4);
+  const lines = headText.split('\r\n');
+  const statusLine = lines[0];
+  const headers = lines.slice(1).filter(Boolean).map((l) => {
+    const i = l.indexOf(':');
+    return i < 0 ? [l, ''] : [l.slice(0, i).trim(), l.slice(i + 1).trim()];
+  });
+
+  const te = (headers.find(([k]) => k.toLowerCase() === 'transfer-encoding') || [, ''])[1].toLowerCase();
+  if (te.includes('chunked')) bodyBuf = dechunk(bodyBuf);
+
+  const ce = (headers.find(([k]) => k.toLowerCase() === 'content-encoding') || [, ''])[1].toLowerCase();
+  try {
+    if (ce.includes('gzip')) bodyBuf = zlib.gunzipSync(bodyBuf);
+    else if (ce.includes('deflate')) bodyBuf = zlib.inflateSync(bodyBuf);
+    else if (ce.includes('br')) bodyBuf = zlib.brotliDecompressSync(bodyBuf);
+  } catch (e) {
+    // 解压失败就保留原始字节
+  }
+
+  const ct = (headers.find(([k]) => k.toLowerCase() === 'content-type') || [, ''])[1];
+  const m = /charset=([\w-]+)/i.exec(ct);
+  let charset = m ? m[1].toLowerCase() : 'utf-8';
+  if (charset === 'gbk' || charset === 'gb2312') charset = 'gb18030';
+
+  let bodyText;
+  try {
+    bodyText = new TextDecoder(charset).decode(bodyBuf);
+  } catch (e) {
+    bodyText = bodyBuf.toString('utf8');
+  }
+
+  const text = headText + '\r\n\r\n' + bodyText;
+  const status = Number((/^HTTP\/[\d.]+\s+(\d+)/.exec(statusLine) || [0, 0])[1]);
+  return { status, ms, text, headers, raw: text };
+}
+
+function dechunk(buf) {
+  const out = [];
+  let i = 0;
+  while (i < buf.length) {
+    const nl = buf.indexOf('\r\n', i);
+    if (nl < 0) break;
+    const size = parseInt(buf.slice(i, nl).toString('latin1').split(';')[0], 16);
+    if (!Number.isFinite(size) || size === 0) break;
+    out.push(buf.slice(nl + 2, nl + 2 + size));
+    i = nl + 2 + size + 2;
+  }
+  return Buffer.concat(out);
+}
+
+module.exports = { send, parseRequest, decodeResponse, dechunk };

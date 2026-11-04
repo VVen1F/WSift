@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+<title>Refract</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="dragger"></div>
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"><span></span></span>Refract</div>
+
+    <button class="nav on" data-page="repeater">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l3 3-3 3"/></svg>
+      复测
+    </button>
+    <button class="nav" data-page="report">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
+      报告
+    </button>
+    <button class="nav" data-page="templates">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="15" width="7" height="5" rx="1.5"/></svg>
+      模板
+    </button>
+    <button class="nav" data-page="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+      设置
+    </button>
+
+    <div class="grow"></div>
+    <div class="ver" id="ver"></div>
+  </aside>
+
+  <main>
+    <!-- 复测 -->
+    <section class="page on" id="page-repeater">
+      <div class="toolbar">
+        <select class="inp" id="scheme"><option value="https">https</option><option value="http">http</option></select>
+        <button class="btn primary" id="btnSend">发送 ⌘↵</button>
+        <button class="btn" id="btnShot">截图</button>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn ghost" id="btnToReport">作为报告材料 →</button>
+      </div>
+
+      <div class="card" style="flex:1">
+        <div class="split">
+          <div class="col" style="display:flex;flex-direction:column;min-width:0">
+            <div class="pane-h">Request</div>
+            <textarea class="editor" id="req" spellcheck="false"></textarea>
+          </div>
+          <div class="col" style="display:flex;flex-direction:column;min-width:0">
+            <div class="pane-h">Response <span id="resMeta" style="margin-left:auto"></span></div>
+            <pre class="code" id="res"></pre>
+          </div>
+        </div>
+        <div class="status">
+          <span id="statusText">就绪</span>
+          <span class="spacer"></span>
+          <span id="shotPath"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 报告 -->
+    <section class="page" id="page-report">
+      <div class="report-grid">
+        <div class="card left">
+          <div class="card-h">报告材料</div>
+          <div class="form">
+            <label class="f">系统名称<input class="inp" id="rProduct" placeholder="示例：某某社区创作平台" /></label>
+            <label class="f">影响地址<input class="inp" id="rUrl" placeholder="https://" /></label>
+            <div class="row">
+              <label class="f">漏洞类型<input class="inp" id="rType" placeholder="越权 / SQL 注入" /></label>
+              <label class="f">等级
+                <select class="inp" id="rLevel">
+                  <option>中</option><option>高</option><option>严重</option><option>低</option>
+                </select>
+              </label>
+            </div>
+            <label class="f">模板<select class="inp" id="rTemplate"></select></label>
+            <label class="f">材料（请求、响应、现象）
+              <textarea class="inp" id="rMaterial" style="min-height:150px" placeholder="粘请求和响应，或写清现象"></textarea>
+            </label>
+            <label class="f">补充要求（可选）
+              <textarea class="inp" id="rExtra" style="min-height:52px" placeholder="例如：强调未授权访问"></textarea>
+            </label>
+            <div class="row">
+              <button class="btn primary" id="btnGen">生成报告</button>
+              <button class="btn" id="btnSave">保存</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card right">
+          <div class="card-h">预览
+            <span class="spacer"></span>
+            <button class="btn ghost" id="btnCopy">复制</button>
+            <button class="btn ghost" id="btnReveal">打开文件夹</button>
+          </div>
+          <div class="md" id="mdPreview"><div class="empty">生成后会显示在这里</div></div>
+          <div class="status"><span id="genStatus">未生成</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 模板 -->
+    <section class="page" id="page-templates">
+      <div class="report-grid">
+        <div class="card left" style="width:260px;flex:0 0 260px">
+          <div class="card-h">模板
+            <span class="spacer"></span>
+            <button class="btn ghost" id="btnTplNew">新建</button>
+          </div>
+          <div class="list" id="tplList"></div>
+        </div>
+        <div class="card right">
+          <div class="card-h">编辑
+            <span class="spacer"></span>
+            <button class="btn ghost" id="btnTplReset">恢复内置</button>
+            <button class="btn primary" id="btnTplSave">保存</button>
+            <button class="btn ghost" id="btnTplDel">删除</button>
+          </div>
+          <div class="form" style="flex:1;min-height:0">
+            <div class="row">
+              <label class="f">名称<input class="inp" id="tplName" /></label>
+              <label class="f">平台<input class="inp" id="tplPlatform" /></label>
+            </div>
+            <label class="f" style="flex:1;min-height:0">正文（Markdown，支持 {{title}} 这类占位符）
+              <textarea class="inp" id="tplBody" style="flex:1;min-height:280px"></textarea>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="page" id="page-settings">
+      <div class="card" style="flex:1">
+        <div class="card-h">设置</div>
+        <div class="settings">
+          <div class="sect">
+            <h3>模型服务</h3>
+            <div id="provList"></div>
+            <div class="row" style="max-width:340px">
+              <button class="btn" id="btnProvAdd">添加服务</button>
+              <button class="btn" id="btnProvTest">测试连接</button>
+            </div>
+          </div>
+
+          <div class="sect">
+            <h3>通用</h3>
+            <div class="row" style="max-width:520px">
+              <label class="f">截图宽度（px）
+                <input class="inp" id="setWidth" type="number" min="800" max="2600" step="40" />
+              </label>
+              <label class="f">发送后自动截图
+                <select class="inp" id="setAutoShot"><option value="0">关</option><option value="1">开</option></select>
+              </label>
+            </div>
+          </div>
+
+          <div class="sect">
+            <h3>更新</h3>
+            <div class="row" style="max-width:520px;align-items:flex-end">
+              <button class="btn" id="btnCheckUpdate">检查更新</button>
+              <button class="btn primary" id="btnDoUpdate" disabled>下载并安装</button>
+            </div>
+            <div style="color:var(--muted);font-size:12px" id="updateText">当前版本 v-</div>
+          </div>
+
+          <div class="sect">
+            <h3>关于</h3>
+            <div style="color:var(--muted);font-size:12px;line-height:1.7">
+              Refract · 复测与报告工作台<br />
+              数据保存在本机，不上传任何请求内容。
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

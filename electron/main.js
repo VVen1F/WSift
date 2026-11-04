@@ -12,6 +12,7 @@ const shot = require('./shot');
 const updater = require('./updater');
 
 let mainWindow = null;
+const SMOKE = process.argv.includes('--smoke');
 
 function windowState() {
   try {
@@ -41,7 +42,23 @@ function createWindow() {
     }
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    if (SMOKE) {
+      setTimeout(() => {
+        console.log('SMOKE_OK');
+        app.exit(0);
+      }, 2000);
+    }
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => console.log('RENDERER_LOADED'));
+  mainWindow.webContents.on('render-process-gone', () => {
+    if (SMOKE) {
+      console.error('RENDERER_GONE');
+      app.exit(1);
+    }
+  });
   mainWindow.on('close', () => {
     try {
       const b = mainWindow.getNormalBounds ? mainWindow.getNormalBounds() : mainWindow.getBounds();

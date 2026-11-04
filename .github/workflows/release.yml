@@ -24,6 +24,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Smoke test
+        run: npx electron . --smoke
+
       - name: Build dmg
         run: npx electron-builder --mac dmg --arm64 --x64 --publish never
 

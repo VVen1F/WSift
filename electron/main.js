@@ -10,8 +10,11 @@ const report = require('./report');
 const llm = require('./llm');
 const shot = require('./shot');
 const updater = require('./updater');
+const browser = require('./browser');
+const remote = require('./remote');
 
 let mainWindow = null;
+let remoteInfo = null;
 const SMOKE = process.argv.includes('--smoke');
 
 function windowState() {
@@ -111,9 +114,16 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   buildMenu();
   createWindow();
+
+  try {
+    const cfg = store.load();
+    remoteInfo = await remote.start({ port: (cfg.ui && cfg.ui.remotePort) || 8765 });
+  } catch (e) {
+    remoteInfo = { error: e.message };
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -124,6 +134,8 @@ app.on('window-all-closed', () => {
 });
 
 /* ---------------- IPC ---------------- */
+
+ipcMain.handle('remote:info', () => remoteInfo || {});
 
 ipcMain.handle('app:info', () => ({
   version: app.getVersion(),
@@ -153,6 +165,77 @@ ipcMain.handle('shot:capture', async (_e, payload) => {
     out
   });
   return res;
+});
+
+const shotDir = () => {
+  const dir = path.join(app.getPath('userData'), 'shots');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+};
+const stampName = (p) => `${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}${p}`;
+
+browser.onDialog(async (info) => {
+  let shot = null;
+  let error = null;
+  try {
+    const r = await shot.captureScreen(path.join(shotDir(), stampName('-dialog.png')));
+    shot = r.path;
+  } catch (e) {
+    error = e.message;
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('browser:dialog', {
+      type: info.type, message: info.message, shot, error
+    });
+  }
+});
+
+ipcMain.handle('browser:status', () => browser.status());
+ipcMain.handle('browser:ensure', async () => {
+  try {
+    await browser.ensure();
+    return { ok: true, ...browser.status() };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+ipcMain.handle('browser:navigate', async (_e, url) => {
+  try {
+    await browser.ensure();
+    const r = await browser.navigate(url);
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+ipcMain.handle('browser:eval', async (_e, code) => {
+  try {
+    return { ok: true, value: await browser.evaluate(code) };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+ipcMain.handle('browser:shot', async () => {
+  try {
+    const buf = await browser.screenshotPage();
+    const file = path.join(shotDir(), stampName('-page.png'));
+    fs.writeFileSync(file, buf);
+    return { ok: true, path: file };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+ipcMain.handle('browser:screen', async () => {
+  try {
+    const r = await shot.captureScreen(path.join(shotDir(), stampName('-screen.png')));
+    return { ok: true, path: r.path };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+ipcMain.handle('browser:close', () => {
+  browser.shutdown();
+  return { ok: true };
 });
 
 ipcMain.handle('settings:get', () => store.load());

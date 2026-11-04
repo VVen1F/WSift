@@ -181,7 +181,7 @@ function go(page) {
 
 $$('.nav').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
 
-/* ---------------- 复测 ---------------- */
+/* ---------------- 测试 ---------------- */
 
 const SAMPLE = 'GET / HTTP/1.1\nHost: example.com\nUser-Agent: Mozilla/5.0\nAccept: */*\n\n';
 
@@ -408,6 +408,17 @@ $('#btnTplReset').addEventListener('click', async () => {
 
 /* ---------------- 设置 ---------------- */
 
+const MODELS_CACHE = {};
+
+function modelField(p) {
+  const list = MODELS_CACHE[p.id];
+  if (list && list.length) {
+    const opts = list.map((m) => `<option${m === p.model ? ' selected' : ''}>${esc(m)}</option>`).join('');
+    return `<select class="inp" data-k="model">${opts}</select>`;
+  }
+  return `<input class="inp" data-k="model" value="${esc(p.model)}" />`;
+}
+
 function renderProviders() {
   const box = $('#provList');
   box.innerHTML = S.settings.providers
@@ -424,13 +435,14 @@ function renderProviders() {
       </div>
       <div class="row">
         <label class="f">Base URL<input class="inp" data-k="baseURL" value="${esc(p.baseURL)}" /></label>
-        <label class="f">模型<input class="inp" data-k="model" value="${esc(p.model)}" /></label>
+        <label class="f">模型${modelField(p)}</label>
       </div>
       <label class="f">API Key（只存本机）
         <input class="inp" data-k="apiKey" type="password" value="${esc(p.apiKey)}" />
       </label>
-      <div class="row" style="max-width:220px">
+      <div class="row" style="max-width:340px">
         <button class="btn ghost" data-act="use">设为默认</button>
+        <button class="btn ghost" data-act="models">拉取模型</button>
         <button class="btn ghost" data-act="del">删除</button>
       </div>
     </div>`
@@ -450,6 +462,17 @@ function renderProviders() {
       persist();
       renderProviders();
       toast('已设为默认');
+    });
+    el.querySelector('[data-act="models"]').addEventListener('click', async () => {
+      toast('拉取中…');
+      const r = await window.api.models(S.settings.providers[i]);
+      if (r.ok) {
+        MODELS_CACHE[S.settings.providers[i].id] = r.models;
+        renderProviders();
+        toast(`拉到 ${r.models.length} 个模型`);
+      } else {
+        toast('拉取失败：' + r.error, true);
+      }
     });
     el.querySelector('[data-act="del"]').addEventListener('click', () => {
       S.settings.providers.splice(i, 1);
@@ -536,6 +559,74 @@ $('#btnDoUpdate').addEventListener('click', async () => {
   setTimeout(() => window.api.update.relaunch(), 600);
 });
 
+
+/* ---------------- 浏览器 ---------------- */
+
+function showBrowserShot(path, note) {
+  const img = $('#bwImg');
+  const base = window.api.imageUrl ? window.api.imageUrl(path) : 'file://' + path;
+  img.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+  img.hidden = false;
+  $('#bwEmpty').style.display = 'none';
+  if (note) $('#bwInfo').textContent = note;
+}
+
+async function bwPageShot() {
+  $('#bwLog').textContent = '截图中…';
+  const r = await window.api.browser.shot();
+  if (r.ok) {
+    showBrowserShot(r.path, '页面截图');
+    $('#bwLog').textContent = '已保存 ' + r.path;
+  } else {
+    $('#bwLog').textContent = '截图失败：' + r.error;
+  }
+}
+
+async function bwScreenShot() {
+  $('#bwLog').textContent = '整屏截图中…';
+  const r = await window.api.browser.screen();
+  if (r.ok) {
+    showBrowserShot(r.path, '整屏截图');
+    $('#bwLog').textContent = '已保存 ' + r.path;
+    S.images.push(r.path);
+  } else {
+    $('#bwLog').textContent = '截图失败：' + r.error;
+  }
+}
+
+function bindBrowser() {
+  if (!window.api.browser) return;
+  $('#bwGo').addEventListener('click', async () => {
+    const url = $('#bwUrl').value.trim();
+    if (!url) return;
+    $('#bwLog').textContent = '打开中…';
+    const r = await window.api.browser.go(url);
+    if (!r.ok) {
+      $('#bwLog').textContent = '打开失败：' + r.error;
+      return;
+    }
+    $('#bwLog').textContent = '已打开 · ' + (r.ready || '');
+    await bwPageShot();
+  });
+  $('#bwUrl').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') $('#bwGo').click();
+  });
+  $('#bwShot').addEventListener('click', bwPageShot);
+  $('#bwScreen').addEventListener('click', bwScreenShot);
+  $('#bwClose').addEventListener('click', async () => {
+    await window.api.browser.close();
+    $('#bwLog').textContent = '已关闭';
+  });
+
+  if (window.api.browser && window.api.browser.onDialog) {
+    window.api.browser.onDialog((d) => {
+      $('#bwLog').textContent = `捕获弹窗（${d.type || 'alert'}）：${d.message}`;
+      if (d.shot) showBrowserShot(d.shot, '弹窗整屏截图');
+      if (d.error) $('#bwLog').textContent += ' · 截图失败：' + d.error;
+      toast('检测到弹窗，已整屏截图');
+    });
+  }
+}
 
 /* ---------------- 首页 ---------------- */
 
@@ -650,18 +741,19 @@ function autoGrow() {
 function bindHome() {
   emptyNode = $('#chatEmpty');
   const page = $('#page-home');
-  const drop = () => $('#drop');
+  const comp = $('.composer');
 
   ['dragenter', 'dragover'].forEach((t) =>
-    page.addEventListener(t, (e) => { e.preventDefault(); const d = drop(); if (d) d.classList.add('over'); })
+    comp.addEventListener(t, (e) => { e.preventDefault(); comp.classList.add('over'); })
   );
   ['dragleave', 'drop'].forEach((t) =>
-    page.addEventListener(t, (e) => { e.preventDefault(); const d = drop(); if (d) d.classList.remove('over'); })
+    comp.addEventListener(t, (e) => { e.preventDefault(); comp.classList.remove('over'); })
   );
-  page.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
-  page.addEventListener('click', (e) => {
-    if (e.target.closest('#drop')) $('#filePick').click();
-  });
+  comp.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+
+  // 页面别的地方拖进来也不要触发浏览器打开文件
+  ['dragover', 'drop'].forEach((t) => page.addEventListener(t, (e) => e.preventDefault()));
+  $('#btnAttach').addEventListener('click', () => $('#filePick').click());
   $('#filePick').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
 
   $('#btnChatSend').addEventListener('click', () => sendChat());
@@ -726,11 +818,31 @@ async function boot() {
   $('#updateText').textContent = `当前版本 v${S.info.version}`;
   $('#rLevel').value = '中';
   $('#protocol').value = (S.settings.ui && S.settings.ui.protocol) || 'auto';
+  const ri = await window.api.remoteInfo();
+  if (ri && ri.url) {
+    $('#remoteText').innerHTML = '局域网内其他设备打开：<br><b>' + esc(ri.url) + '</b>';
+    $('#remoteText').onclick = () => window.api.clipboard(ri.url);
+  } else if (ri && ri.error) {
+    $('#remoteText').textContent = '未启动：' + ri.error;
+  }
+  $('#setPort').value = (S.settings.ui && S.settings.ui.remotePort) || 8765;
+  $('#setPort').addEventListener('change', (e) => {
+    S.settings.ui.remotePort = Number(e.target.value) || 8765;
+    persist();
+    toast('端口已保存，重启后生效');
+  });
+  $('#btnCopyRemote').addEventListener('click', async () => {
+    const txt = (ri && ri.url) || '';
+    if (!txt) return toast('还没有地址', true);
+    try { await navigator.clipboard.writeText(txt); } catch (e) { await window.api.clipboard(txt); }
+    toast('已复制');
+  });
   $('#protocol').addEventListener('change', (e) => {
     S.settings.ui.protocol = e.target.value;
     persist();
   });
   bindHome();
+  bindBrowser();
   renderStats();
 }
 

@@ -5,6 +5,8 @@ let seq = 0;
 
 contextBridge.exposeInMainWorld('api', {
   info: () => ipcRenderer.invoke('app:info'),
+  remoteInfo: () => ipcRenderer.invoke('remote:info'),
+  imageUrl: (p) => 'file://' + p,
   send: (payload) => ipcRenderer.invoke('http:send', payload),
   capture: (payload) => ipcRenderer.invoke('shot:capture', payload),
 
@@ -63,6 +65,21 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   clipboard: (text) => ipcRenderer.invoke('clipboard:write', text),
+
+  browser: {
+    status: () => ipcRenderer.invoke('browser:status'),
+    open: () => ipcRenderer.invoke('browser:ensure'),
+    go: (url) => ipcRenderer.invoke('browser:navigate', url),
+    eval: (code) => ipcRenderer.invoke('browser:eval', code),
+    shot: () => ipcRenderer.invoke('browser:shot'),
+    screen: () => ipcRenderer.invoke('browser:screen'),
+    close: () => ipcRenderer.invoke('browser:close'),
+    onDialog(cb) {
+      const h = (_e, p) => cb(p);
+      ipcRenderer.on('browser:dialog', h);
+      return () => ipcRenderer.off('browser:dialog', h);
+    }
+  },
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),

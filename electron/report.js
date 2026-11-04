@@ -42,7 +42,7 @@ function buildMessages({ material, template, meta = {} }) {
     `危害等级：${meta.level || '未判定'}`,
     `日期：${meta.date || today()}`,
     '',
-    '材料（请求、响应、现象、复测记录）：',
+    '材料（请求、响应、现象、测试记录）：',
     material || '（无）'
   ].join('\n');
 
@@ -56,7 +56,7 @@ function buildMessages({ material, template, meta = {} }) {
   ];
 }
 
-const CHAT_SYSTEM = `你是 Refract 里的助手，帮用户做漏洞复现和写报告。
+const CHAT_SYSTEM = `你是 Refract 里的助手，帮用户做漏洞测试和写报告。
 
 【回答】
 - 简洁直接，不寒暄，不复述用户说过的话

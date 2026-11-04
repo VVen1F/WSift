@@ -114,10 +114,13 @@ async function chatAnthropic(provider, messages, onDelta, signal, temperature, m
 }
 
 async function listModels(provider) {
-  const url = provider.kind === 'anthropic'
-    ? joinURL(provider.baseURL, '/v1/models')
-    : joinURL(provider.baseURL, '/models');
-  const res = await fetch(url, { headers: authHeaders(provider) });
+  const url = provider.modelsURL ||
+    (provider.kind === 'anthropic' ? joinURL(provider.baseURL, '/v1/models') : joinURL(provider.baseURL, '/models'));
+  // 智谱的 models 走 OpenAI 风格鉴权
+  const headers = provider.modelsURL
+    ? { 'content-type': 'application/json', authorization: `Bearer ${provider.apiKey || ''}` }
+    : authHeaders(provider);
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`获取模型失败 ${res.status}`);
   const json = await res.json();
   const arr = json.data || json.models || [];

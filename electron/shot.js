@@ -55,4 +55,25 @@ async function capture({ request, response, width = 1600, out }) {
   }
 }
 
-module.exports = { capture };
+/**
+ * 整屏截图：把浏览器外壳、alert 弹窗一起拍进去。
+ * macOS 用 screencapture，其它平台退回 desktopCapturer。
+ */
+async function captureScreen(out) {
+  const { execFileSync } = require('child_process');
+  const target = out || path.join(app.getPath('temp'), `refract-screen-${Date.now()}.png`);
+  if (process.platform === 'darwin') {
+    execFileSync('screencapture', ['-x', '-o', target]);
+    return { path: target };
+  }
+  const { desktopCapturer, screen } = require('electron');
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: screen.getPrimaryDisplay().size
+  });
+  if (!sources.length) throw new Error('没有可截的屏幕');
+  fs.writeFileSync(target, sources[0].thumbnail.toPNG());
+  return { path: target };
+}
+
+module.exports = { capture, captureScreen };

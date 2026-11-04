@@ -20,6 +20,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l3 3-3 3"/></svg>
       测试
     </button>
+    <button class="nav" data-page="browser">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5S14.4 18.2 12 20.5c-2.4-2.3-3.6-5.2-3.6-8.5S9.6 5.8 12 3.5z"/></svg>
+      浏览器
+    </button>
     <button class="nav" data-page="report">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
       报告
@@ -42,18 +46,15 @@
     <section class="page on" id="page-home">
       <div class="home">
         <div class="home-top">
-          <h1>今天要复现什么？</h1>
-          <p class="sub">把请求拖进来，或者直接说要什么报告。</p>
+          <h1>今天要做什么？</h1>
+          <p class="sub">把请求拖进输入框，或者直接说你要什么。</p>
         </div>
 
         <div class="chat" id="chatLog">
           <div class="chat-empty" id="chatEmpty">
-            <div class="drop" id="drop">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 16V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3.5"/>
-              </svg>
-              <div class="drop-t">把 <code>.txt</code> <code>.http</code> <code>.har</code> 拖到这里</div>
-              <div class="drop-s">也可以点一下选文件</div>
+            <div class="hint">
+              <div class="hint-t">把请求拖进下面的输入框</div>
+              <div class="hint-s">支持 .txt / .http / .har，也可以直接说你要什么</div>
             </div>
           </div>
         </div>
@@ -61,7 +62,12 @@
         <div class="home-bottom">
           <div class="chips" id="chips"></div>
           <div class="composer">
-            <textarea id="chatInput" rows="1" placeholder="让 AI 写报告、看风险，或回答关于这次复现的问题"></textarea>
+            <button class="attach" id="btnAttach" title="添加文件">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 11.5 12.4 19a5 5 0 0 1-7.1-7.1l8-8a3.4 3.4 0 0 1 4.8 4.8l-7.9 8a1.8 1.8 0 0 1-2.5-2.5l7.1-7.1"/>
+              </svg>
+            </button>
+            <textarea id="chatInput" rows="1" placeholder="拖入请求，或让 AI 写报告、看风险"></textarea>
             <button class="btn primary" id="btnChatSend">发送</button>
           </div>
           <div class="quick">
@@ -107,6 +113,26 @@
           <span class="spacer"></span>
           <span id="shotPath"></span>
         </div>
+      </div>
+    </section>
+
+    <!-- 浏览器 -->
+    <section class="page" id="page-browser">
+      <div class="toolbar">
+        <input class="inp url" id="bwUrl" placeholder="https://example.com/?q=<script>alert(1)</script>" spellcheck="false" />
+        <button class="btn primary" id="bwGo">打开</button>
+        <button class="btn" id="bwShot">页面截图</button>
+        <button class="btn" id="bwScreen">整屏截图</button>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="bwClose">关闭浏览器</button>
+      </div>
+      <div class="card" style="flex:1">
+        <div class="pane-h">预览 <span id="bwInfo" style="margin-left:auto"></span></div>
+        <div class="bw-body" id="bwBody">
+          <div class="empty" id="bwEmpty">打开一个地址，截图会出现在这里</div>
+          <img id="bwImg" alt="" hidden />
+        </div>
+        <div class="status"><span id="bwLog">就绪</span></div>
       </div>
     </section>
 
@@ -205,6 +231,15 @@
               <label class="f">发送后自动截图
                 <select class="inp" id="setAutoShot"><option value="0">关</option><option value="1">开</option></select>
               </label>
+            </div>
+          </div>
+
+          <div class="sect">
+            <h3>远程访问</h3>
+            <div style="color:var(--muted);font-size:12px;line-height:1.7" id="remoteText">启动后显示地址</div>
+            <div class="row" style="max-width:420px;align-items:flex-end">
+              <label class="f">端口<input class="inp" id="setPort" type="number" min="1024" max="65535" step="1" /></label>
+              <button class="btn" id="btnCopyRemote">复制地址</button>
             </div>
           </div>
 

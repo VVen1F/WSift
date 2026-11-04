@@ -6,7 +6,16 @@ const { dataDir } = require('./paths');
 const DEFAULTS = {
   providers: [
     {
-      id: 'default',
+      id: 'glm',
+      name: '智谱 GLM',
+      kind: 'anthropic',
+      baseURL: 'https://open.bigmodel.cn/api/anthropic',
+      modelsURL: 'https://open.bigmodel.cn/api/paas/v4/models',
+      apiKey: '',
+      model: 'glm-4.6'
+    },
+    {
+      id: 'openai',
       name: 'OpenAI 兼容',
       kind: 'openai',
       baseURL: 'https://api.openai.com/v1',
@@ -14,7 +23,7 @@ const DEFAULTS = {
       model: 'gpt-4o-mini'
     }
   ],
-  activeProviderId: 'default',
+  activeProviderId: 'glm',
   report: {
     author: '',
     platform: '通用',
@@ -24,7 +33,8 @@ const DEFAULTS = {
     theme: 'system',
     shotWidth: 1600,
     autoShot: false,
-    protocol: 'auto'
+    protocol: 'auto',
+    remotePort: 8765
   },
   stats: { shots: 0, reports: 0 }
 };

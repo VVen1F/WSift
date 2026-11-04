@@ -22,7 +22,9 @@ const stub = {
   },
   BrowserWindow: class {
     constructor() { this.webContents = { on: () => {}, send: () => {}, executeJavaScript: () => Promise.resolve(0), setWindowOpenHandler: () => {} }; }
-    once() {} loadFile() { return Promise.resolve(); } show() {} isDestroyed() { return false; } destroy() {}
+    once() {} on() {} getBounds() { return { width: 1180, height: 780 }; }
+    getNormalBounds() { return { width: 1180, height: 780 }; }
+    loadFile() { return Promise.resolve(); } show() {} isDestroyed() { return false; } destroy() {}
   },
   ipcMain: {
     handle: (ch, fn) => handlers.set(ch, fn),

@@ -481,6 +481,8 @@ $('#setAutoShot').addEventListener('change', (e) => {
   persist();
 });
 
+$('#btnDataDir').addEventListener('click', () => window.api.openPath(S.info.userData));
+
 /* ---------------- 更新 ---------------- */
 
 $('#btnCheckUpdate').addEventListener('click', async () => {

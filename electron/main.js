@@ -13,10 +13,20 @@ const updater = require('./updater');
 
 let mainWindow = null;
 
+function windowState() {
+  try {
+    const f = path.join(app.getPath('userData'), 'window.json');
+    return JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch (e) {
+    return { width: 1180, height: 780 };
+  }
+}
+
 function createWindow() {
+  const bounds = windowState();
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 780,
+    width: bounds.width,
+    height: bounds.height,
     minWidth: 900,
     minHeight: 600,
     titleBarStyle: 'hiddenInset',
@@ -32,6 +42,14 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.on('close', () => {
+    try {
+      const b = mainWindow.getNormalBounds ? mainWindow.getNormalBounds() : mainWindow.getBounds();
+      fs.writeFileSync(path.join(app.getPath('userData'), 'window.json'), JSON.stringify(b));
+    } catch (e) {
+      /* 忽略 */
+    }
+  });
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

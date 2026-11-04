@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('api', {
 
   saveReport: (payload) => ipcRenderer.invoke('report:save', payload),
   compose: (payload) => ipcRenderer.invoke('report:compose', payload),
+  chatMessages: (payload) => ipcRenderer.invoke('report:chat', payload),
 
   update: {
     check: () => ipcRenderer.invoke('update:check'),

@@ -12,9 +12,13 @@
   <aside class="sidebar">
     <div class="brand"><span class="dot"><span></span></span>Refract</div>
 
-    <button class="nav on" data-page="repeater">
+    <button class="nav on" data-page="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6.5 10.5V20h11v-9.5"/></svg>
+      首页
+    </button>
+    <button class="nav" data-page="repeater">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l3 3-3 3"/></svg>
-      复测
+      测试
     </button>
     <button class="nav" data-page="report">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
@@ -34,13 +38,56 @@
   </aside>
 
   <main>
-    <!-- 复测 -->
-    <section class="page on" id="page-repeater">
+    <!-- 首页 -->
+    <section class="page on" id="page-home">
+      <div class="home">
+        <div class="home-top">
+          <h1>今天要复现什么？</h1>
+          <p class="sub">把请求拖进来，或者直接说要什么报告。</p>
+        </div>
+
+        <div class="chat" id="chatLog">
+          <div class="chat-empty" id="chatEmpty">
+            <div class="drop" id="drop">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3.5"/>
+              </svg>
+              <div class="drop-t">把 <code>.txt</code> <code>.http</code> <code>.har</code> 拖到这里</div>
+              <div class="drop-s">也可以点一下选文件</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="home-bottom">
+          <div class="chips" id="chips"></div>
+          <div class="composer">
+            <textarea id="chatInput" rows="1" placeholder="让 AI 写报告、看风险，或回答关于这次复现的问题"></textarea>
+            <button class="btn primary" id="btnChatSend">发送</button>
+          </div>
+          <div class="quick">
+            <button class="btn ghost" data-q="report">写一份报告</button>
+            <button class="btn ghost" data-q="risk">看看有没有风险</button>
+            <button class="btn ghost" data-q="test">去测试接口</button>
+            <span class="spacer"></span>
+            <span class="stats" id="homeStats"></span>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="filePick" multiple accept=".txt,.http,.md,.har,.json" hidden />
+    </section>
+
+    <!-- 测试 -->
+    <section class="page" id="page-repeater">
       <div class="toolbar">
         <select class="inp" id="scheme"><option value="https">https</option><option value="http">http</option></select>
+        <select class="inp" id="protocol">
+          <option value="auto">自动协议</option>
+          <option value="http1.1">HTTP/1.1</option>
+          <option value="h2">HTTP/2</option>
+        </select>
         <button class="btn primary" id="btnSend">发送 ⌘↵</button>
         <button class="btn" id="btnShot">截图</button>
-        <span class="spacer" style="flex:1"></span>
+        <span class="spacer"></span>
         <button class="btn ghost" id="btnToReport">作为报告材料 →</button>
       </div>
 
@@ -173,7 +220,7 @@
           <div class="sect">
             <h3>关于</h3>
             <div style="color:var(--muted);font-size:12px;line-height:1.7">
-              Refract · 复测与报告工作台<br />
+              Refract · 漏洞测试与报告工作台<br />
               数据保存在本机，不上传任何请求内容。
             </div>
             <div class="row" style="max-width:220px">

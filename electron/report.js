@@ -56,6 +56,34 @@ function buildMessages({ material, template, meta = {} }) {
   ];
 }
 
+const CHAT_SYSTEM = `你是 Refract 里的助手，帮用户做漏洞复现和写报告。
+
+【回答】
+- 简洁直接，不寒暄，不复述用户说过的话
+- 先给结论，再给理由；能一句说清就不写第二句
+- 用户没给的信息不要编造，不确定就说不确定
+- 不要出现“作为 AI”“我来帮你”这类话
+
+【写报告】
+用户要求写报告时，直接输出完整 Markdown 正文，不要用代码块包住整篇，
+标题、结构、语气严格遵守下面的写作约束。`;
+
+function buildChatMessages({ material, template, meta = {}, question }) {
+  const facts = [
+    meta.product ? `系统名称：${meta.product}` : '',
+    meta.url ? `影响地址：${meta.url}` : '',
+    meta.type ? `漏洞类型：${meta.type}` : '',
+    meta.level ? `危害等级：${meta.level}` : '',
+    template ? `报告模板：\n${template}` : '',
+    material ? `材料：\n${material}` : ''
+  ].filter(Boolean).join('\n\n');
+
+  return [
+    { role: 'system', content: CHAT_SYSTEM + '\n\n' + SYSTEM_PROMPT },
+    { role: 'user', content: (facts ? facts + '\n\n' : '') + '用户：' + (question || '') }
+  ];
+}
+
 function fillTemplate(body, vars) {
   return String(body || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] == null ? '' : String(vars[k])));
 }
@@ -98,4 +126,4 @@ function save({ markdown, images = [], title = '', baseDir }) {
   return { dir, md: mdPath, images: written };
 }
 
-module.exports = { SYSTEM_PROMPT, buildMessages, fillTemplate, save, slugify, today };
+module.exports = { SYSTEM_PROMPT, CHAT_SYSTEM, buildMessages, buildChatMessages, fillTemplate, save, slugify, today };

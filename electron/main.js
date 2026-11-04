@@ -134,8 +134,8 @@ ipcMain.handle('app:info', () => ({
 
 ipcMain.handle('http:send', async (_e, payload) => {
   try {
-    const r = await http.send(payload.raw, { scheme: payload.scheme, timeout: payload.timeout });
-    return { ok: true, status: r.status, ms: r.ms, text: r.text };
+    const r = await http.send(payload.raw, { scheme: payload.scheme, protocol: payload.protocol, timeout: payload.timeout });
+    return { ok: true, status: r.status, ms: r.ms, text: r.text, protocol: r.protocol || 'h1' };
   } catch (err) {
     return { ok: false, text: `HTTP/1.1 0 CONNECTION_ERROR\r\n\r\n${err.message}`, error: err.message };
   }
@@ -165,6 +165,7 @@ ipcMain.handle('templates:reset', () => templates.reset());
 
 ipcMain.handle('report:save', (_e, payload) => report.save(payload));
 ipcMain.handle('report:compose', (_e, payload) => report.buildMessages(payload));
+ipcMain.handle('report:chat', (_e, payload) => report.buildChatMessages(payload));
 
 ipcMain.handle('llm:models', async (_e, provider) => {
   try {

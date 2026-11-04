@@ -28,6 +28,23 @@ function header(headers, name) {
 }
 
 async function send(raw, opts = {}) {
+  const protocol = opts.protocol || 'auto';
+  const wantH2 = protocol === 'h2' || (protocol === 'auto' && (opts.scheme || 'https') === 'https');
+
+  if (wantH2) {
+    try {
+      const h2 = require('./http2');
+      return await h2.send(raw, opts);
+    } catch (err) {
+      if (protocol === 'h2') throw err;
+      // 自动模式：只在「还没拿到响应」时回落，避免写请求被重复发送
+      if (!(err.code === 'NO_H2' || err.beforeResponse)) throw err;
+    }
+  }
+  return sendH1(raw, opts);
+}
+
+async function sendH1(raw, opts = {}) {
   const timeout = opts.timeout || 30000;
   const req = parseRequest(raw);
 
@@ -83,7 +100,9 @@ async function send(raw, opts = {}) {
     connect();
   });
 
-  return decodeResponse(res, Date.now() - started);
+  const out = decodeResponse(res, Date.now() - started);
+  out.protocol = 'h1';
+  return out;
 }
 
 function decodeResponse(buf, ms) {

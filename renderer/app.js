@@ -189,15 +189,17 @@ async function doSend() {
   const raw = $('#req').value;
   if (!raw.trim()) return toast('请求为空', true);
   const scheme = $('#scheme').value;
+  const protocol = $('#protocol') ? $('#protocol').value : 'auto';
   $('#statusText').textContent = '发送中…';
-  const r = await window.api.send({ raw, scheme });
+  const r = await window.api.send({ raw, scheme, protocol });
   S.lastReq = raw;
   S.lastRes = r.text || '';
   $('#res').innerHTML = highlight(S.lastRes);
+  const proto = (r.protocol || 'h1').toUpperCase();
   $('#statusText').innerHTML = r.ok
-    ? `<span class="ok">${r.status}</span> · ${r.ms} ms`
+    ? `<span class="ok">${r.status}</span> · ${r.ms} ms · ${proto}`
     : `<span class="bad">失败</span> · ${esc(r.error || '')}`;
-  $('#resMeta').textContent = r.ok ? `${r.ms} ms` : '';
+  $('#resMeta').textContent = r.ok ? `${r.ms} ms · ${proto}` : '';
   if (S.settings.ui.autoShot) doShot();
 }
 
@@ -211,6 +213,9 @@ async function doShot() {
       width: Number(S.settings.ui.shotWidth) || 1600
     });
     S.images.push(r.path);
+    S.settings.stats.shots = (S.settings.stats.shots || 0) + 1;
+    persist();
+    renderStats();
     $('#shotPath').textContent = '已保存 ' + r.path.split('/').pop();
     toast('截图已保存');
   } catch (e) {
@@ -313,6 +318,9 @@ async function saveReport() {
   const md = S.reportMd.replace(/\s+$/, '') + imagesSection();
   const r = await window.api.saveReport({ markdown: md, images: S.images, title });
   S.reportDir = r.dir;
+  S.settings.stats.reports = (S.settings.stats.reports || 0) + 1;
+  persist();
+  renderStats();
   toast('已保存到 ' + r.dir);
   $('#btnReveal').disabled = false;
   return r;
@@ -528,6 +536,173 @@ $('#btnDoUpdate').addEventListener('click', async () => {
   setTimeout(() => window.api.update.relaunch(), 600);
 });
 
+
+/* ---------------- 首页 ---------------- */
+
+const HOME = { files: [], msgs: [], busy: false };
+let emptyNode = null;
+
+function renderStats() {
+  const st = S.settings.stats || { shots: 0, reports: 0 };
+  const el = $('#homeStats');
+  if (el) el.textContent = `截图 ${st.shots || 0} · 报告 ${st.reports || 0} · 模板 ${S.templates.length}`;
+}
+
+function renderChips() {
+  const box = $('#chips');
+  if (!box) return;
+  box.innerHTML = HOME.files
+    .map((f, i) => `<span class="chip"><b>${esc(f.name)}</b><i data-i="${i}">×</i></span>`)
+    .join('');
+  box.querySelectorAll('i').forEach((el) => {
+    el.addEventListener('click', () => {
+      HOME.files.splice(Number(el.dataset.i), 1);
+      renderChips();
+    });
+  });
+}
+
+async function addFiles(list) {
+  for (const f of Array.from(list || [])) {
+    if (f.size > 400 * 1024) {
+      toast(f.name + ' 太大，跳过', true);
+      continue;
+    }
+    try {
+      HOME.files.push({ name: f.name, text: await f.text() });
+    } catch (e) {
+      toast('读取 ' + f.name + ' 失败', true);
+    }
+  }
+  if (HOME.files.length > 3) HOME.files = HOME.files.slice(-3);
+  renderChips();
+}
+
+function renderHome() {
+  const log = $('#chatLog');
+  if (!HOME.msgs.length) {
+    if (!log.contains(emptyNode) && emptyNode) log.innerHTML = '', log.appendChild(emptyNode);
+    return;
+  }
+  log.innerHTML = HOME.msgs
+    .map((m, i) => {
+      if (m.role === 'user') {
+        return `<div class="msg user"><div class="who">你</div><div class="bubble">${esc(m.text)}</div></div>`;
+      }
+      return `<div class="msg ai"><div class="who">Refract</div><div class="bubble md">${mdToHtml(m.text || '')}</div>
+        <div class="acts">
+          <button class="btn ghost" data-act="copy" data-i="${i}">复制</button>
+          <button class="btn ghost" data-act="save" data-i="${i}">保存为报告</button>
+        </div></div>`;
+    })
+    .join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+async function sendChat(text) {
+  const q = (text != null ? text : $('#chatInput').value).trim();
+  if (!q || HOME.busy) return;
+  const prov = activeProvider();
+  if (!prov || !prov.apiKey) return toast('先在设置里配置模型和 API Key', true);
+
+  HOME.msgs.push({ role: 'user', text: q });
+  const ai = { role: 'ai', text: '' };
+  HOME.msgs.push(ai);
+  if (text == null) $('#chatInput').value = '';
+  autoGrow();
+  HOME.busy = true;
+  renderHome();
+
+  const material = HOME.files.map((f) => `【${f.name}】\n${f.text}`).join('\n\n');
+  const tpl = S.templates.find((t) => t.id === $('#rTemplate').value) || S.templates[0];
+  const messages = await window.api.chatMessages({
+    material,
+    template: tpl ? tpl.body : '',
+    meta: {
+      product: $('#rProduct').value,
+      url: $('#rUrl').value,
+      type: $('#rType').value,
+      level: $('#rLevel').value
+    },
+    question: q
+  });
+
+  let raf = 0;
+  window.api.chat({
+    provider: prov,
+    messages,
+    onDelta: (d) => {
+      ai.text += d;
+      if (!raf) raf = setTimeout(() => { raf = 0; renderHome(); }, 90);
+    },
+    onDone: (t) => { ai.text = t || ai.text; HOME.busy = false; renderHome(); },
+    onError: (msg) => { ai.text = '出错了：' + msg; HOME.busy = false; renderHome(); }
+  });
+}
+
+function autoGrow() {
+  const ta = $('#chatInput');
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+}
+
+function bindHome() {
+  emptyNode = $('#chatEmpty');
+  const page = $('#page-home');
+  const drop = () => $('#drop');
+
+  ['dragenter', 'dragover'].forEach((t) =>
+    page.addEventListener(t, (e) => { e.preventDefault(); const d = drop(); if (d) d.classList.add('over'); })
+  );
+  ['dragleave', 'drop'].forEach((t) =>
+    page.addEventListener(t, (e) => { e.preventDefault(); const d = drop(); if (d) d.classList.remove('over'); })
+  );
+  page.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+  page.addEventListener('click', (e) => {
+    if (e.target.closest('#drop')) $('#filePick').click();
+  });
+  $('#filePick').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
+
+  $('#btnChatSend').addEventListener('click', () => sendChat());
+  $('#chatInput').addEventListener('input', autoGrow);
+  $('#chatInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+
+  document.querySelectorAll('.quick .btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      const q = b.dataset.q;
+      if (q === 'test') return go('repeater');
+      if (q === 'report') return sendChat('根据附件写一份完整的漏洞报告。');
+      if (q === 'risk') return sendChat('看看这个请求或这段流量有没有风险，按严重程度列出来。');
+    });
+  });
+
+  $('#chatLog').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const m = HOME.msgs[Number(btn.dataset.i)];
+    if (!m) return;
+    if (btn.dataset.act === 'copy') {
+      try { await navigator.clipboard.writeText(m.text); } catch (err) { await window.api.clipboard(m.text); }
+      toast('已复制');
+    }
+    if (btn.dataset.act === 'save') {
+      const r = await window.api.saveReport({
+        markdown: m.text,
+        images: S.images,
+        title: ($('#rProduct').value || 'report').slice(0, 40)
+      });
+      S.reportDir = r.dir;
+      S.settings.stats.reports = (S.settings.stats.reports || 0) + 1;
+      persist();
+      renderStats();
+      toast('已保存到 ' + r.dir);
+    }
+  });
+}
+
 /* ---------------- 启动 ---------------- */
 
 async function boot() {
@@ -550,6 +725,13 @@ async function boot() {
   $('#btnReveal').disabled = true;
   $('#updateText').textContent = `当前版本 v${S.info.version}`;
   $('#rLevel').value = '中';
+  $('#protocol').value = (S.settings.ui && S.settings.ui.protocol) || 'auto';
+  $('#protocol').addEventListener('change', (e) => {
+    S.settings.ui.protocol = e.target.value;
+    persist();
+  });
+  bindHome();
+  renderStats();
 }
 
 boot();

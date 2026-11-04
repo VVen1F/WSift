@@ -59,10 +59,14 @@ function ok(name, cond, extra) {
 
   ok('http.send 导出', typeof httpc.send === 'function');
   ok('settings 默认值', store.load().providers.length >= 1);
+  ok('settings 含统计', typeof store.load().stats === 'object');
   ok('模板内置 5 套', templates.list().length === 5);
   ok('模板占位符替换', report.fillTemplate('# {{title}}', { title: 'T' }) === '# T');
   ok('报告 prompt 有标题约束', report.SYSTEM_PROMPT.includes('固定句式'));
   ok('报告 prompt 禁 AI 腔', report.SYSTEM_PROMPT.includes('值得注意的是'));
+  const chatMsgs = report.buildChatMessages({ material: 'GET / HTTP/1.1', template: '# {{title}}', meta: { product: 'X' }, question: '写报告' });
+  ok('对话 prompt 含写作约束', chatMsgs[0].content.includes('固定句式') && chatMsgs[0].content.includes('简洁直接'));
+  ok('对话 prompt 带材料', chatMsgs[1].content.includes('GET / HTTP/1.1'));
   ok('LLM joinURL', llm.joinURL('https://x/v1/', '/chat') === 'https://x/v1/chat');
   ok('版本比较', updater.cmp('0.1.0', '0.1.1') === -1 && updater.cmp('1.0.0', '0.9.9') === 1);
 
@@ -86,6 +90,20 @@ function ok(name, cond, extra) {
   const missing = await httpc.send('GET / HTTP/1.1\n\n', { scheme: 'http' }).catch((e) => e.message);
   ok('缺 Host 抛错', String(missing).includes('Host'));
   srv.close();
+
+  console.log('\n[HTTP/2]');
+  const http2 = require('http2');
+  const s2 = http2.createServer((req, res) => {
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ proto: req.httpVersion, url: req.url }));
+  });
+  await new Promise((r) => s2.listen(0, '127.0.0.1', r));
+  const p2 = s2.address().port;
+  const h2 = await httpc.send(`GET /p2 HTTP/1.1\nHost: 127.0.0.1:${p2}\n\n`, { scheme: 'http', protocol: 'h2' });
+  ok('h2 请求成功', h2.status === 200 && h2.protocol === 'h2');
+  ok('h2 状态行', h2.text.startsWith('HTTP/2 200'));
+  ok('h2 body 透传', h2.text.includes('"proto":"2.0"'));
+  s2.close();
 
   console.log('\n[报告保存]');
   const saved = report.save({ markdown: '# t', images: [], title: 'demo', baseDir: path.join(process.env.REFRACT_DATA_DIR, 'reports') });

@@ -23,8 +23,10 @@ const DEFAULTS = {
   ui: {
     theme: 'system',
     shotWidth: 1600,
-    autoShot: false
-  }
+    autoShot: false,
+    protocol: 'auto'
+  },
+  stats: { shots: 0, reports: 0 }
 };
 
 function file() {
@@ -39,6 +41,7 @@ function load() {
       ...raw,
       report: { ...DEFAULTS.report, ...(raw.report || {}) },
       ui: { ...DEFAULTS.ui, ...(raw.ui || {}) },
+      stats: { ...DEFAULTS.stats, ...(raw.stats || {}) },
       providers: Array.isArray(raw.providers) && raw.providers.length ? raw.providers : DEFAULTS.providers
     };
   } catch (e) {

@@ -53,7 +53,13 @@ function connect(origin, timeout) {
     });
     session.once('error', (err) => {
       clearTimeout(timer);
-      reject(Object.assign(err, { code: err.code || 'H2_ERROR' }));
+      // 连接阶段失败（服务端不认 h2、证书、网络）统一标记为可回落
+      const noH2 = /application protocol|ALPN/i.test(err.message || '') ||
+        err.code === 'ERR_SSL_TLSV1_ALERT_NO_APPLICATION_PROTOCOL';
+      reject(Object.assign(err, {
+        code: noH2 ? 'NO_H2' : (err.code || 'H2_ERROR'),
+        beforeResponse: true
+      }));
     });
   });
 }

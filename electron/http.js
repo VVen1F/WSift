@@ -84,7 +84,12 @@ async function sendH1(raw, opts = {}) {
     let socket;
     const connect = () => {
       socket = scheme === 'https'
-        ? tls.connect({ host: hostname, port, servername: hostname.replace(/^\[|\]$/g, ''), rejectUnauthorized: false })
+        ? tls.connect({
+            host: hostname,
+            port,
+            servername: /^[\d.]+$|:/.test(hostname) ? undefined : hostname.replace(/^\[|\]$/g, ''),
+            rejectUnauthorized: false
+          })
         : net.connect({ host: hostname, port });
       socket.setTimeout(timeout);
       socket.once(scheme === 'https' ? 'secureConnect' : 'connect', () => {

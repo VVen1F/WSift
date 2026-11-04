@@ -45,10 +45,23 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     if (SMOKE) {
-      setTimeout(() => {
-        console.log('SMOKE_OK');
-        app.exit(0);
-      }, 2000);
+      setTimeout(async () => {
+        try {
+          const out = path.join(app.getPath('temp'), 'refract-smoke.png');
+          const r = await shot.capture({
+            request: 'GET / HTTP/1.1\nHost: smoke\n\n',
+            response: 'HTTP/1.1 200 OK\nContent-Type: application/json\n\n{"ok":true}',
+            width: 1200,
+            out
+          });
+          const size = fs.statSync(r.path).size;
+          console.log('SMOKE_OK shot=' + size);
+          app.exit(size > 5000 ? 0 : 1);
+        } catch (e) {
+          console.error('SMOKE_SHOT_FAIL ' + e.message);
+          app.exit(1);
+        }
+      }, 1200);
     }
   });
 

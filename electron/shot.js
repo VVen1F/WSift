@@ -19,6 +19,7 @@ async function capture({ request, response, width = 1600, out }) {
       offscreen: false,
       contextIsolation: true,
       nodeIntegration: false,
+      backgroundThrottling: false,
       paintWhenInitiallyHidden: true
     }
   });
@@ -35,9 +36,17 @@ async function capture({ request, response, width = 1600, out }) {
     const h = Math.max(240, Math.min(Number(height) || 800, 20000));
     win.setContentSize(width, h);
 
-    await new Promise((r) => setTimeout(r, 180));
+    await new Promise((r) => setTimeout(r, 220));
 
-    const image = await win.webContents.capturePage();
+    let image = await win.webContents.capturePage();
+    if (!image || image.isEmpty()) {
+      // 隐藏窗口偶尔不绘制：挪到屏幕外显示一次再截
+      win.setPosition(-20000, 0);
+      win.showInactive();
+      await new Promise((r) => setTimeout(r, 400));
+      image = await win.webContents.capturePage();
+    }
+    if (!image || image.isEmpty()) throw new Error('截图失败：窗口未绘制');
     const target = out || path.join(app.getPath('temp'), `refract-${Date.now()}.png`);
     fs.writeFileSync(target, image.toPNG());
     return { path: target, width, height: h };

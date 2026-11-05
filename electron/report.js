@@ -1,6 +1,13 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const zip = require('./zip');
+
+/** 模板里允许的占位符。未知名字在编辑时标出来。 */
+const TEMPLATE_VARS = [
+  'title', 'type', 'level', 'url', 'date', 'description', 'steps',
+  'impact', 'fix', 'account', 'product', 'author'
+];
 
 /** 后端硬编码的写作约束：所有报告都必须过这一层，保证风格一致。 */
 const SYSTEM_PROMPT = `你是一名有十年经验的 SRC 漏洞报告作者。你的输出只有报告正文，不解释、不寒暄、不复述写作过程。
@@ -90,6 +97,16 @@ function fillTemplate(body, vars) {
   return String(body || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] == null ? '' : String(vars[k])));
 }
 
+function scanVars(body) {
+  const used = [];
+  const re = /\{\{\s*(\w+)\s*\}\}/g;
+  let m;
+  while ((m = re.exec(String(body || '')))) {
+    if (!used.includes(m[1])) used.push(m[1]);
+  }
+  return { used, unknown: used.filter((k) => !TEMPLATE_VARS.includes(k)) };
+}
+
 function slugify(title) {
   const s = String(title || 'report')
     .replace(/[\\/:*?"<>|]/g, '')
@@ -104,8 +121,32 @@ function stamp() {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
+function imageName(i) {
+  return `${String(i + 1).padStart(2, '0')}.png`;
+}
+
+/** 只收存在的文件，序号与正文里的 images/NN.png 对齐。 */
+function packImages(images) {
+  const packed = [];
+  (images || []).forEach((src, i) => {
+    if (!src || !fs.existsSync(src)) return;
+    const name = imageName(i);
+    packed.push({ src, name, rel: `images/${name}`, index: i });
+  });
+  return packed;
+}
+
+function withImageLinks(markdown, packed) {
+  let md = String(markdown || '');
+  const missing = packed.filter((p) => !md.includes(p.rel));
+  if (!missing.length) return md.endsWith('\n') || !md ? md : md + '\n';
+  const block = missing.map((p) => `![${p.index + 1}](${p.rel})`).join('\n\n');
+  return md.replace(/\s+$/, '') + '\n\n## 截图\n\n' + block + '\n';
+}
+
 /**
  * 保存报告与图片到同一文件夹。
+ * 图片一律写成 images/NN.png，和正文里的相对路径一致。
  * @returns {{dir:string, md:string, images:string[]}}
  */
 function save({ markdown, images = [], title = '', baseDir }) {
@@ -114,18 +155,49 @@ function save({ markdown, images = [], title = '', baseDir }) {
   const imgDir = path.join(dir, 'images');
   fs.mkdirSync(imgDir, { recursive: true });
 
-  const written = [];
-  images.forEach((src, i) => {
-    if (!src || !fs.existsSync(src)) return;
-    const ext = path.extname(src) || '.png';
-    const name = `${String(i + 1).padStart(2, '0')}${ext}`;
-    fs.copyFileSync(src, path.join(imgDir, name));
-    written.push(name);
-  });
+  const packed = packImages(images);
+  packed.forEach((p) => fs.copyFileSync(p.src, path.join(imgDir, p.name)));
 
+  const md = withImageLinks(markdown, packed);
   const mdPath = path.join(dir, 'report.md');
-  fs.writeFileSync(mdPath, markdown || '', 'utf8');
-  return { dir, md: mdPath, images: written };
+  fs.writeFileSync(mdPath, md, 'utf8');
+  return { dir, md: mdPath, images: packed.map((p) => p.name) };
 }
 
-module.exports = { SYSTEM_PROMPT, CHAT_SYSTEM, buildMessages, buildChatMessages, fillTemplate, save, slugify, today };
+/**
+ * 导出 zip：<标题>/report.md + <标题>/images/NN.png。
+ * 没有运行时依赖，zip 由 electron/zip.js 写成。
+ */
+function exportZip({ markdown, images = [], title = '', dest, baseDir }) {
+  const folder = slugify(title);
+  const packed = packImages(images);
+  const md = withImageLinks(markdown, packed);
+  const entries = [
+    { name: `${folder}/report.md`, data: Buffer.from(md, 'utf8') },
+    ...packed.map((p) => ({ name: `${folder}/${p.rel}`, data: fs.readFileSync(p.src) }))
+  ];
+  const root = baseDir || path.join(require('os').homedir(), 'Documents', 'Refract');
+  const file = dest || path.join(root, `${stamp()}-${folder}.zip`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, zip.pack(entries));
+  return {
+    zip: file,
+    title: folder,
+    images: packed.map((p) => p.rel),
+    entries: entries.map((e) => e.name)
+  };
+}
+
+module.exports = {
+  SYSTEM_PROMPT,
+  CHAT_SYSTEM,
+  TEMPLATE_VARS,
+  buildMessages,
+  buildChatMessages,
+  fillTemplate,
+  scanVars,
+  save,
+  exportZip,
+  slugify,
+  today
+};

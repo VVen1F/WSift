@@ -495,19 +495,14 @@ function providerListHTML() {
       const on = p.id === activeId;
       const key = providerKey(p);
       return `<div class="llm-card ${on ? 'on' : ''}" data-id="${p.id}">
-        <div class="lc-top">
-          <button class="star ${on ? 'on' : ''}" data-act="star" title="${on ? '当前激活' : '设为激活'}">${on ? '★' : '☆'}</button>
+        <button class="star ${on ? 'on' : ''}" data-act="star" title="${on ? '当前激活' : '设为激活'}">${on ? '★' : '☆'}</button>
+        <div class="pmeta">
           <b>${esc(p.name)}</b>
-          <span class="badge">${p.kind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</span>
-          <span class="spacer"></span>
-          <span class="lc-state ${p.enabled === false ? 'off' : ''}">${p.enabled === false ? '已关闭' : '正常'}</span>
+          <small>${esc(p.activeModel || '未选模型')} · ${key ? '…' + esc(key.slice(-4)) : '未填 Key'}</small>
         </div>
-        <div class="lc-model">${esc(p.activeModel || '—')}</div>
-        <div class="lc-meta">${key ? '…' + esc(key.slice(-4)) : '未填 Key'} · ${(p.models || []).length} 个模型</div>
-        <div class="lc-actions">
-          <button class="btn ${on ? '' : 'primary'}" data-act="activate">${on ? '已激活' : '设为激活'}</button>
-          <button class="btn ghost" data-act="del">删除</button>
-        </div>
+        <span class="badge">${p.kind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</span>
+        <span class="lc-state ${p.enabled === false ? 'off' : ''}">${p.enabled === false ? '已关闭' : '正常'}</span>
+        <button class="btn ghost" data-act="del">删除</button>
       </div>`;
     })
     .join('')}</div>`;
@@ -538,16 +533,13 @@ function providerDetailHTML(id) {
         <option value="anthropic"${p.kind === 'anthropic' ? ' selected' : ''}>Anthropic 兼容</option>
       </select>
     </div>
-    <div class="krow"><div class="klabel">Base URL</div><input class="inp" style="flex:1;max-width:none" id="pdBase" value="${esc(p.baseURL)}" /></div>
-    <div class="krow"><div class="klabel">模型列表地址<small>留空按协议猜</small></div><input class="inp" style="flex:1;max-width:none" id="pdModelsURL" value="${esc(p.modelsURL || '')}" /></div>
-    <div class="krow"><div class="klabel">代理<small>http/socks5，留空直连</small></div><input class="inp" style="flex:1;max-width:none" id="pdProxy" value="${esc(p.proxy || '')}" placeholder="http://127.0.0.1:8080" /></div>
-    <div class="krow"><div class="klabel">自定义会话头<small>留空则不发送</small></div><input class="inp" style="flex:1;max-width:none" id="pdSession" value="${esc(p.sessionHeader || '')}" placeholder="如 x-session-id" /></div>
-    <div class="krow">
-      <div class="klabel">限速与上下文<small>0 = 不限</small></div>
-      <input class="inp kin" id="pdSec" type="number" min="0" placeholder="每秒" value="${Number(p.limitSec) || 0}" />
-      <input class="inp kin" id="pdMin" type="number" min="0" placeholder="每分钟" value="${Number(p.limitMin) || 0}" />
-      <input class="inp kin" id="pdCtx" type="number" min="0" placeholder="上下文 K" value="${Number(p.contextK) || 0}" />
-    </div>
+    <div class="krow"><div class="klabel">Base URL</div><input class="inp kin" id="pdBase" value="${esc(p.baseURL)}" /></div>
+    <div class="krow"><div class="klabel">模型列表地址<small>留空按协议猜</small></div><input class="inp kin" id="pdModelsURL" value="${esc(p.modelsURL || '')}" /></div>
+    <div class="krow"><div class="klabel">代理<small>http 或 socks5，留空直连</small></div><input class="inp kin" id="pdProxy" value="${esc(p.proxy || '')}" placeholder="http://127.0.0.1:8080" /></div>
+    <div class="krow"><div class="klabel">自定义会话头<small>留空则不发送</small></div><input class="inp kin" id="pdSession" value="${esc(p.sessionHeader || '')}" placeholder="如 x-session-id" /></div>
+    <div class="krow"><div class="klabel">每秒<small>0 表示不限</small></div><input class="inp kin" id="pdSec" type="number" min="0" value="${Number(p.limitSec) || 0}" /></div>
+    <div class="krow"><div class="klabel">每分钟<small>0 表示不限</small></div><input class="inp kin" id="pdMin" type="number" min="0" value="${Number(p.limitMin) || 0}" /></div>
+    <div class="krow"><div class="klabel">上下文 K<small>0 表示不限</small></div><input class="inp kin" id="pdCtx" type="number" min="0" value="${Number(p.contextK) || 0}" /></div>
   </div>
 
   <div class="pd-sec">
@@ -555,10 +547,12 @@ function providerDetailHTML(id) {
     <div id="pdAccounts">
       ${accs.map((a) => `
         <div class="acc-item" data-aid="${a.id}">
-          <input class="inp aname" data-a="name" value="${esc(a.name)}" placeholder="名称" />
-          <input class="inp" data-a="apiKey" type="password" value="${esc(a.apiKey)}" placeholder="API Key" />
-          <button class="btn ghost" data-act="use">${a.id === p.activeAccountId ? '首选' : '设为首选'}</button>
-          <button class="btn ghost" data-act="del">删除</button>
+          <label class="f">名称<input class="inp aname" data-a="name" value="${esc(a.name)}" placeholder="名称" /></label>
+          <label class="f">API Key<input class="inp" data-a="apiKey" type="password" value="${esc(a.apiKey)}" placeholder="API Key" /></label>
+          <div class="row actions">
+            <button class="btn ghost" data-act="use">${a.id === p.activeAccountId ? '首选' : '设为首选'}</button>
+            <button class="btn ghost" data-act="del">删除</button>
+          </div>
         </div>`).join('')}
     </div>
     <button class="btn ghost" id="pdAddAcc">+ 添加账号</button>
@@ -569,20 +563,20 @@ function providerDetailHTML(id) {
     <div class="chips" id="pdChips">
       ${all.map((m) => `<span class="mchip ${mine.includes(m) ? 'on' : ''} ${m === p.activeModel ? 'cur' : ''}" data-m="${esc(m)}">${esc(m)}</span>`).join('')}
     </div>
-    <div class="row actions" style="margin-top:10px">
-      <input class="inp" id="pdModelInput" placeholder="添加模型 ID" style="max-width:190px" />
-      <button class="btn" id="pdAddModel">添加模型</button>
-      <button class="btn" id="pdFetch">重新获取模型</button>
-      <button class="btn" id="pdTest">测试模型</button>
-      <span class="spacer"></span>
+    <label class="f">添加模型 ID
+      <input class="inp" id="pdModelInput" placeholder="模型 ID" />
+    </label>
+    <div class="row actions">
+      <button class="btn" id="pdAddModel">添加</button>
+      <button class="btn" id="pdFetch">重新获取</button>
+      <button class="btn" id="pdTest">测试</button>
       <span class="muted" id="pdModelCount">${mine.length} 个已选</span>
     </div>
-    <div class="row actions" style="margin-top:10px">
-      <select class="inp kin" id="pdActiveModel" style="max-width:220px">
+    <label class="f">当前使用
+      <select class="inp" id="pdActiveModel">
         ${mine.map((m) => `<option${m === p.activeModel ? ' selected' : ''}>${esc(m)}</option>`).join('')}
       </select>
-      <span class="muted">当前使用</span>
-    </div>
+    </label>
   </div>
 
   <div class="row actions" style="margin-top:18px">
@@ -962,15 +956,15 @@ function renderSync() {
         </select>
       </div>
       ${sy.kind === 'webdav' ? `
-      <div class="krow"><div class="klabel">地址</div><input class="inp" style="flex:1;max-width:none" id="wdUrl" value="${esc(w.url)}" placeholder="https://dav.example.com/dav/files/me" /></div>
+      <div class="krow"><div class="klabel">地址</div><input class="inp kin" id="wdUrl" value="${esc(w.url)}" placeholder="https://dav.example.com/dav/files/me" /></div>
       <div class="krow"><div class="klabel">用户名</div><input class="inp kin" id="wdUser" value="${esc(w.user)}" /></div>
       <div class="krow"><div class="klabel">密码</div><input class="inp kin" type="password" id="wdPass" value="${esc(w.pass)}" /></div>
       <div class="krow"><div class="klabel">远端文件名</div><input class="inp kin" id="wdPath" value="${esc(w.path)}" /></div>` : ''}
       ${sy.kind === 'github' ? `
       <div class="krow"><div class="klabel">仓库<small>owner/repo</small></div><input class="inp kin" id="ghRepo" value="${esc(g.repo)}" placeholder="me/dotfiles" /></div>
       <div class="krow"><div class="klabel">分支</div><input class="inp kin" id="ghBranch" value="${esc(g.branch)}" /></div>
-      <div class="krow"><div class="klabel">路径</div><input class="inp" style="flex:1;max-width:none" id="ghPath" value="${esc(g.path)}" /></div>
-      <div class="krow"><div class="klabel">Token<small>只存本机</small></div><input class="inp" style="flex:1;max-width:none" type="password" id="ghToken" value="${esc(g.token)}" /></div>` : ''}
+      <div class="krow"><div class="klabel">路径</div><input class="inp kin" id="ghPath" value="${esc(g.path)}" /></div>
+      <div class="krow"><div class="klabel">Token<small>只存本机</small></div><input class="inp kin" type="password" id="ghToken" value="${esc(g.token)}" /></div>` : ''}
     </div>
     ${sy.kind === 'off' ? '' : `
     <div class="row actions" style="margin-top:12px">
@@ -1371,6 +1365,8 @@ function motionOff() {
 
 function setChatting(on) {
   const home = $('#home');
+  const ta = $('#chatInput');
+  if (ta) ta.placeholder = on ? '提出修改' : '描述要做的事';
   if (!home || home.classList.contains('chatting') === on) return;
   const wrap = $('#composerWrap');
   const before = wrap.getBoundingClientRect();

@@ -73,7 +73,7 @@
 
           <div class="composer" id="composer">
             <div class="c-top">
-              <textarea id="chatInput" rows="1" placeholder="提出后续修改要求"></textarea>
+              <textarea id="chatInput" rows="1" placeholder="描述要做的事"></textarea>
             </div>
             <div class="c-bottom">
               <button class="c-btn" id="btnAttach" title="添加文件">
@@ -281,7 +281,7 @@
           <div class="sect" id="sect-llm">
             <div class="llm-head">
               <h3>LLM</h3>
-              <span class="muted">点一行编辑，星标是当前激活的配置</span>
+              <span class="muted">星标为当前配置</span>
               <span class="spacer"></span>
               <button class="btn primary" id="btnProvNew">+ 新建</button>
             </div>
@@ -299,7 +299,7 @@
               <div id="syncPanel" class="sync-panel" hidden></div>
               <div class="krow">
                 <div class="klabel">导出<small>把设置写成一份 JSON</small></div>
-                <select class="inp kin" id="setWithKeys" style="max-width:120px"><option value="0">不带 Key</option><option value="1">带上 Key</option></select>
+                <select class="inp kin" id="setWithKeys"><option value="0">不带 Key</option><option value="1">带上 Key</option></select>
                 <button class="btn" id="btnExport">导出…</button>
               </div>
               <div class="krow">
@@ -388,20 +388,16 @@
         </select>
       </label>
       <label class="f">模型
-        <span class="field-row">
-          <input class="inp" id="pmModel" placeholder="claude-opus-4-8" />
-          <button class="btn" id="pmModelFetch">拉取</button>
-        </span>
+        <input class="inp" id="pmModel" placeholder="claude-opus-4-8" />
       </label>
+      <div class="row actions"><button class="btn ghost" id="pmModelFetch">拉取模型</button></div>
       <label class="f">Base URL<input class="inp" id="pmBase" placeholder="https://api.openai.com/v1" /></label>
       <label class="f">API Key<input class="inp" id="pmKey" type="password" placeholder="sk-…" /></label>
       <label class="f">代理<small>http 或 socks5，留空直连</small><input class="inp" id="pmProxy" placeholder="http://127.0.0.1:8080" /></label>
       <label class="f">自定义会话头<small>留空则不发送</small><input class="inp" id="pmSession" placeholder="如 x-session-id" /></label>
-      <div class="field-row">
-        <label class="f">每秒<input class="inp" id="pmSec" type="number" min="0" placeholder="0" /></label>
-        <label class="f">每分钟<input class="inp" id="pmMin" type="number" min="0" placeholder="0" /></label>
-        <label class="f">上下文 K<input class="inp" id="pmCtx" type="number" min="0" placeholder="0" /></label>
-      </div>
+      <label class="f">每秒<input class="inp" id="pmSec" type="number" min="0" placeholder="0" /></label>
+      <label class="f">每分钟<input class="inp" id="pmMin" type="number" min="0" placeholder="0" /></label>
+      <label class="f">上下文 K<input class="inp" id="pmCtx" type="number" min="0" placeholder="0" /></label>
     </div>
     <div class="row actions">
       <button class="btn" id="pmTest">测试连接</button>

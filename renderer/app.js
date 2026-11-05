@@ -1577,18 +1577,18 @@ function providerListHTML() {
     .map((p) => {
       const on = p.id === activeId;
       const key = providerKey(p);
-      return `<div class="llm-card ${on ? 'on' : ''}" data-id="${p.id}">
-        <div class="pmeta">
-          <b>${esc(p.name)}</b>
-          <small>${esc(p.activeModel || '未选模型')} · ${key ? '…' + esc(key.slice(-4)) : '未填 Key'}</small>
-        </div>
-        <span class="badge">${p.kind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</span>
-        ${p.enabled === false ? '<span class="lc-state off">已关闭</span>' : ''}
-        ${on ? '<span class="lc-now">当前</span>' : '<button class="btn ghost" data-act="star">激活</button>'}
-        <button class="btn ghost" data-act="del">删除</button>
+      return `<div class="prov-row ${on ? 'on' : ''}" data-id="${p.id}">
+        <b class="prov-name">${esc(p.name)}</b>
+        <span class="prov-tag">${p.kind === 'anthropic' ? '自定义' : 'OpenAI 兼容'}</span>
+        <span class="prov-dot ${p.enabled === false ? 'off' : ''}"></span>
+        <span class="prov-model">${esc(p.activeModel || '未选模型')}</span>
+        <span class="spacer"></span>
+        ${on ? '<span class="prov-now">当前</span>' : '<button class="btn ghost" data-act="star">设为当前</button>'}
+        <button class="btn ghost" data-act="edit">编辑</button>
+        <button class="btn ghost danger" data-act="del">删除</button>
       </div>`;
     })
-    .join('')}</div>`;
+    .join('')}<button class="prov-add" type="button" data-act="add">＋ 添加模型提供商</button></div>`;
 }
 
 function providerDetailHTML(id) {
@@ -1777,7 +1777,13 @@ function bindProviderDetail(id) {
 }
 
 function bindProviderList() {
-  document.querySelectorAll('.llm-card').forEach((card) => {
+  const add = document.querySelector('.prov-add');
+  if (add) {
+    add.addEventListener('click', () => {
+      if (typeof openProvModal === 'function') openProvModal();
+    });
+  }
+  document.querySelectorAll('.prov-row').forEach((card) => {
     const id = card.dataset.id;
     const p = S.settings.providers.find((x) => x.id === id);
     if (!p) return;
@@ -1787,6 +1793,15 @@ function bindProviderList() {
       LLM.detail = id;
       renderLLM();
     });
+
+    const edit = card.querySelector('[data-act="edit"]');
+    if (edit) {
+      edit.addEventListener('click', (e) => {
+        e.stopPropagation();
+        LLM.detail = id;
+        renderLLM();
+      });
+    }
 
     const star = card.querySelector('[data-act="star"]');
     if (star) {

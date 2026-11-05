@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <title>shot</title>
@@ -7,50 +7,188 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: auto; background: #fff; }
   body {
-    font: 13px/1.5 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
-    color: #212121;
+    font: 13px/1.45 -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: #1f1f1f;
     -webkit-font-smoothing: antialiased;
   }
-  #app { display: flex; }
-  .pane { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
-  .pane + .pane { border-left: 1px solid #e2e2e2; }
-  .head {
-    height: 38px; display: flex; align-items: center; padding: 0 14px;
-    font-size: 13px; font-weight: 600; color: #111;
+
+  .win { display: flex; flex-direction: column; background: #fff; }
+  .body-row { display: flex; min-height: 0; }
+
+  .panes { display: flex; flex: 1 1 auto; min-width: 0; }
+  .pane { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid #e2e2e2; }
+  .pane:last-child { border-right: 0; }
+
+  /* 标题 */
+  .title {
+    height: 44px; display: flex; align-items: center; padding: 0 14px;
+    font-size: 12.5px; font-weight: 600; color: #000;
   }
-  pre.code {
-    margin: 0; padding: 8px 14px 10px 60px;
-    font: 13px/20px ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
-    white-space: pre-wrap; overflow-wrap: anywhere; color: #212121;
-    background: #fff;
-    background-image: linear-gradient(to right, transparent 49px, #ececec 49px, #ececec 50px, transparent 50px);
+
+  /* 页签 */
+  .tabs {
+    height: 30px; display: flex; align-items: stretch; gap: 0;
+    padding: 0 8px; border-bottom: 1px solid #e2e2e2; position: relative;
+  }
+  .tab { display: flex; align-items: center; padding: 0 12px; font-size: 12px; color: #2b2b2b; }
+  .tab.on { color: #000; position: relative; }
+  .tab.on::after {
+    content: ''; position: absolute; left: 6px; right: 6px; bottom: -1px; height: 2px;
+    background: #c4663f;
+  }
+  .tab-icons { margin-left: auto; display: flex; align-items: center; gap: 10px; padding-right: 4px; }
+  .ico { width: 17px; height: 17px; color: #3a3a3a; display: block; }
+  .ico.on { color: #2a6497; }
+
+  /* 代码区 */
+  .code {
+    margin: 0; padding: 4px 12px 10px 44px; flex: 1 1 auto; min-height: 508px;
+    font: 12px/14.5px Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+    white-space: pre-wrap; overflow-wrap: anywhere; color: #1f1f1f;
+    background-image: none;
     background-repeat: no-repeat;
     counter-reset: ln;
   }
-  .ln { position: relative; min-height: 20px; }
+  .ln { position: relative; min-height: 14.5px; }
   .ln::before {
     counter-increment: ln; content: counter(ln);
-    position: absolute; left: -46px; top: 0; width: 36px;
-    text-align: right; color: #9b9b9b;
-    font: 13px/20px ui-monospace, Menlo, Consolas, monospace;
+    position: absolute; left: -38px; top: 0; width: 28px;
+    text-align: right; color: #a0a0a0;
+    font: 11.5px/14.5px Consolas, Menlo, monospace;
   }
   .hn { color: #000080; }
   .cv { color: #800000; }
   .jk { color: #000080; }
   .js { color: #008000; }
   .jn { color: #0000cc; }
+
+  /* 每栏底部工具条 */
+  .pane-tools {
+    height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    border-top: 1px solid #e2e2e2;
+  }
+  .tool-ico { width: 15px; height: 15px; color: #3a3a3a; }
+  .arrow { width: 22px; height: 20px; border: 1px solid #d6d6d6; border-radius: 3px; display: grid; place-items: center; color: #555; }
+  .search {
+    flex: 1 1 auto; height: 26px; border: 1px solid #c9c9c9; border-radius: 2px;
+    display: flex; align-items: center; padding: 0 8px; color: #8a8a8a; font-size: 12px;
+  }
+  .search .ph { flex: 1 1 auto; }
+  .search svg { width: 14px; height: 14px; color: #6b6b6b; }
+  .hl-count { font-size: 12px; color: #2b2b2b; white-space: nowrap; }
+
+  /* 右侧栏 */
+  .rail { width: 33px; flex: 0 0 33px; display: flex; flex-direction: column; border-left: 1px solid #e2e2e2; }
+  .rail-item {
+    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 8px; padding: 23px 0; border-bottom: 1px solid #e2e2e2;
+  }
+  .rail-gap { flex: 1 1 auto; }
+  .rail-item svg { width: 17px; height: 17px; color: #3a3a3a; }
+  .rail-item span {
+    writing-mode: vertical-rl; text-orientation: mixed;
+    font-size: 11.5px; color: #2f2f2f; letter-spacing: .2px;
+  }
+  .rail-foot { height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-top: 1px solid #e2e2e2; }
+  .rail-foot svg { width: 16px; height: 16px; color: #3a3a3a; }
+
+  /* 状态栏 */
+  .status {
+    height: 25px; display: flex; align-items: center; padding: 0 10px;
+    border-top: 1px solid #e2e2e2; font-size: 12px; color: #2b2b2b;
+  }
+  .status .left { flex: 1 1 auto; }
+  .status .right { white-space: nowrap; }
 </style>
 </head>
 <body>
-<div id="app">
-  <section class="pane">
-    <div class="head">Request</div>
-    <pre class="code" id="req"></pre>
-  </section>
-  <section class="pane">
-    <div class="head">Response</div>
-    <pre class="code" id="res"></pre>
-  </section>
+<div class="win">
+  <div class="body-row">
+    <div class="panes">
+      <section class="pane">
+        <div class="title">Request</div>
+        <div class="tabs" id="reqTabs">
+          <div class="tab on" data-tab="pretty">Pretty</div>
+          <div class="tab" data-tab="raw">Raw</div>
+          <div class="tab" data-tab="hex">Hex</div>
+          <div class="tab" data-tab="chinese">Chinese</div>
+          <div class="tab-icons">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.9 9.9 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.7 2-1.9 3.2"/><path d="M6.2 6.2C4.2 7.6 3 9.4 3 12c0 2.5 4 7 9 7 1.3 0 2.5-.3 3.6-.8"/></svg>
+            <svg class="ico on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h11M4 17h16"/></svg>
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </div>
+        </div>
+        <pre class="code" id="req"></pre>
+        <div class="pane-tools">
+          <svg class="tool-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 1 1 3.4 2.5c-.6.2-.9.7-.9 1.3v.4"/><path d="M12 17h.01"/></svg>
+          <svg class="tool-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L5 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h5l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>
+          <div class="arrow">‹</div>
+          <div class="arrow">›</div>
+          <div class="search"><span class="ph">Search</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.3-4.3"/></svg>
+          </div>
+          <div class="hl-count">0 highlights</div>
+        </div>
+      </section>
+
+      <section class="pane">
+        <div class="title">Response</div>
+        <div class="tabs" id="resTabs">
+          <div class="tab on" data-tab="pretty">Pretty</div>
+          <div class="tab" data-tab="raw">Raw</div>
+          <div class="tab" data-tab="hex">Hex</div>
+          <div class="tab" data-tab="render">Render</div>
+          <div class="tab" data-tab="chinese">Chinese</div>
+          <div class="tab-icons">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.9 9.9 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.7 2-1.9 3.2"/><path d="M6.2 6.2C4.2 7.6 3 9.4 3 12c0 2.5 4 7 9 7 1.3 0 2.5-.3 3.6-.8"/></svg>
+            <svg class="ico on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h11M4 17h16"/></svg>
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </div>
+        </div>
+        <pre class="code" id="res"></pre>
+        <div class="pane-tools">
+          <svg class="tool-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 1 1 3.4 2.5c-.6.2-.9.7-.9 1.3v.4"/><path d="M12 17h.01"/></svg>
+          <svg class="tool-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L5 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h5l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>
+          <div class="arrow">‹</div>
+          <div class="arrow">›</div>
+          <div class="search"><span class="ph">Search</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.3-4.3"/></svg>
+          </div>
+          <div class="hl-count">0 highlights</div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="rail">
+      <div class="rail-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        <span>Inspector</span>
+      </div>
+      <div class="rail-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9h8M8 13h8"/></svg>
+        <span>Notes</span>
+      </div>
+      <div class="rail-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M9 15c.8.8 1.8 1.2 3 1.2s2.2-.4 3-1.2"/></svg>
+        <span>Explanations</span>
+      </div>
+      <div class="rail-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h11"/><path d="M11 8l4 4-4 4"/><path d="M18 5v14"/></svg>
+        <span>Custom actions</span>
+      </div>
+      <div class="rail-gap"></div>
+      <div class="rail-foot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L5 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h5l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>
+      </div>
+    </aside>
+  </div>
+
+  <div class="status">
+    <span class="left">Ready</span>
+    <span class="right" id="stat"></span>
+  </div>
 </div>
 
 <script>
@@ -81,6 +219,26 @@ function colorCookie(v, firstOnly) {
     return (i ? ';' : '') + esc(m[1]) + '<span class="hn">' + esc(m[2]) + '=</span><span class="cv">' + esc(m[3]) + '</span>';
   }).join('');
 }
+function bodyOf(text) {
+  const sep = text.indexOf('\r\n\r\n') >= 0 ? '\r\n\r\n' : '\n\n';
+  const i = text.indexOf(sep);
+  return i >= 0 ? text.slice(i + sep.length) : '';
+}
+
+/** Burp 单行报文默认停在 Raw，多行的才显示 Pretty。 */
+function pickView(text) {
+  const body = bodyOf(text).trim();
+  return body.includes('\n') ? 'pretty' : 'raw';
+}
+
+function setTab(containerId, view) {
+  const box = document.getElementById(containerId);
+  if (!box) return;
+  box.querySelectorAll('.tab').forEach((t) => {
+    t.classList.toggle('on', t.dataset.tab === view);
+  });
+}
+
 function hl(text) {
   if (!text) return '';
   const sep = text.indexOf('\r\n\r\n') >= 0 ? '\r\n\r\n' : '\n\n';
@@ -115,8 +273,19 @@ function hl(text) {
 }
 
 window.render = function (data) {
-  document.getElementById('req').innerHTML = hl(data.request || '');
-  document.getElementById('res').innerHTML = hl(data.response || '');
+  const reqText = data.request || '';
+  const resText = data.response || '';
+  document.getElementById('req').innerHTML = hl(reqText);
+  document.getElementById('res').innerHTML = hl(resText);
+  setTab('reqTabs', pickView(reqText));
+  setTab('resTabs', pickView(resText));
+
+  const ms = data.ms;
+  const bytes = data.bytes;
+  const parts = [];
+  if (Number.isFinite(bytes)) parts.push(bytes + ' bytes');
+  if (Number.isFinite(ms)) parts.push(ms + ' millis');
+  document.getElementById('stat').textContent = parts.join(' | ');
   return true;
 };
 </script>

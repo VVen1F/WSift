@@ -192,7 +192,7 @@ function start(opts) {
         const b = await readBody(req);
         const name = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14) + '.png';
         const out = path.join(shotsDir(), name);
-        const r = await shot.capture({ request: b.request, response: b.response, width: b.width || 1600, out });
+        const r = await shot.capture({ request: b.request, response: b.response, width: b.width || 1600, out, ms: b.ms });
         return send(res, 200, JSON.stringify({ path: r.path, url: '/api/shot?path=' + encodeURIComponent(r.path) }));
       }
 

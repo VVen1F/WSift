@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.18', pkg.version === '0.6.18');
+  ok('版本 0.6.18', pkg.version === '0.6.19');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -318,7 +318,15 @@ function ok(name, cond, extra) {
   ok('工作区能读回', spaces.workspaces[0].name === '麦当劳' && tasksMod.load().workspaces[0].name === '麦当劳' && tasksMod.load().tasks[0].workspaceId === 'ws1');
   tasksMod.saveAll([]);
   const shotHtml = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'shot.html'), 'utf8');
-  ok('截图是左右两栏', shotHtml.includes('>Request<') && shotHtml.includes('>Response<') && !shotHtml.includes('Inspector') && !shotHtml.includes('millis'));
+  ok('截图是左右两栏', shotHtml.includes('>Request<') && shotHtml.includes('>Response<'));
+  ok('截图带状态栏', shotHtml.includes('millis') && shotHtml.includes('bytes'));
+  ok('截图带右侧栏', shotHtml.includes('Inspector') && shotHtml.includes('Explanations'));
+  const shotMod = fs.readFileSync(path.join(__dirname, '..', 'electron', 'shot.js'), 'utf8');
+  ok('截图接真实毫秒', shotMod.includes('ms: realMs') && shotMod.includes('Number.isFinite(Number(ms))'));
+  ok('截图算字节数', shotMod.includes("Buffer.byteLength"));
+  const appSrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+  ok('发送后记录毫秒', appSrc.includes('S.lastMs = r.ok'));
+  ok('截图带上毫秒', appSrc.includes('ms: S.lastMs'));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

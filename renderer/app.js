@@ -2420,6 +2420,109 @@ function bindPerm() {
   }
 }
 
+
+/* ---------------- 归档管理 ---------------- */
+
+function wsNameOf(id) {
+  const w = (TASKS.workspaces || []).find((x) => x.id === id);
+  return w ? w.name : '未归类';
+}
+
+function archivedForList() {
+  const q = (($('#archSearch') && $('#archSearch').value) || '').trim().toLowerCase();
+  let list = (TASKS.list || []).filter((t) => t.archived && hasContent(t));
+  if (q) list = list.filter((t) => String(t.title || '').toLowerCase().includes(q));
+  const byName = $('#archSort') && $('#archSort').value === 'name';
+  list.sort(byName
+    ? (a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'zh')
+    : (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return list;
+}
+
+function renderArchive() {
+  const box = $('#archList');
+  if (!box) return;
+  const list = archivedForList();
+  if (!list.length) {
+    box.innerHTML = '<div class="arch-empty">还没有归档的会话</div>';
+    return;
+  }
+  const groups = new Map();
+  list.forEach((t) => {
+    const k = t.workspaceId || 'ws-default';
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(t);
+  });
+  let html = '';
+  groups.forEach((items, wsId) => {
+    html += '<div class="arch-group" data-ws="' + esc(wsId) + '">' +
+      '<div class="arch-head"><span>' + esc(wsNameOf(wsId)) + '</span>' +
+      '<span class="arch-count">' + items.length + ' 个会话</span><span class="spacer"></span>' +
+      '<button class="btn ghost" type="button" data-act="unarchive-all">全部取消归档</button>' +
+      '<button class="btn ghost danger" type="button" data-act="delete-all">全部删除</button></div>';
+    items.forEach((t) => {
+      html += '<div class="arch-row" data-id="' + esc(t.id) + '">' +
+        '<span class="arch-title">' + esc(t.title || '未命名') + '</span>' +
+        '<span class="arch-date">' + esc(dayGroup(t.updatedAt || t.createdAt || Date.now())) + '</span>' +
+        '<button class="btn" type="button" data-act="restore">恢复</button>' +
+        '<button class="btn danger" type="button" data-act="delete">删除</button>' +
+        '</div>';
+    });
+    html += '</div>';
+  });
+  box.innerHTML = html;
+}
+
+function openArchive() {
+  const m = $('#archiveModal');
+  if (!m) return;
+  m.hidden = false;
+  renderArchive();
+  $('#archSearch').focus();
+}
+
+function closeArchive() {
+  const m = $('#archiveModal');
+  if (m) m.hidden = true;
+}
+
+function bindArchive() {
+  const nav = $('#navArchive');
+  if (nav) nav.addEventListener('click', openArchive);
+  if ($('#archClose')) $('#archClose').addEventListener('click', closeArchive);
+  const modal = $('#archiveModal');
+  if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'archiveModal') closeArchive(); });
+  if ($('#archSearch')) $('#archSearch').addEventListener('input', renderArchive);
+  if ($('#archSort')) $('#archSort').addEventListener('change', renderArchive);
+
+  const list = $('#archList');
+  if (!list) return;
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const group = btn.closest('.arch-group');
+    const wsId = group ? group.dataset.ws : '';
+    const row = btn.closest('.arch-row');
+    const id = row ? row.dataset.id : '';
+
+    if (act === 'restore' && id) {
+      unarchiveTask(id);
+    } else if (act === 'delete' && id) {
+      TASKS.list = TASKS.list.filter((t) => t.id !== id);
+      saveTasksNow();
+    } else if (act === 'unarchive-all' && wsId) {
+      TASKS.list.forEach((t) => { if (t.archived && (t.workspaceId || 'ws-default') === wsId) t.archived = false; });
+      saveTasksNow();
+    } else if (act === 'delete-all' && wsId) {
+      TASKS.list = TASKS.list.filter((t) => !(t.archived && (t.workspaceId || 'ws-default') === wsId));
+      saveTasksNow();
+    }
+    renderArchive();
+    renderTaskList();
+  });
+}
+
 /* ---------------- 设置菜单 ---------------- */
 
 function resolvedDark(pref) {
@@ -2816,6 +2919,7 @@ async function boot() {
   $('#ver').textContent = 'v' + S.info.version;
   S.settings = await window.api.settings.get();
   bindTheme();
+  bindArchive();
   S.templates = await window.api.templates.list();
 
   $('#req').value = SAMPLE;

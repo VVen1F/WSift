@@ -1249,3 +1249,28 @@ textarea.inp {
 
 /* 网络设置里的代理地址比其他输入框宽 */
 .kin.wide { width: 280px; max-width: 280px; }
+
+/* 归档管理 */
+.arch-card { width: 640px; }
+.arch-toolbar { display: flex; gap: 8px; margin: 12px 0 16px; }
+.arch-search { flex: 1; }
+.arch-list { max-height: 60vh; overflow: auto; }
+.arch-group { margin-bottom: 18px; }
+.arch-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; font-size: 13px; font-weight: 500; color: var(--text);
+}
+.arch-count { font-size: 12px; color: var(--caption); }
+.arch-head .spacer { flex: 1; }
+.arch-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-top: 0.5px solid var(--line);
+}
+.arch-title {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.arch-date { font-size: 12px; color: var(--caption); flex: 0 0 auto; }
+.arch-row .btn { height: 26px; padding: 0 10px; font-size: 12px; }
+.arch-row .btn.danger { color: var(--danger); }
+.arch-empty { padding: 40px 0; text-align: center; color: var(--muted); font-size: 13px; }

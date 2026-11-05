@@ -1274,3 +1274,6 @@ textarea.inp {
 .arch-row .btn { height: 26px; padding: 0 10px; font-size: 12px; }
 .arch-row .btn.danger { color: var(--danger); }
 .arch-empty { padding: 40px 0; text-align: center; color: var(--muted); font-size: 13px; }
+
+/* 设置菜单里的分隔线 */
+.pop-sep { height: 1px; margin: 4px 8px; background: var(--line); }

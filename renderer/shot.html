@@ -46,17 +46,18 @@
 
   /* 代码区 */
   .code {
-    margin: 0; padding: 1px 12px 10px 34px; flex: 1 1 auto; min-height: 506px;
+    margin: 0; padding: 1px 12px 10px 42px; flex: 1 1 auto; min-height: 506px;
     font: 12px/14.5px Menlo, Consolas, "SF Mono", "DejaVu Sans Mono", monospace;
     white-space: pre-wrap; overflow-wrap: anywhere; color: #1f1f1f; overflow: hidden;
-    background-image: none;
+    background-image: linear-gradient(to right, transparent 23px, #efefef 23px, #efefef 24px, transparent 24px);
+    background-repeat: no-repeat;
     background-repeat: no-repeat;
     counter-reset: ln;
   }
   .ln { position: relative; min-height: 14.5px; }
   .ln::before {
     counter-increment: ln; content: counter(ln);
-    position: absolute; left: -29px; top: 0; width: 28px;
+    position: absolute; left: -40px; top: 0; width: 20px;
     text-align: right; color: #a0a0a0;
     font: 11.5px/14.5px Menlo, Consolas, monospace;
   }
@@ -80,7 +81,7 @@
   }
   .search .ph { flex: 1 1 auto; }
   .search svg { width: 14px; height: 14px; color: #6b6b6b; }
-  .hl-count { font-size: 12px; color: #2b2b2b; white-space: nowrap; }
+  .hl-count { font-size: 12px; color: #2b2b2b; white-space: nowrap; margin-left: 14px; }
 
   /* 右侧栏 */
   .rail { width: 33px; flex: 0 0 33px; display: flex; flex-direction: column; border-left: 1px solid #e2e2e2; }

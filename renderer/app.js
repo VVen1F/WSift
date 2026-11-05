@@ -2487,8 +2487,7 @@ function closeArchive() {
 }
 
 function bindArchive() {
-  const nav = $('#navArchive');
-  if (nav) nav.addEventListener('click', openArchive);
+
   if ($('#archClose')) $('#archClose').addEventListener('click', closeArchive);
   const modal = $('#archiveModal');
   if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'archiveModal') closeArchive(); });
@@ -2591,6 +2590,14 @@ function bindSettingsMenu() {
 
   btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   pop.addEventListener('click', (e) => e.stopPropagation());
+
+  const arch = $('#menuArchive');
+  if (arch) {
+    arch.addEventListener('click', () => {
+      close();
+      openArchive();
+    });
+  }
 
   pop.querySelectorAll('button[data-sec]').forEach((b) => {
     b.addEventListener('click', () => {

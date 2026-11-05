@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { dataDir } = require('./paths');
 
+function newId(prefix) {
+  return prefix + '-' + Math.random().toString(36).slice(2, 8);
+}
+
 const DEFAULTS = {
   providers: [
     {
@@ -11,30 +15,42 @@ const DEFAULTS = {
       kind: 'anthropic',
       baseURL: 'https://open.bigmodel.cn/api/anthropic',
       modelsURL: 'https://open.bigmodel.cn/api/paas/v4/models',
-      apiKey: '',
-      model: 'glm-4.6'
+      enabled: true,
+      accounts: [{ id: 'glm-a1', name: '默认', apiKey: '' }],
+      activeAccountId: 'glm-a1',
+      models: ['glm-4.6'],
+      activeModel: 'glm-4.6'
     },
     {
       id: 'openai',
       name: 'OpenAI 兼容',
       kind: 'openai',
       baseURL: 'https://api.openai.com/v1',
-      apiKey: '',
-      model: 'gpt-4o-mini'
+      enabled: false,
+      accounts: [{ id: 'openai-a1', name: '默认', apiKey: '' }],
+      activeAccountId: 'openai-a1',
+      models: ['gpt-4o-mini'],
+      activeModel: 'gpt-4o-mini'
     }
   ],
   activeProviderId: 'glm',
-  report: {
-    author: '',
-    platform: '通用',
-    language: 'zh'
-  },
+  report: { author: '', platform: '通用', language: 'zh' },
   ui: {
     theme: 'system',
     shotWidth: 1600,
     autoShot: false,
     protocol: 'auto',
-    remotePort: 8765
+    remotePort: 8765,
+    maskKeys: true,
+    confirmQuit: false,
+    launchAtLogin: false
+  },
+  backup: {
+    auto: 'off',
+    keep: 7,
+    dir: '',
+    withKeys: false,
+    lastAt: ''
   },
   stats: { shots: 0, reports: 0 }
 };
@@ -43,26 +59,94 @@ function file() {
   return path.join(dataDir(), 'settings.json');
 }
 
+/** 老版本的扁平结构迁移成「服务 + 多账号 + 多模型」。 */
+function migrateProvider(p) {
+  if (!p || typeof p !== 'object') return null;
+  const legacyKey = typeof p.apiKey === 'string' ? p.apiKey : '';
+  const legacyModel = typeof p.model === 'string' ? p.model : '';
+
+  let accounts = Array.isArray(p.accounts) ? p.accounts.filter(Boolean) : [];
+  if (!accounts.length) {
+    accounts = [{ id: newId(p.id || 'acc'), name: '默认', apiKey: legacyKey }];
+  }
+  accounts = accounts.map((a) => ({
+    id: a.id || newId('acc'),
+    name: a.name || '默认',
+    apiKey: typeof a.apiKey === 'string' ? a.apiKey : ''
+  }));
+
+  let models = Array.isArray(p.models) ? p.models.filter(Boolean) : [];
+  if (!models.length && legacyModel) models = [legacyModel];
+
+  const activeAccountId = accounts.some((a) => a.id === p.activeAccountId)
+    ? p.activeAccountId
+    : accounts[0].id;
+
+  return {
+    id: p.id || newId('prov'),
+    name: p.name || '未命名服务',
+    kind: p.kind === 'anthropic' ? 'anthropic' : 'openai',
+    baseURL: p.baseURL || '',
+    modelsURL: p.modelsURL || '',
+    enabled: p.enabled !== false,
+    accounts,
+    activeAccountId,
+    models,
+    activeModel: models.includes(p.activeModel) ? p.activeModel : models[0] || legacyModel || ''
+  };
+}
+
 function load() {
+  let raw = {};
   try {
-    const raw = JSON.parse(fs.readFileSync(file(), 'utf8'));
-    return {
-      ...DEFAULTS,
-      ...raw,
-      report: { ...DEFAULTS.report, ...(raw.report || {}) },
-      ui: { ...DEFAULTS.ui, ...(raw.ui || {}) },
-      stats: { ...DEFAULTS.stats, ...(raw.stats || {}) },
-      providers: Array.isArray(raw.providers) && raw.providers.length ? raw.providers : DEFAULTS.providers
-    };
+    raw = JSON.parse(fs.readFileSync(file(), 'utf8'));
   } catch (e) {
     return JSON.parse(JSON.stringify(DEFAULTS));
   }
+  const providers = (Array.isArray(raw.providers) && raw.providers.length ? raw.providers : DEFAULTS.providers)
+    .map(migrateProvider)
+    .filter(Boolean);
+
+  return {
+    ...DEFAULTS,
+    ...raw,
+    report: { ...DEFAULTS.report, ...(raw.report || {}) },
+    ui: { ...DEFAULTS.ui, ...(raw.ui || {}) },
+    backup: { ...DEFAULTS.backup, ...(raw.backup || {}) },
+    stats: { ...DEFAULTS.stats, ...(raw.stats || {}) },
+    providers,
+    activeProviderId: providers.some((p) => p.id === raw.activeProviderId) ? raw.activeProviderId : providers[0].id
+  };
 }
 
 function save(next) {
   fs.mkdirSync(dataDir(), { recursive: true });
-  fs.writeFileSync(file(), JSON.stringify(next, null, 2), 'utf8');
-  return next;
+  const clean = {
+    ...next,
+    providers: (next.providers || []).map(migrateProvider).filter(Boolean)
+  };
+  fs.writeFileSync(file(), JSON.stringify(clean, null, 2), 'utf8');
+  return clean;
 }
 
-module.exports = { load, save, DEFAULTS, file };
+/** 把「服务 + 当前账号 + 当前模型」压平成调用大模型要的形状。 */
+function resolveProvider(cfg, id) {
+  const list = (cfg && cfg.providers) || [];
+  const p = list.find((x) => x.id === (id || (cfg && cfg.activeProviderId))) || list[0];
+  if (!p) return null;
+  const accounts = p.accounts || [];
+  const acc = accounts.find((a) => a.id === p.activeAccountId) || accounts[0] || { apiKey: '', name: '' };
+  return {
+    id: p.id,
+    name: p.name,
+    kind: p.kind,
+    baseURL: p.baseURL,
+    modelsURL: p.modelsURL,
+    apiKey: acc.apiKey || '',
+    accountName: acc.name || '',
+    model: p.activeModel || (p.models || [])[0] || '',
+    models: p.models || []
+  };
+}
+
+module.exports = { load, save, DEFAULTS, file, resolveProvider, newId, migrateProvider };

@@ -244,9 +244,34 @@ $('#btnToReport').addEventListener('click', () => {
 
 /* ---------------- 报告 ---------------- */
 
+function providerKey(p) {
+  const acc = (p.accounts || []).find((a) => a.id === p.activeAccountId) || (p.accounts || [])[0] || {};
+  return acc.apiKey || '';
+}
+
+function flattenProvider(p) {
+  if (!p) return null;
+  const acc = (p.accounts || []).find((a) => a.id === p.activeAccountId) || (p.accounts || [])[0] || {};
+  return {
+    id: p.id,
+    name: p.name,
+    kind: p.kind,
+    baseURL: p.baseURL,
+    modelsURL: p.modelsURL,
+    apiKey: acc.apiKey || '',
+    accountName: acc.name || '',
+    model: p.activeModel || (p.models || [])[0] || '',
+    models: p.models || []
+  };
+}
+
 function activeProvider() {
   const s = S.settings;
-  return (s.providers || []).find((p) => p.id === s.activeProviderId) || (s.providers || [])[0];
+  const list = s.providers || [];
+  const usable = (p) => p && p.enabled !== false && providerKey(p);
+  const cur = list.find((p) => p.id === s.activeProviderId);
+  const picked = usable(cur) ? cur : list.find(usable) || cur || list[0];
+  return flattenProvider(picked);
 }
 
 function fillTemplateSelect() {
@@ -425,115 +450,461 @@ $('#btnTplReset').addEventListener('click', async () => {
 
 /* ---------------- 设置 ---------------- */
 
-const MODELS_CACHE = {};
+const LLM = { detail: null, models: {} };
 
-function modelField(p) {
-  const list = MODELS_CACHE[p.id];
-  if (list && list.length) {
-    const opts = list.map((m) => `<option${m === p.model ? ' selected' : ''}>${esc(m)}</option>`).join('');
-    return `<select class="inp" data-k="model">${opts}</select>`;
-  }
-  return `<input class="inp" data-k="model" value="${esc(p.model)}" />`;
+function maskKey(k) {
+  if (!k) return '未填 Key';
+  if (!S.settings.ui.maskKeys) return k;
+  return k.length > 10 ? k.slice(0, 3) + '…' + k.slice(-4) : '••••';
 }
 
-function renderProviders() {
-  const box = $('#provList');
-  box.innerHTML = S.settings.providers
-    .map(
-      (p, i) => `<div class="prov" data-i="${i}">
-      <div class="row">
-        <label class="f">名称<input class="inp" data-k="name" value="${esc(p.name)}" /></label>
-        <label class="f">协议
-          <select class="inp" data-k="kind">
-            <option value="openai"${p.kind === 'openai' ? ' selected' : ''}>OpenAI 兼容</option>
-            <option value="anthropic"${p.kind === 'anthropic' ? ' selected' : ''}>Anthropic 兼容</option>
-          </select>
-        </label>
-      </div>
-      <div class="row">
-        <label class="f">Base URL<input class="inp" data-k="baseURL" value="${esc(p.baseURL)}" /></label>
-        <label class="f">模型${modelField(p)}</label>
-      </div>
-      <label class="f">API Key（只存本机）
-        <input class="inp" data-k="apiKey" type="password" placeholder="填你自己的 Key" value="${esc(p.apiKey)}" />
-      </label>
-      <div class="row" style="max-width:340px">
-        <button class="btn ghost" data-act="use">设为默认</button>
-        <button class="btn ghost" data-act="models">拉取模型</button>
-        <button class="btn ghost" data-act="del">删除</button>
-      </div>
-    </div>`
-    )
-    .join('');
+function provSummary(p) {
+  const n = (p.models || []).length;
+  const key = providerKey(p);
+  return `${key ? '已填 ' + maskKey(key) : '未填 Key'} · ${n} 个模型`;
+}
 
-  box.querySelectorAll('.prov').forEach((el) => {
-    const i = Number(el.dataset.i);
-    el.querySelectorAll('[data-k]').forEach((inp) => {
-      inp.addEventListener('input', () => {
-        S.settings.providers[i][inp.dataset.k] = inp.value;
-        persist();
-      });
+function providerListHTML() {
+  const list = S.settings.providers || [];
+  const row = (p, cls) => `
+    <div class="prov-row ${cls}" data-id="${p.id}">
+      <span class="pico">${esc((p.name || '?').slice(0, 1).toUpperCase())}</span>
+      <div class="pmeta"><b>${esc(p.name)}</b><small>${esc(provSummary(p))}</small></div>
+      <span class="pchip">${esc(p.activeModel || '—')}</span>
+      <label class="switch" data-toggle="${p.id}"><input type="checkbox" ${p.enabled ? 'checked' : ''}/><span></span></label>
+      <span class="chev">›</span>
+    </div>`;
+  const on = list.filter((p) => p.enabled !== false);
+  const off = list.filter((p) => p.enabled === false);
+
+  return `
+    <div class="prov-toolbar">
+      <input class="inp" id="provSearch" placeholder="查找供应商" />
+      <label class="switch"><input type="checkbox" id="provMask" ${S.settings.ui.maskKeys ? 'checked' : ''}/><span></span></label>
+      <span class="muted">账号打码</span>
+    </div>
+    ${on.length ? `<div class="prov-group">${on.map((p) => row(p, '')).join('')}</div>` : ''}
+    ${off.length ? `<div class="prov-group-title">已关闭的 ${off.length}</div><div class="prov-group">${off.map((p) => row(p, 'off')).join('')}</div>` : ''}
+    <button class="btn ghost" id="btnProvAdd" style="margin-top:10px">+ 添加供应商</button>`;
+}
+
+function providerDetailHTML(id) {
+  const p = S.settings.providers.find((x) => x.id === id);
+  if (!p) return providerListHTML();
+
+  const accs = p.accounts || [];
+  const mine = p.models || [];
+  const fetched = LLM.models[id] || [];
+  const all = Array.from(new Set([...mine, ...fetched]));
+
+  return `
+  <div class="pd-head">
+    <button class="btn ghost" id="pdBack">‹ 返回</button>
+    <b>${esc(p.name)}</b>
+    <span class="spacer"></span>
+    <label class="switch"><input type="checkbox" id="pdEnabled" ${p.enabled ? 'checked' : ''}/><span></span></label>
+  </div>
+
+  <div class="klist">
+    <div class="krow"><div class="klabel">名称</div><input class="inp kin" id="pdName" value="${esc(p.name)}" /></div>
+    <div class="krow"><div class="klabel">接口协议</div>
+      <select class="inp kin" id="pdKind">
+        <option value="openai"${p.kind === 'openai' ? ' selected' : ''}>OpenAI 兼容</option>
+        <option value="anthropic"${p.kind === 'anthropic' ? ' selected' : ''}>Anthropic 兼容</option>
+      </select>
+    </div>
+    <div class="krow"><div class="klabel">Base URL</div><input class="inp" style="flex:1;max-width:none" id="pdBase" value="${esc(p.baseURL)}" /></div>
+    <div class="krow"><div class="klabel">模型列表地址<small>留空按协议猜</small></div><input class="inp" style="flex:1;max-width:none" id="pdModelsURL" value="${esc(p.modelsURL || '')}" /></div>
+  </div>
+
+  <div class="pd-sec">
+    <h4>账号</h4>
+    <div id="pdAccounts">
+      ${accs.map((a) => `
+        <div class="acc-item" data-aid="${a.id}">
+          <input class="inp aname" data-a="name" value="${esc(a.name)}" placeholder="名称" />
+          <input class="inp" data-a="apiKey" type="password" value="${esc(a.apiKey)}" placeholder="API Key" />
+          <button class="btn ghost" data-act="use">${a.id === p.activeAccountId ? '首选' : '设为首选'}</button>
+          <button class="btn ghost" data-act="del">删除</button>
+        </div>`).join('')}
+    </div>
+    <button class="btn ghost" id="pdAddAcc">+ 添加账号</button>
+  </div>
+
+  <div class="pd-sec">
+    <h4>模型</h4>
+    <div class="chips" id="pdChips">
+      ${all.map((m) => `<span class="mchip ${mine.includes(m) ? 'on' : ''} ${m === p.activeModel ? 'cur' : ''}" data-m="${esc(m)}">${esc(m)}</span>`).join('')}
+    </div>
+    <div class="row actions" style="margin-top:10px">
+      <input class="inp" id="pdModelInput" placeholder="添加模型 ID" style="max-width:190px" />
+      <button class="btn" id="pdAddModel">添加模型</button>
+      <button class="btn" id="pdFetch">重新获取模型</button>
+      <button class="btn" id="pdTest">测试模型</button>
+      <span class="spacer"></span>
+      <span class="muted" id="pdModelCount">${mine.length} 个已选</span>
+    </div>
+    <div class="row actions" style="margin-top:10px">
+      <select class="inp kin" id="pdActiveModel" style="max-width:220px">
+        ${mine.map((m) => `<option${m === p.activeModel ? ' selected' : ''}>${esc(m)}</option>`).join('')}
+      </select>
+      <span class="muted">当前使用</span>
+    </div>
+  </div>
+
+  <div class="row actions" style="margin-top:18px">
+    <button class="btn primary" id="pdSave">保存</button>
+    <button class="btn ghost" id="pdRemove">移除</button>
+  </div>`;
+}
+
+function bindProviderDetail(id) {
+  const p = S.settings.providers.find((x) => x.id === id);
+  if (!p) return;
+
+  const rerender = () => renderLLM();
+
+  $('#pdBack').addEventListener('click', () => { LLM.detail = null; renderLLM(); });
+  $('#pdEnabled').addEventListener('change', (e) => { p.enabled = e.target.checked; persist(); renderLLM(); });
+  $('#pdName').addEventListener('input', (e) => { p.name = e.target.value; persist(); });
+  $('#pdKind').addEventListener('change', (e) => { p.kind = e.target.value; persist(); });
+  $('#pdBase').addEventListener('input', (e) => { p.baseURL = e.target.value; persist(); });
+  $('#pdModelsURL').addEventListener('input', (e) => { p.modelsURL = e.target.value; persist(); });
+
+  document.querySelectorAll('#pdAccounts .acc-item').forEach((el) => {
+    const aid = el.dataset.aid;
+    const acc = (p.accounts || []).find((a) => a.id === aid);
+    if (!acc) return;
+    el.querySelectorAll('[data-a]').forEach((inp) => {
+      inp.addEventListener('input', () => { acc[inp.dataset.a] = inp.value; persist(); });
     });
     el.querySelector('[data-act="use"]').addEventListener('click', () => {
-      S.settings.activeProviderId = S.settings.providers[i].id;
+      p.activeAccountId = aid;
       persist();
-      renderProviders();
-      toast('已设为默认');
-    });
-    el.querySelector('[data-act="models"]').addEventListener('click', async () => {
-      toast('拉取中…');
-      const r = await window.api.models(S.settings.providers[i]);
-      if (r.ok) {
-        MODELS_CACHE[S.settings.providers[i].id] = r.models;
-        renderProviders();
-        toast(`拉到 ${r.models.length} 个模型`);
-      } else {
-        toast('拉取失败：' + r.error, true);
-      }
+      rerender();
     });
     el.querySelector('[data-act="del"]').addEventListener('click', () => {
-      S.settings.providers.splice(i, 1);
+      if ((p.accounts || []).length <= 1) return toast('至少留一个账号', true);
+      p.accounts = p.accounts.filter((a) => a.id !== aid);
+      if (p.activeAccountId === aid) p.activeAccountId = p.accounts[0].id;
       persist();
-      renderProviders();
+      rerender();
     });
+  });
+
+  $('#pdAddAcc').addEventListener('click', () => {
+    p.accounts = p.accounts || [];
+    p.accounts.push({ id: 'acc' + Date.now().toString(36), name: '账号 ' + (p.accounts.length + 1), apiKey: '' });
+    persist();
+    rerender();
+  });
+
+  document.querySelectorAll('#pdChips .mchip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const m = chip.dataset.m;
+      const has = (p.models || []).includes(m);
+      p.models = has ? p.models.filter((x) => x !== m) : [...(p.models || []), m];
+      if (!p.models.length) p.models = [m];
+      if (!p.models.includes(p.activeModel)) p.activeModel = p.models[0];
+      persist();
+      rerender();
+    });
+  });
+
+  $('#pdAddModel').addEventListener('click', () => {
+    const v = $('#pdModelInput').value.trim();
+    if (!v) return;
+    if (!(p.models || []).includes(v)) p.models = [...(p.models || []), v];
+    p.activeModel = p.activeModel || v;
+    $('#pdModelInput').value = '';
+    persist();
+    rerender();
+    toast('已添加 ' + v);
+  });
+
+  $('#pdFetch').addEventListener('click', async () => {
+    toast('拉取中…');
+    const r = await window.api.models(flattenProvider(p));
+    if (r.ok) {
+      LLM.models[id] = r.models;
+      renderLLM();
+      toast(`拉到 ${r.models.length} 个模型`);
+    } else {
+      toast('拉取失败：' + r.error, true);
+    }
+  });
+
+  $('#pdTest').addEventListener('click', async () => {
+    toast('测试中…');
+    const r = await window.api.models(flattenProvider(p));
+    if (r.ok) toast(`连接成功，${r.models.length} 个模型`);
+    else toast('连接失败：' + r.error, true);
+  });
+
+  $('#pdActiveModel').addEventListener('change', (e) => { p.activeModel = e.target.value; persist(); });
+
+  $('#pdSave').addEventListener('click', () => {
+    persist();
+    toast('已保存');
+  });
+
+  $('#pdRemove').addEventListener('click', () => {
+    S.settings.providers = S.settings.providers.filter((x) => x.id !== id);
+    if (S.settings.activeProviderId === id) {
+      const first = S.settings.providers[0];
+      S.settings.activeProviderId = first ? first.id : '';
+    }
+    LLM.detail = null;
+    persist();
+    renderLLM();
+    toast('已移除');
   });
 }
 
-async function testProvider() {
+function bindProviderList() {
+  document.querySelectorAll('.prov-row').forEach((row) => {
+    const id = row.dataset.id;
+    const p = S.settings.providers.find((x) => x.id === id);
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.switch')) return;
+      LLM.detail = id;
+      renderLLM();
+    });
+    const sw = row.querySelector('[data-toggle] input');
+    if (sw) {
+      sw.addEventListener('change', (e) => {
+        p.enabled = e.target.checked;
+        if (p.enabled) S.settings.activeProviderId = id;
+        persist();
+        renderLLM();
+      });
+    }
+  });
+
+  $('#provMask').addEventListener('change', (e) => {
+    S.settings.ui.maskKeys = e.target.checked;
+    persist();
+    renderLLM();
+  });
+
+  $('#provSearch').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.prov-row').forEach((row) => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+
+  $('#btnProvAdd').addEventListener('click', () => {
+    const id = 'p' + Date.now().toString(36);
+    S.settings.providers.push({
+      id,
+      name: '新供应商',
+      kind: 'openai',
+      baseURL: 'https://api.openai.com/v1',
+      modelsURL: '',
+      enabled: true,
+      accounts: [{ id: 'acc' + Date.now().toString(36), name: '默认', apiKey: '' }],
+      activeAccountId: '',
+      models: [],
+      activeModel: ''
+    });
+    const np = S.settings.providers[S.settings.providers.length - 1];
+    np.activeAccountId = np.accounts[0].id;
+    persist();
+    LLM.detail = id;
+    renderLLM();
+  });
+}
+
+function renderLLM() {
+  const box = $('#llmPanel');
+  if (!box) return;
+  box.innerHTML = LLM.detail ? providerDetailHTML(LLM.detail) : providerListHTML();
+  if (LLM.detail) bindProviderDetail(LLM.detail);
+  else bindProviderList();
+}
+
+function renderProviders() {
+  renderLLM();
+}
+
+const persist = debounce(() => window.api.settings.set(S.settings), 200);
+
+$('#btnProvTest') && $('#btnProvTest').addEventListener('click', async () => {
   const p = activeProvider();
   if (!p) return toast('没有可用服务', true);
   toast('测试中…');
   const r = await window.api.models(p);
   if (r.ok) toast(`连接成功，${r.models.length} 个模型`);
   else toast('连接失败：' + r.error, true);
-}
-
-const persist = debounce(() => window.api.settings.set(S.settings), 200);
-
-$('#btnProvAdd').addEventListener('click', () => {
-  S.settings.providers.push({
-    id: 'p' + Date.now().toString(36),
-    name: '新服务',
-    kind: 'openai',
-    baseURL: 'https://api.openai.com/v1',
-    apiKey: '',
-    model: 'gpt-4o-mini'
-  });
-  persist();
-  renderProviders();
 });
-$('#btnProvTest').addEventListener('click', testProvider);
 
-$('#setWidth').addEventListener('input', (e) => {
-  S.settings.ui.shotWidth = Number(e.target.value) || 1600;
-  persist();
-});
-$('#setAutoShot').addEventListener('change', (e) => {
-  S.settings.ui.autoShot = e.target.value === '1';
-  persist();
-});
 
 $('#btnDataDir').addEventListener('click', () => window.api.openPath(S.info.userData));
+
+
+/* ---------------- 设置页 ---------------- */
+
+function renderBackupList(items) {
+  const box = $('#backupList');
+  if (!box) return;
+  if (!items.length) {
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = items
+    .map(
+      (it) => `<div class="vrow" data-path="${esc(it.path)}">
+        <span>${esc(new Date(it.mtime).toLocaleString())} · ${Math.round(it.size / 1024)} KB</span>
+        <button class="btn ghost" data-act="restore">恢复…</button>
+      </div>`
+    )
+    .join('');
+  box.querySelectorAll('[data-act="restore"]').forEach((b) => {
+    b.addEventListener('click', async () => {
+      const file = b.closest('.vrow').dataset.path;
+      const r = await window.api.backup.restore(file);
+      if (!r.ok) return toast('恢复失败：' + r.error, true);
+      S.settings = r.settings;
+      renderLLM();
+      fillTemplateSelect();
+      toast('已恢复，重启后全部生效');
+    });
+  });
+}
+
+async function refreshBackup() {
+  const r = await window.api.backup.list();
+  if (r.ok) {
+    renderBackupList(r.items);
+    $('#backupLast').textContent = r.items.length ? `${r.items.length} 份` : '还没有备份';
+  }
+  const d = await window.api.backup.dir();
+  const dir = (d && d.ok !== false && typeof d === 'string') ? d : '';
+  $('#backupDirText').textContent = S.settings.backup.dir || (dir ? '默认 · ' + dir : '默认');
+  $('#backupDirText').title = dir;
+}
+
+async function bindSettingsPage(ri) {
+  const ui = S.settings.ui;
+  const bk = S.settings.backup;
+
+  $('#setWidth').value = ui.shotWidth || 1600;
+  $('#setAutoShot').value = ui.autoShot ? '1' : '0';
+  $('#setProtocol').value = ui.protocol || 'auto';
+  $('#setConfirmQuit').value = ui.confirmQuit ? '1' : '0';
+  $('#setWithKeys').value = bk.withKeys ? '1' : '0';
+  $('#setBackupAuto').value = bk.auto || 'off';
+  $('#setBackupKeep').value = String(bk.keep || 7);
+  $('#setPort').value = ui.remotePort || 8765;
+
+  $('#setWidth').addEventListener('input', (e) => {
+    S.settings.ui.shotWidth = Number(e.target.value) || 1600;
+    persist();
+  });
+  $('#setAutoShot').addEventListener('change', (e) => {
+    S.settings.ui.autoShot = e.target.value === '1';
+    persist();
+  });
+  $('#setProtocol').addEventListener('change', (e) => {
+    S.settings.ui.protocol = e.target.value;
+    $('#protocol').value = e.target.value;
+    persist();
+  });
+  $('#setConfirmQuit').addEventListener('change', (e) => {
+    S.settings.ui.confirmQuit = e.target.value === '1';
+    persist();
+  });
+  $('#setWithKeys').addEventListener('change', (e) => {
+    S.settings.backup.withKeys = e.target.value === '1';
+    persist();
+  });
+  $('#setBackupAuto').addEventListener('change', (e) => {
+    S.settings.backup.auto = e.target.value;
+    persist();
+    toast(e.target.value === 'off' ? '已关闭自动备份' : '已开启自动备份');
+  });
+  $('#setBackupKeep').addEventListener('change', (e) => {
+    S.settings.backup.keep = Number(e.target.value) || 7;
+    persist();
+  });
+  $('#setPort').addEventListener('change', (e) => {
+    S.settings.ui.remotePort = Number(e.target.value) || 8765;
+    persist();
+    toast('端口已保存，重启后生效');
+  });
+
+  // 开机自启
+  try {
+    const auto = await window.api.app.loginItem();
+    $('#setLogin').value = auto ? '1' : '0';
+  } catch (e) {
+    $('#setLogin').value = '0';
+  }
+  $('#setLogin').addEventListener('change', async (e) => {
+    const on = e.target.value === '1';
+    const r = await window.api.app.loginItem(on);
+    S.settings.ui.launchAtLogin = !!r;
+    persist();
+    toast(r ? '已设置开机自启' : '已关闭开机自启');
+  });
+
+  // 网络
+  if (ri && ri.url) {
+    $('#remoteText').textContent = ri.url;
+    $('#remoteText').title = ri.url;
+    $('#remoteText').onclick = () => window.api.clipboard(ri.url);
+  } else if (ri && ri.error) {
+    $('#remoteText').textContent = '未启动：' + ri.error;
+  }
+  $('#btnCopyRemote').addEventListener('click', async () => {
+    const txt = (ri && ri.url) || '';
+    if (!txt) return toast('还没有地址', true);
+    try { await navigator.clipboard.writeText(txt); } catch (e) { await window.api.clipboard(txt); }
+    toast('已复制');
+  });
+
+  // 备份
+  $('#btnBackupNow').addEventListener('click', async () => {
+    const r = await window.api.backup.now();
+    if (!r.ok) return toast('备份失败：' + r.error, true);
+    toast('已备份');
+    refreshBackup();
+  });
+  $('#btnBackupDir').addEventListener('click', async () => {
+    const r = await window.api.backup.choose();
+    if (r.canceled) return;
+    S.settings.backup.dir = r.dir || '';
+    persist();
+    refreshBackup();
+  });
+  $('#btnBackupShow').addEventListener('click', () => window.api.backup.show());
+  refreshBackup();
+
+  // 导出 / 导入
+  $('#btnExport').addEventListener('click', async () => {
+    const withKeys = $('#setWithKeys').value === '1';
+    const r = await window.api.settings.export(withKeys);
+    if (r.canceled) return;
+    if (r.ok) toast('已导出到 ' + r.path);
+    else toast('导出失败：' + r.error, true);
+  });
+  $('#btnImport').addEventListener('click', async () => {
+    const r = await window.api.settings.import();
+    if (r.canceled) return;
+    if (!r.ok) return toast('导入失败：' + r.error, true);
+    S.settings = r.settings;
+    renderLLM();
+    fillTemplateSelect();
+    toast('已导入，重启后全部生效');
+  });
+
+  // 关于
+  $('#aboutVer').textContent = 'v' + S.info.version;
+  $('#aboutDir').textContent = S.info.userData || '-';
+  $('#aboutDir').title = S.info.userData || '';
+  $('#btnRepo').addEventListener('click', () => window.api.openExternal('https://github.com/VVen1F/refract'));
+}
 
 /* ---------------- 更新 ---------------- */
 
@@ -916,14 +1287,11 @@ async function boot() {
   $('#req').value = SAMPLE;
   $('#res').innerHTML = '<div class="empty">发送后显示响应</div>';
   $('#scheme').value = 'https';
-  $('#setWidth').value = S.settings.ui.shotWidth || 1600;
-  $('#setAutoShot').value = S.settings.ui.autoShot ? '1' : '0';
 
   renderProviders();
   renderTplList();
   fillTemplateSelect();
   if (S.templates.length) selectTpl(S.templates[0].id);
-
   $('#btnReveal').disabled = true;
   $('#updateText').textContent = `当前版本 v${S.info.version}`;
   $('#protocol').value = (S.settings.ui && S.settings.ui.protocol) || 'auto';
@@ -932,41 +1300,7 @@ async function boot() {
   bindPerm();
   refreshPerm();
   renderGateway(ri);
-  if (ri && ri.url) {
-    $('#remoteText').innerHTML = '局域网内其他设备打开：<br><b>' + esc(ri.url) + '</b>';
-    $('#remoteText').onclick = () => window.api.clipboard(ri.url);
-  } else if (ri && ri.error) {
-    $('#remoteText').textContent = '未启动：' + ri.error;
-  }
-  $('#setPort').value = (S.settings.ui && S.settings.ui.remotePort) || 8765;
-  $('#setPort').addEventListener('change', (e) => {
-    S.settings.ui.remotePort = Number(e.target.value) || 8765;
-    persist();
-    toast('端口已保存，重启后生效');
-  });
-  $('#btnExport').addEventListener('click', async () => {
-    const withKeys = $('#setWithKeys').value === '1';
-    const r = await window.api.settings.export(withKeys);
-    if (r.canceled) return;
-    if (r.ok) toast('已导出到 ' + r.path);
-    else toast('导出失败：' + r.error, true);
-  });
-  $('#btnImport').addEventListener('click', async () => {
-    const r = await window.api.settings.import();
-    if (r.canceled) return;
-    if (!r.ok) return toast('导入失败：' + r.error, true);
-    S.settings = r.settings;
-    renderProviders();
-    fillTemplateSelect();
-    toast('已导入，重启后全部生效');
-  });
-
-  $('#btnCopyRemote').addEventListener('click', async () => {
-    const txt = (ri && ri.url) || '';
-    if (!txt) return toast('还没有地址', true);
-    try { await navigator.clipboard.writeText(txt); } catch (e) { await window.api.clipboard(txt); }
-    toast('已复制');
-  });
+  await bindSettingsPage(ri);
   $('#protocol').addEventListener('change', (e) => {
     S.settings.ui.protocol = e.target.value;
     persist();

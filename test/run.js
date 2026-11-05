@@ -105,6 +105,24 @@ function ok(name, cond, extra) {
   ok('h2 body 透传', h2.text.includes('"proto":"2.0"'));
   s2.close();
 
+  console.log('\n[备份]');
+  const backup = require('../electron/backup.js');
+  const bkCfg = store.load();
+  bkCfg.backup.keep = 2;
+  for (let i = 0; i < 4; i++) backup.snapshot(bkCfg, false);
+  const bkList = backup.list(bkCfg);
+  ok('保留份数生效', bkList.length === 2, `实际 ${bkList.length}`);
+  const bkJson = JSON.parse(fs.readFileSync(bkList[0].path, 'utf8'));
+  ok('默认不含 Key', bkJson.providers.every((p) => (p.accounts || []).every((a) => !a.apiKey)));
+  ok('能读回来', Array.isArray(backup.restore(bkList[0].path).providers));
+  ok('到期判断', backup.due({ backup: { auto: '1h', lastAt: new Date().toISOString() } }) === false);
+
+  console.log('\n[旧配置迁移]');
+  const oldProv = { id: 'x', name: 'X', kind: 'openai', baseURL: 'u', apiKey: 'k1', model: 'm1' };
+  const mig = store.migrateProvider(oldProv);
+  ok('apiKey 变成账号', mig.accounts.length === 1 && mig.accounts[0].apiKey === 'k1');
+  ok('model 变成模型列表', mig.models[0] === 'm1' && mig.activeModel === 'm1');
+
   console.log('\n[报告保存]');
   const saved = report.save({ markdown: '# t', images: [], title: 'demo', baseDir: path.join(process.env.REFRACT_DATA_DIR, 'reports') });
   ok('生成 report.md', fs.existsSync(saved.md));

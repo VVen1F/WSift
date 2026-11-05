@@ -12,9 +12,11 @@ const shot = require('./shot');
 const updater = require('./updater');
 const browser = require('./browser');
 const remote = require('./remote');
+const backup = require('./backup');
 
 let mainWindow = null;
 let remoteInfo = null;
+let quitting = false;
 const SMOKE = process.argv.includes('--smoke');
 
 function windowState() {
@@ -75,12 +77,30 @@ function createWindow() {
       app.exit(1);
     }
   });
-  mainWindow.on('close', () => {
+  mainWindow.on('close', (e) => {
     try {
       const b = mainWindow.getNormalBounds ? mainWindow.getNormalBounds() : mainWindow.getBounds();
       fs.writeFileSync(path.join(app.getPath('userData'), 'window.json'), JSON.stringify(b));
-    } catch (e) {
+    } catch (err) {
       /* 忽略 */
+    }
+    const cfg = store.load();
+    if (cfg.ui.confirmQuit && !quitting) {
+      e.preventDefault();
+      dialog
+        .showMessageBox(mainWindow, {
+          type: 'question',
+          buttons: ['退出', '取消'],
+          defaultId: 1,
+          cancelId: 1,
+          message: '确定要退出 Refract 吗？'
+        })
+        .then((r) => {
+          if (r.response === 0) {
+            quitting = true;
+            mainWindow.close();
+          }
+        });
     }
   });
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -124,6 +144,20 @@ app.whenReady().then(async () => {
   } catch (e) {
     remoteInfo = { error: e.message };
   }
+
+  // 每 5 分钟看一次要不要自动备份
+  setInterval(() => {
+    try {
+      const cfg = store.load();
+      if (backup.due(cfg)) {
+        backup.snapshot(cfg, cfg.backup.withKeys);
+        cfg.backup.lastAt = new Date().toISOString();
+        store.save(cfg);
+      }
+    } catch (e) {
+      /* 备份失败不影响主流程 */
+    }
+  }, 5 * 60 * 1000);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -279,6 +313,53 @@ browser.onDialog(async (info) => {
 
 browser.onDialogClosed(() => {
   if (burstCtl) burstCtl.stop = true;
+});
+
+ipcMain.handle('backup:dir', () => backup.dirOf(store.load()));
+
+ipcMain.handle('backup:now', () => {
+  try {
+    const cfg = store.load();
+    const file = backup.snapshot(cfg, cfg.backup.withKeys);
+    cfg.backup.lastAt = new Date().toISOString();
+    store.save(cfg);
+    return { ok: true, path: file };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('backup:list', () => {
+  try { return { ok: true, items: backup.list(store.load()) }; }
+  catch (e) { return { ok: false, error: e.message, items: [] }; }
+});
+
+ipcMain.handle('backup:restore', (_e, file) => {
+  try {
+    const settings = store.save({ ...store.load(), ...backup.restore(file) });
+    return { ok: true, settings };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('backup:choose', async () => {
+  const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return { canceled: true };
+  return { ok: true, dir: r.filePaths[0] };
+});
+
+ipcMain.handle('backup:show', async () => {
+  const dir = backup.dirOf(store.load());
+  await shell.openPath(dir);
+  return { ok: true, dir };
+});
+
+ipcMain.handle('app:loginItem', (_e, enable) => {
+  if (typeof enable === 'boolean') {
+    try { app.setLoginItemSettings({ openAtLogin: enable }); } catch (e) { /* ignore */ }
+  }
+  try { return app.getLoginItemSettings().openAtLogin; } catch (e) { return false; }
 });
 
 ipcMain.handle('perm:screen', () => ({ status: shot.screenAccess(), platform: process.platform }));

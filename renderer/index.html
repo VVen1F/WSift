@@ -218,66 +218,134 @@
       <div class="card" style="flex:1">
         <div class="card-h">设置</div>
         <div class="settings" id="settingsScroll">
+
           <div class="sect" id="sect-general">
             <h3>常规</h3>
-            <div class="row" style="max-width:520px">
-              <label class="f">截图宽度（px）
-                <input class="inp" id="setWidth" type="number" min="800" max="2600" step="40" />
-              </label>
-              <label class="f">发送后自动截图
-                <select class="inp" id="setAutoShot"><option value="0">关</option><option value="1">开</option></select>
-              </label>
-            </div>
-            <div class="perm-row">
-              <div class="perm-label">屏幕录制权限<small>拍浏览器弹窗要用</small></div>
-              <div class="perm-state" id="permText">检测中…</div>
-              <button class="btn" id="btnPermAsk">去授权</button>
-              <button class="btn" id="btnPermCheck">重新检测</button>
+            <div class="klist">
+              <div class="krow">
+                <div class="klabel">截图宽度<small>请求 / 响应截图的像素宽度</small></div>
+                <input class="inp kin" id="setWidth" type="number" min="800" max="2600" step="40" />
+              </div>
+              <div class="krow">
+                <div class="klabel">发送后自动截图</div>
+                <select class="inp kin" id="setAutoShot"><option value="0">关闭</option><option value="1">开启</option></select>
+              </div>
+              <div class="krow">
+                <div class="klabel">默认协议</div>
+                <select class="inp kin" id="setProtocol">
+                  <option value="auto">自动</option>
+                  <option value="http1.1">HTTP/1.1</option>
+                  <option value="h2">HTTP/2</option>
+                </select>
+              </div>
+              <div class="krow">
+                <div class="klabel">屏幕录制权限<small>拍浏览器弹窗要用</small></div>
+                <div class="kval" id="permText">检测中…</div>
+                <button class="btn" id="btnPermAsk">去授权</button>
+                <button class="btn" id="btnPermCheck">重新检测</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">开机自启</div>
+                <select class="inp kin" id="setLogin"><option value="0">关闭</option><option value="1">开启</option></select>
+              </div>
+              <div class="krow">
+                <div class="klabel">退出前询问</div>
+                <select class="inp kin" id="setConfirmQuit"><option value="0">关闭</option><option value="1">开启</option></select>
+              </div>
             </div>
           </div>
 
           <div class="sect" id="sect-network">
             <h3>网络</h3>
-            <div style="color:var(--muted);font-size:12px;line-height:1.7" id="remoteText">启动后显示地址</div>
-            <div class="row" style="max-width:420px;align-items:flex-end">
-              <label class="f">端口<input class="inp" id="setPort" type="number" min="1024" max="65535" step="1" /></label>
-              <button class="btn" id="btnCopyRemote">复制地址</button>
+            <div class="klist">
+              <div class="krow">
+                <div class="klabel">网关地址<small>同一局域网的其他设备打开这个地址</small></div>
+                <div class="kval" id="remoteText">启动后显示</div>
+                <button class="btn" id="btnCopyRemote">复制</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">端口<small>改完重启生效</small></div>
+                <input class="inp kin" id="setPort" type="number" min="1024" max="65535" step="1" />
+              </div>
             </div>
           </div>
 
           <div class="sect" id="sect-llm">
             <h3>LLM</h3>
-            <div id="provList"></div>
-            <div class="row" style="max-width:340px">
-              <button class="btn" id="btnProvAdd">添加服务</button>
-              <button class="btn" id="btnProvTest">测试连接</button>
-            </div>
+            <div id="llmPanel"></div>
           </div>
 
           <div class="sect" id="sect-backup">
-            <h3>备份</h3>
-            <div style="color:var(--muted);font-size:12px;line-height:1.7">导出模型服务、模板以外的工作区设置，换机器时导回去。</div>
-            <div class="row" style="max-width:520px;align-items:flex-end">
-              <label class="f">导出时带上 API Key
-                <select class="inp" id="setWithKeys"><option value="0">不带</option><option value="1">带上</option></select>
-              </label>
-              <button class="btn" id="btnExport">导出配置</button>
-              <button class="btn" id="btnImport">导入配置</button>
+            <h3>同步与备份</h3>
+            <div class="klist">
+              <div class="krow">
+                <div class="klabel">导出<small>把设置写成一份 JSON</small></div>
+                <select class="inp kin" id="setWithKeys" style="max-width:120px"><option value="0">不带 Key</option><option value="1">带上 Key</option></select>
+                <button class="btn" id="btnExport">导出…</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">导入</div>
+                <button class="btn" id="btnImport">导入…</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">自动备份</div>
+                <select class="inp kin" id="setBackupAuto">
+                  <option value="off">关闭</option>
+                  <option value="1h">1 小时</option>
+                  <option value="6h">6 小时</option>
+                  <option value="1d">1 天</option>
+                  <option value="1w">1 周</option>
+                </select>
+              </div>
+              <div class="krow">
+                <div class="klabel">保留份数</div>
+                <select class="inp kin" id="setBackupKeep">
+                  <option value="3">3</option><option value="7">7</option><option value="14">14</option><option value="30">30</option>
+                </select>
+              </div>
+              <div class="krow">
+                <div class="klabel">备份文件夹</div>
+                <div class="kval" id="backupDirText">默认</div>
+                <button class="btn" id="btnBackupDir">更改…</button>
+                <button class="btn" id="btnBackupShow">显示</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">版本<small>点一份可以恢复</small></div>
+                <div class="kval" id="backupLast">还没有备份</div>
+                <button class="btn" id="btnBackupNow">立即备份</button>
+              </div>
             </div>
+            <div class="vlist" id="backupList"></div>
           </div>
 
           <div class="sect" id="sect-about">
             <h3>关于</h3>
-            <div style="color:var(--muted);font-size:12px;line-height:1.7">
-              Refract · 漏洞测试与报告工作台<br />
-              数据保存在本机，不上传任何请求内容。
+            <div class="klist">
+              <div class="krow">
+                <div class="klabel">版本</div>
+                <div class="kval" id="aboutVer">-</div>
+                <button class="btn" id="btnCheckUpdate">检查更新</button>
+                <button class="btn primary" id="btnDoUpdate" disabled>下载并安装</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">数据目录</div>
+                <div class="kval" id="aboutDir">-</div>
+                <button class="btn" id="btnDataDir">打开</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">项目主页</div>
+                <div class="kval">github.com/VVen1F/refract</div>
+                <button class="btn" id="btnRepo">打开</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">开源许可</div>
+                <div class="kval">MIT</div>
+              </div>
+              <div class="krow">
+                <div class="klabel">更新状态</div>
+                <div class="kval" id="updateText">-</div>
+              </div>
             </div>
-            <div class="row" style="max-width:520px;align-items:flex-end">
-              <button class="btn" id="btnCheckUpdate">检查更新</button>
-              <button class="btn primary" id="btnDoUpdate" disabled>下载并安装</button>
-              <button class="btn" id="btnDataDir">打开数据目录</button>
-            </div>
-            <div style="color:var(--muted);font-size:12px" id="updateText">当前版本 v-</div>
           </div>
         </div>
       </div>

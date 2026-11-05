@@ -68,6 +68,18 @@ contextBridge.exposeInMainWorld('api', {
 
   clipboard: (text) => ipcRenderer.invoke('clipboard:write', text),
 
+  backup: {
+    now: () => ipcRenderer.invoke('backup:now'),
+    list: () => ipcRenderer.invoke('backup:list'),
+    restore: (file) => ipcRenderer.invoke('backup:restore', file),
+    choose: () => ipcRenderer.invoke('backup:choose'),
+    show: () => ipcRenderer.invoke('backup:show'),
+    dir: () => ipcRenderer.invoke('backup:dir')
+  },
+  app: {
+    loginItem: (enable) => ipcRenderer.invoke('app:loginItem', enable)
+  },
+
   perm: {
     screen: () => ipcRenderer.invoke('perm:screen'),
     request: () => ipcRenderer.invoke('perm:request'),

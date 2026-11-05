@@ -46,8 +46,8 @@
 
   /* 代码区 */
   .code {
-    margin: 0; padding: 4px 12px 10px 44px; flex: 1 1 auto; min-height: 508px;
-    font: 12px/14.5px Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+    margin: 0; padding: 1px 12px 10px 34px; flex: 1 1 auto; min-height: 506px;
+    font: 12px/14.5px Menlo, Consolas, "SF Mono", "DejaVu Sans Mono", monospace;
     white-space: pre-wrap; overflow-wrap: anywhere; color: #1f1f1f; overflow: hidden;
     background-image: none;
     background-repeat: no-repeat;
@@ -56,9 +56,9 @@
   .ln { position: relative; min-height: 14.5px; }
   .ln::before {
     counter-increment: ln; content: counter(ln);
-    position: absolute; left: -38px; top: 0; width: 28px;
+    position: absolute; left: -29px; top: 0; width: 28px;
     text-align: right; color: #a0a0a0;
-    font: 11.5px/14.5px Consolas, Menlo, monospace;
+    font: 11.5px/14.5px Menlo, Consolas, monospace;
   }
   .hn { color: #000080; }
   .cv { color: #800000; }
@@ -75,7 +75,7 @@
   .tools-left { display: block; height: 22px; width: 89px; }
   .arrow { width: 22px; height: 20px; border: 1px solid #d6d6d6; border-radius: 3px; display: grid; place-items: center; color: #555; }
   .search {
-    flex: 1 1 auto; height: 26px; border: 1px solid #c9c9c9; border-radius: 2px;
+    flex: 1 1 auto; height: 20px; border: 1px solid #c9c9c9; border-radius: 2px;
     display: flex; align-items: center; padding: 0 8px; color: #8a8a8a; font-size: 12px;
   }
   .search .ph { flex: 1 1 auto; }
@@ -89,6 +89,11 @@
     gap: 8px; padding: 23px 0; border-bottom: 1px solid #e2e2e2;
   }
   .rail-gap { flex: 1 1 auto; }
+  /* 四段高度按原图钉死，不受字体影响 */
+  .rail-item:nth-child(1) { min-height: 127px; }
+  .rail-item:nth-child(2) { min-height: 105px; }
+  .rail-item:nth-child(3) { min-height: 146px; }
+  .rail-item:nth-child(4) { min-height: 162px; }
   .rail-ico { width: 17px; height: 16px; display: block; }
   .rail-ico.gear { width: 18px; height: 18px; }
   .rail-item span {

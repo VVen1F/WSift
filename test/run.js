@@ -235,9 +235,36 @@ function ok(name, cond, extra) {
   require('../electron/main.js');
   await new Promise((r) => setTimeout(r, 50));
   ok('注册了 IPC', handlers.size >= 10, `实际 ${handlers.size}`);
-  for (const ch of ['http:send', 'shot:capture', 'settings:get', 'templates:list', 'llm:chat', 'report:save', 'update:check']) {
+  for (const ch of ['http:send', 'shot:capture', 'settings:get', 'templates:list', 'llm:chat', 'report:save', 'update:check', 'tasks:list', 'tasks:save']) {
     ok(`IPC ${ch}`, handlers.has(ch));
   }
+
+  console.log('\n[报告任务]');
+  const tasksMod = require('../electron/tasks.js');
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
+  ok('版本 0.6.3', pkg.version === '0.6.3');
+  const savedTasks = tasksMod.saveAll([
+    { id: 'a', title: '', detail: '请求：\n```http\nGET /admin HTTP/1.1', markdown: '', apiKey: 'SECRETKEY' },
+    { id: 'b', title: '自定义标题', markdown: '# 别的', detail: 'x' },
+    { id: 'c', title: '', markdown: '# 某社区草稿保存接口存在越权', detail: '' },
+    { title: '没有 id' },
+    { id: 'a', title: '后来的' }
+  ]);
+  ok('丢掉没有 id 的草稿', savedTasks.tasks.length === 3);
+  ok('同 id 以后写的为准', savedTasks.tasks.find((t) => t.id === 'a').title === '后来的');
+  ok('草稿不带 Key 字段', !Object.prototype.hasOwnProperty.call(savedTasks.tasks[0], 'apiKey') && !JSON.stringify(savedTasks).includes('SECRETKEY'));
+  ok('详情里的请求行当标题', tasksMod.displayTitle({ title: '', detail: '请求：\n```http\nGET /admin HTTP/1.1' }) === 'GET /admin HTTP/1.1');
+  ok('自定义标题优先', tasksMod.displayTitle(savedTasks.tasks.find((t) => t.id === 'b')) === '自定义标题');
+  ok('用一级标题', tasksMod.displayTitle(savedTasks.tasks.find((t) => t.id === 'c')) === '某社区草稿保存接口存在越权');
+  ok('空草稿叫未命名', tasksMod.displayTitle({ title: '  ', markdown: '# 报告', detail: '请求：' }) === '未命名');
+  ok('能读回草稿', tasksMod.load().tasks.length === 3);
+  ok('清空草稿', tasksMod.saveAll([]).tasks.length === 0 && tasksMod.load().tasks.length === 0);
+  const ui = ['renderer/index.html', 'renderer/app.js', 'renderer/style.css']
+    .map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'))
+    .join('\n');
+  ok('侧栏有报告列表', ui.includes('id="taskList"') && ui.includes('>清空<') && ui.includes('确认清空'));
+  ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);
   process.exit(fail ? 1 : 0);

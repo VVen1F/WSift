@@ -24,15 +24,20 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5S14.4 18.2 12 20.5c-2.4-2.3-3.6-5.2-3.6-8.5S9.6 5.8 12 3.5z"/></svg>
       浏览器
     </button>
-    <button class="nav" data-page="report">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
-      报告
-    </button>
     <button class="nav" data-page="templates">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="15" width="7" height="5" rx="1.5"/></svg>
       模板
     </button>
-    <div class="grow"></div>
+
+    <div class="task-sec">
+      <div class="task-sec-h">
+        <button class="task-sec-label" id="btnReports" type="button">报告</button>
+        <button class="btn ghost sm" id="btnTaskNew" type="button">新建</button>
+      </div>
+      <div class="task-scroll" id="taskList"></div>
+      <button class="task-clear" id="btnTasksClear" type="button" hidden>清空</button>
+      <div class="task-fill"></div>
+    </div>
 
     <div class="side-foot">
       <button class="nav" id="navSettings">
@@ -57,14 +62,9 @@
     <!-- 首页 -->
     <section class="page on" id="page-home">
       <div class="home" id="home">
-        <div class="hero" id="hero">
-          <h1 id="heroTitle">早上好</h1>
-          <p class="sub">拖入请求，或直接描述要做的事</p>
-        </div>
-
         <div class="chat" id="chatLog">
           <div class="chat-empty" id="chatEmpty">
-            <div class="hint">把请求拖进输入框，或直接说要做什么</div>
+            <div class="hint">还没有消息</div>
           </div>
         </div>
 
@@ -73,7 +73,7 @@
 
           <div class="composer" id="composer">
             <div class="c-top">
-              <textarea id="chatInput" rows="1" placeholder="描述要做的事"></textarea>
+              <textarea id="chatInput" rows="1" placeholder="粘贴请求，或说明要写的报告"></textarea>
             </div>
             <div class="c-bottom">
               <button class="c-btn" id="btnAttach" title="添加文件">
@@ -91,11 +91,9 @@
           </div>
 
           <div class="quick">
-            <button class="q-chip" data-q="report">写一份报告</button>
-            <button class="q-chip" data-q="risk">看看有没有风险</button>
-            <button class="q-chip" data-q="test">去测试接口</button>
-            <span class="spacer"></span>
-            <span class="stats" id="homeStats"></span>
+            <button class="q-chip" data-q="report">写报告</button>
+            <button class="q-chip" data-q="risk">查风险</button>
+            <button class="q-chip" data-q="test">去测试</button>
           </div>
 
           <div class="model-pop" id="modelPop" hidden></div>
@@ -116,7 +114,7 @@
         <button class="btn primary" id="btnSend">发送 ⌘↵</button>
         <button class="btn" id="btnShot">截图</button>
         <span class="spacer"></span>
-        <button class="btn ghost" id="btnToReport">作为报告材料 →</button>
+        <button class="btn ghost" id="btnToReport">放入报告</button>
       </div>
 
       <div class="sheet">
@@ -160,35 +158,39 @@
 
     <!-- 报告 -->
     <section class="page" id="page-report">
-      <div class="report-grid">
-        <div class="sheet left">
-          <div class="pane-h">报告材料</div>
-          <div class="form">
-            <label class="f">模板<select class="inp" id="rTemplate"></select></label>
-            <label class="f">账号密码
-              <textarea class="inp" id="rCred" placeholder="测试账号、口令，没有就留空"></textarea>
-            </label>
-            <label class="f grow">漏洞详情
-              <textarea class="inp" id="rDetail" placeholder="粘请求和响应，写清现象和复现条件"></textarea>
-            </label>
-            <label class="f">其他要求
-              <textarea class="inp" id="rExtra" placeholder="可选。例如：强调未授权访问"></textarea>
-            </label>
-            <div class="row actions">
-              <button class="btn primary" id="btnGen">生成报告</button>
-              <button class="btn" id="btnSave">导出</button>
-            </div>
+      <div class="report-empty" id="reportEmpty">
+        <p id="reportEmptyText">还没有报告</p>
+        <button class="btn primary" id="btnReportNew" type="button">新建</button>
+      </div>
+      <div class="narrow report-col" id="reportCol" hidden>
+        <div class="report-top">
+          <input class="title-input" id="rTitle" placeholder="标题" autocomplete="off" spellcheck="false" />
+          <div class="btns">
+            <button class="btn" id="btnSave" type="button">导出</button>
+            <button class="btn primary" id="btnGen" type="button">生成</button>
           </div>
         </div>
-
-        <div class="sheet right">
-          <div class="pane-h">预览
+        <div class="form">
+          <label class="f">模板<select class="inp" id="rTemplate"></select></label>
+          <label class="f">账号密码
+            <textarea class="inp" id="rCred" placeholder="测试账号、口令，没有就留空"></textarea>
+          </label>
+          <label class="f">漏洞详情
+            <textarea class="inp" id="rDetail" placeholder="粘请求和响应，写清现象和复现条件"></textarea>
+          </label>
+          <label class="f">其他要求
+            <textarea class="inp" id="rExtra" placeholder="可选。例如：强调未授权访问"></textarea>
+          </label>
+        </div>
+        <div class="preview-block">
+          <div class="pane-h">
+            <span>预览</span>
+            <span id="genStatus" class="pane-meta">未生成</span>
             <span class="spacer"></span>
-            <button class="btn ghost" id="btnCopy">复制</button>
-            <button class="btn ghost" id="btnReveal">打开文件夹</button>
+            <button class="btn ghost" id="btnCopy" type="button">复制</button>
+            <button class="btn ghost" id="btnReveal" type="button">打开文件夹</button>
           </div>
-          <div class="md" id="mdPreview"><div class="empty">生成后会显示在这里</div></div>
-          <div class="status"><span id="genStatus">未生成</span></div>
+          <div class="md" id="mdPreview"><div class="empty">生成后显示在这里</div></div>
         </div>
       </div>
     </section>
@@ -281,9 +283,8 @@
           <div class="sect" id="sect-llm">
             <div class="llm-head">
               <h3>LLM</h3>
-              <span class="muted">星标为当前配置</span>
               <span class="spacer"></span>
-              <button class="btn primary" id="btnProvNew">+ 新建</button>
+              <button class="btn primary" id="btnProvNew" type="button">新建</button>
             </div>
             <div id="llmPanel"></div>
           </div>
@@ -378,7 +379,7 @@
       <b>新建模型配置</b>
       <button class="modal-x" id="pmClose" aria-label="关闭">×</button>
     </div>
-    <p class="modal-sub">新建后不会自动激活，请在卡片上「设为激活」以启用。</p>
+    <p class="modal-sub">保存后在列表里激活。</p>
     <div class="form">
       <div class="row pm-top">
         <label class="f">名称<input class="inp" id="pmName" placeholder="例如：OpenAI 生产" /></label>
@@ -400,11 +401,11 @@
       <label class="f">Base URL（可选）<input class="inp" id="pmBase" value="https://open.bigmodel.cn/api/anthropic" spellcheck="false" /></label>
       <label class="f">代理（可选）
         <input class="inp" id="pmProxy" placeholder="socks5://user:pass@127.0.0.1:1080 · http://127.0.0.1:8080" spellcheck="false" />
-        <small>仅 LLM 出站请求走此代理，支持 http、https、socks5，可带账号密码（如 socks5://user:pass@host:port，密码含特殊字符需 URL 编码）。留空表示直连。走代理时整段返回，不流式。</small>
+        <small>仅 LLM 请求。支持 http、https、socks5。留空直连。走代理时不流式。</small>
       </label>
       <label class="f">自定义会话头（可选）
         <input class="inp" id="pmSession" placeholder="如 x-session-id（留空=不发送）" spellcheck="false" />
-        <small>填写头名后，每次请求都会带上这个 HTTP 头，头值是本进程固定的 session id。用于按 session id 做提示缓存或粘性路由的网关。留空则不发送。</small>
+        <small>填头名后每个请求都带上，值是本进程固定的 session id。留空不发送。</small>
       </label>
       <label class="f">API Key<input class="inp" id="pmKey" type="password" placeholder="sk-..." autocomplete="off" /></label>
       <div class="row pm-limits">
@@ -412,14 +413,11 @@
         <label class="f">每分钟限速<input class="inp" id="pmMin" type="number" min="0" value="0" /></label>
         <label class="f">上下文窗口(K)<input class="inp" id="pmCtx" type="number" min="0" value="0" /></label>
       </div>
-      <small class="pm-hint">限速 0 表示不限，同一服务的请求共享。上下文窗口单位 K（千 token），0 表示不裁；超出后从最早的消息开始丢，系统提示保留。</small>
+      <small class="pm-hint">限速 0 表示不限。上下文 0 表示不裁，超出后从最早的消息丢，系统提示保留。</small>
     </div>
     <div class="row actions pm-actions">
-      <button class="btn" id="pmTest">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.1 3.8L17 8l-3.9 1.2L12 13l-1.1-3.8L7 8l3.9-1.2L12 3z"/><path d="M18 14l.6 1.8L20.5 16.5 18.6 17.1 18 19l-.6-1.9L15.5 16.5l1.9-.7L18 14z"/></svg>
-        测试连接
-      </button>
-      <button class="btn primary" id="pmCreate">+ 新建</button>
+      <button class="btn" id="pmTest" type="button">测试连接</button>
+      <button class="btn primary" id="pmCreate" type="button">创建</button>
     </div>
     <div class="form-note" id="pmStatus"></div>
   </div>

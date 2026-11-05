@@ -53,6 +53,10 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   saveReport: (payload) => ipcRenderer.invoke('report:save', payload),
+  tasks: {
+    list: () => ipcRenderer.invoke('tasks:list'),
+    save: (list) => ipcRenderer.invoke('tasks:save', list)
+  },
   compose: (payload) => ipcRenderer.invoke('report:compose', payload),
   chatMessages: (payload) => ipcRenderer.invoke('report:chat', payload),
 

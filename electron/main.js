@@ -14,6 +14,7 @@ const browser = require('./browser');
 const remote = require('./remote');
 const backup = require('./backup');
 const sync = require('./sync');
+const tasks = require('./tasks');
 
 let mainWindow = null;
 let remoteInfo = null;
@@ -628,6 +629,9 @@ ipcMain.handle('templates:list', () => templates.list());
 ipcMain.handle('templates:upsert', (_e, t) => templates.upsert(t));
 ipcMain.handle('templates:remove', (_e, id) => templates.remove(id));
 ipcMain.handle('templates:reset', () => templates.reset());
+
+ipcMain.handle('tasks:list', () => tasks.load());
+ipcMain.handle('tasks:save', (_e, list) => tasks.saveAll(list));
 
 ipcMain.handle('report:save', (_e, payload) => report.save(payload));
 ipcMain.handle('report:compose', (_e, payload) => report.buildMessages(payload));

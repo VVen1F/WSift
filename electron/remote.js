@@ -63,6 +63,10 @@ const BRIDGE = `(function(){
     },
     clipboard: (t) => navigator.clipboard.writeText(t).then(() => true).catch(() => false),
     saveReport: (p) => j('/api/report/save', {method:'POST', body: JSON.stringify(p)}),
+    tasks: {
+      list: () => j('/api/tasks'),
+      save: (tasks) => j('/api/tasks', {method:'POST', body: JSON.stringify({ tasks })})
+    },
     imageUrl: (p) => '/api/shot?path=' + encodeURIComponent(p),
     perm: {
       screen: () => Promise.resolve({ status: 'granted', platform: 'remote' }),
@@ -130,6 +134,7 @@ function start(opts) {
   const shot = require('./shot');
   const browser = require('./browser');
   const updater = require('./updater');
+  const tasksStore = require('./tasks');
 
   server = http.createServer(async (req, res) => {
     const u = new URL(req.url, 'http://x');
@@ -227,6 +232,15 @@ function start(opts) {
 
       if (req.method === 'POST' && p === '/api/report/save') {
         return send(res, 200, JSON.stringify(report.save(await readBody(req))));
+      }
+
+      if (req.method === 'GET' && p === '/api/tasks') {
+        return send(res, 200, JSON.stringify(tasksStore.load()));
+      }
+      if (req.method === 'POST' && p === '/api/tasks') {
+        const b = await readBody(req);
+        const list = Array.isArray(b) ? b : b.tasks;
+        return send(res, 200, JSON.stringify(tasksStore.saveAll(list)));
       }
 
       if (req.method === 'GET' && p === '/api/update/check') {

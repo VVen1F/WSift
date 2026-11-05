@@ -15,18 +15,18 @@ function file() {
  */
 function displayTitle(t) {
   const custom = String((t && t.title) || '').trim();
-  if (custom) return custom.slice(0, 40);
+  if (custom) return custom.slice(0, 80);
   const md = /^#\s+(.+)$/m.exec(String((t && t.markdown) || ''));
   if (md) {
     const h = md[1].trim();
-    if (h && h !== '报告') return h.slice(0, 40);
+    if (h && h !== '报告') return h.slice(0, 80);
   }
   const lines = String((t && t.detail) || '').split(/\r?\n/);
   for (const raw of lines) {
     const line = raw.trim();
     if (!line || /^```/.test(line) || /^(请求|响应)[:：]?$/.test(line)) continue;
     const clean = line.replace(/^#+\s*/, '').trim();
-    if (clean) return clean.slice(0, 40);
+    if (clean) return clean.slice(0, 80);
   }
   return '未命名';
 }

@@ -76,10 +76,11 @@ function ok(name, cond, extra) {
   ok('settings 含统计', typeof store.load().stats === 'object');
   ok('模板内置 5 套', templates.list().length === 5);
   ok('模板占位符替换', report.fillTemplate('# {{title}}', { title: 'T' }) === '# T');
-  ok('报告 prompt 有标题约束', report.SYSTEM_PROMPT.includes('固定句式'));
+  ok('报告 prompt 要求纯文本', report.SYSTEM_PROMPT.includes('纯文本') && report.SYSTEM_PROMPT.includes('数据包'));
+  ok('报告 prompt 不要复测', report.SYSTEM_PROMPT.includes('不要出现「复测」'));
   ok('报告 prompt 禁 AI 腔', report.SYSTEM_PROMPT.includes('值得注意的是'));
   const chatMsgs = report.buildChatMessages({ material: 'GET / HTTP/1.1', template: '# {{title}}', meta: { product: 'X' }, question: '写报告' });
-  ok('对话 prompt 含写作约束', chatMsgs[0].content.includes('固定句式') && chatMsgs[0].content.includes('简洁直接'));
+  ok('对话 prompt 含写作约束', chatMsgs[0].content.includes('纯文本') && chatMsgs[0].content.includes('简洁直接'));
   ok('对话 prompt 带材料', chatMsgs[1].content.includes('GET / HTTP/1.1'));
   const longMsgs = [
     { role: 'system', content: 'S'.repeat(100) },
@@ -200,6 +201,13 @@ function ok(name, cond, extra) {
   const mdInZip = zip.read(zbuf, '演示/report.md').toString('utf8');
   ok('md 相对路径对得上', mdInZip.includes('](images/01.png)') && !mdInZip.includes(shotFile));
   ok('文件夹里的图和 md 一致', fs.existsSync(path.join(saved.dir, 'images', '01.png')));
+  ok('目录名就是标题', path.basename(saved.dir) === '演示' && path.basename(saved.zip) === '演示.zip');
+  const titled = '新浪财经 ifund 开放接口 num 参数 SQL 注入';
+  const fancy = '# ' + titled + '复测\n\n## 漏洞信息\n\n| 项目 | 内容 |\n| --- | --- |\n| 类型 | SQL |\n\n```http\nGET /x HTTP/1.1\nHost: a\n\n```\n';
+  const plain = report.toPlain(fancy);
+  ok('去掉标题表格和代码块', plain.startsWith(titled) && !plain.includes('复测') && !plain.includes('#') && !plain.includes('```') && plain.includes('GET /x HTTP/1.1'));
+  const named = report.save({ markdown: fancy, images: [], title: titled + '复测', baseDir: reportRoot });
+  ok('压缩包用报告名', path.basename(named.zip) === titled + '.zip');
 
   console.log('\n[模板占位符]');
   ok('内置占位符通过', templates.checkVars(templates.BUILTIN[0].body).ok === true);
@@ -243,7 +251,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.6', pkg.version === '0.6.6');
+  ok('版本 0.6.7', pkg.version === '0.6.7');
   const llmMod = require('../electron/llm.js');
   ok('流式正文', llmMod.takeStreamEvent({ type: 'content_block_delta', delta: { text: '甲' } }).text === '甲');
   const payload = llmMod.anthropicPayload({ model: 'glm-4.6' }, 's', [], 0.4, 8192);

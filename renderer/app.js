@@ -312,8 +312,8 @@ function deriveMeta(material) {
 }
 
 function mdTitle(md) {
-  const m = /^#\s+(.+)$/m.exec(md || '');
-  return (m ? m[1] : '报告').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 40) || '报告';
+  const line = String(md || '').split(/\r?\n/).map((s) => s.trim()).find(Boolean) || '';
+  return line.replace(/^#+\s*/, '').replace(/[\s]*复测\s*$/g, '').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 80) || '报告';
 }
 
 async function generateReport() {
@@ -446,7 +446,7 @@ async function generateReport() {
 
 function imagesSection() {
   if (!S.images.length) return '';
-  return '\n\n## 截图\n\n' + S.images.map((_, i) => `![${i + 1}](images/${String(i + 1).padStart(2, '0')}.png)`).join('\n\n') + '\n';
+  return '\n\n' + S.images.map((_, i) => `![](images/${String(i + 1).padStart(2, '0')}.png)`).join('\n\n') + '\n';
 }
 
 async function saveReport() {
@@ -513,18 +513,18 @@ function currentTask() {
 
 function displayTitle(t) {
   const custom = String((t && t.title) || '').trim();
-  if (custom) return custom.slice(0, 40);
+  if (custom) return custom.slice(0, 80);
   const md = /^#\s+(.+)$/m.exec(String((t && t.markdown) || ''));
   if (md) {
     const h = md[1].trim();
-    if (h && h !== '报告') return h.slice(0, 40);
+    if (h && h !== '报告') return h.slice(0, 80);
   }
   const lines = String((t && t.detail) || '').split(/\r?\n/);
   for (const raw of lines) {
     const line = raw.trim();
     if (!line || /^```/.test(line) || /^(请求|响应)[:：]?$/.test(line)) continue;
     const clean = line.replace(/^#+\s*/, '').trim();
-    if (clean) return clean.slice(0, 40);
+    if (clean) return clean.slice(0, 80);
   }
   return '未命名';
 }

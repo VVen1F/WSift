@@ -30,11 +30,27 @@ function pickAsset(assets, platform, arch) {
   return list.find((a) => /AppImage$/i.test(a.name)) || list.find((a) => /\.(zip|exe)$/i.test(a.name)) || null;
 }
 
+/** 5xx 和网络错误重试几次，GitHub 的 CDN 偶尔 504。 */
+async function fetchRetry(url, opts = {}, tries = 3) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(url, opts);
+      if (res.ok || res.status < 500) return res;
+      last = new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      last = e;
+    }
+    if (i < tries - 1) await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+  }
+  throw last;
+}
+
 async function check(current) {
-  const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, {
+  const res = await fetchRetry(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, {
     headers: { accept: 'application/vnd.github+json', 'user-agent': 'refract' }
   });
-  if (!res.ok) throw new Error(`检查更新失败 (${res.status})`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const rel = await res.json();
   const latest = String(rel.tag_name || '').replace(/^v/, '');
   const assets = rel.assets || [];
@@ -50,8 +66,8 @@ async function check(current) {
 }
 
 async function download(url, onProgress) {
-  const res = await fetch(url, { headers: { 'user-agent': 'refract' } });
-  if (!res.ok) throw new Error(`下载失败 (${res.status})`);
+  const res = await fetchRetry(url, { headers: { 'user-agent': 'refract' } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const total = Number(res.headers.get('content-length')) || 0;
   const name = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'update.bin');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-update-'));

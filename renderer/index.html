@@ -27,9 +27,9 @@
     </button>
 
     <div class="task-sec">
-      <div class="task-sec-h">
-        <button class="task-sec-label" id="btnReports" type="button">报告</button>
-        <button class="icon-btn" id="btnTaskNew" type="button" aria-label="新建任务">
+      <div class="ws-head">
+        <span>工作区</span>
+        <button class="icon-btn" id="btnWsNew" type="button" aria-label="新建工作区">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
       </div>
@@ -396,6 +396,21 @@
   </div>
 </div>
 
+<div class="modal" id="nameModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <b>新建工作区</b>
+      <button class="modal-x" id="nameX" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="name-body">
+      <label class="f">名称<input class="inp" id="nameInput" placeholder="例如：麦当劳" maxlength="40" /></label>
+    </div>
+    <div class="row actions">
+      <button class="btn" id="nameCancel" type="button">取消</button>
+      <button class="btn primary" id="nameOk" type="button">创建</button>
+    </div>
+  </div>
+</div>
 <div class="modal" id="confirmModal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="modal-head">

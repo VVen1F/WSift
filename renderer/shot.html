@@ -1,58 +1,105 @@
 <!doctype html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <title>shot</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: auto; background: #fff; }
-  body {
-    font: 13px/1.5 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
-    color: #212121;
-    -webkit-font-smoothing: antialiased;
+  html, body { margin: 0; background: #fff; color: #202020; }
+  body { font: 12px/16px "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  #frame { display: flex; align-items: stretch; min-height: 560px; }
+  .editors { flex: 1; min-width: 0; display: flex; }
+  .msg { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; background: #fff; }
+  .msg + .msg { border-left: 1px solid #d9d9d9; }
+  .msg-title {
+    height: 28px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 8px 0 10px; font-size: 13px; font-weight: 650; color: #1a1a1a;
   }
-  #app { display: flex; }
-  .pane { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
-  .pane + .pane { border-left: 1px solid #e2e2e2; }
-  .head {
-    height: 38px; display: flex; align-items: center; padding: 0 14px;
-    font-size: 13px; font-weight: 600; color: #111;
+  .tabs {
+    height: 26px; display: flex; align-items: flex-end; gap: 2px;
+    padding: 0 6px; border-bottom: 1px solid #e3e3e3; background: #fff;
   }
-  pre.code {
-    margin: 0; padding: 8px 14px 10px 60px;
-    font: 13px/20px ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
-    white-space: pre-wrap; overflow-wrap: anywhere; color: #212121;
-    background: #fff;
-    background-image: linear-gradient(to right, transparent 49px, #ececec 49px, #ececec 50px, transparent 50px);
+  .tab {
+    height: 24px; padding: 0 8px; display: inline-flex; align-items: center;
+    color: #4d4d4d; font-size: 12px; border-bottom: 2px solid transparent;
+  }
+  .tab.on { color: #1a1a1a; font-weight: 650; border-bottom: 3px solid #ff6633; }
+  .tab-gap { flex: 1; }
+  .tab-ico { width: 16px; height: 16px; margin: 0 3px 4px; color: #666; }
+  .code {
+    margin: 0; padding: 4px 8px 8px 46px;
+    font: 12px/16px Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+    white-space: pre-wrap; overflow-wrap: anywhere; color: #202020; background: #fff;
+    background-image: linear-gradient(to right, transparent 38px, #ededed 38px, #ededed 39px, transparent 39px);
     background-repeat: no-repeat;
     counter-reset: ln;
   }
-  .ln { position: relative; min-height: 20px; }
+  .ln { position: relative; min-height: 16px; }
   .ln::before {
     counter-increment: ln; content: counter(ln);
-    position: absolute; left: -46px; top: 0; width: 36px;
-    text-align: right; color: #9b9b9b;
-    font: 13px/20px ui-monospace, Menlo, Consolas, monospace;
+    position: absolute; left: -40px; top: 0; width: 30px;
+    text-align: right; color: #9a9a9a;
+    font: 12px/16px Consolas, "Liberation Mono", monospace;
   }
   .hn { color: #000080; }
   .cv { color: #800000; }
   .jk { color: #000080; }
   .js { color: #008000; }
   .jn { color: #0000cc; }
+  .foot {
+    height: 26px; display: flex; align-items: center; gap: 8px;
+    padding: 0 8px; border-top: 1px solid #e3e3e3; background: #f6f6f6;
+    color: #666; font-size: 11px;
+  }
+  .gear { width: 14px; height: 14px; color: #777; }
+  .search {
+    height: 18px; min-width: 120px; padding: 0 6px; border: 1px solid #d0d0d0;
+    background: #fff; color: #9a9a9a; line-height: 16px;
+  }
+  .hl { margin-left: auto; color: #888; }
+  .meta { color: #333; white-space: nowrap; }
+  .rail {
+    width: 46px; flex: none; background: #f3f3f3; border-left: 1px solid #d5d5d5;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 18px; padding: 12px 0; min-height: 560px;
+  }
+  .rail i {
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    font-style: normal; font-size: 11px; line-height: 14px; color: #555; letter-spacing: .02em;
+  }
 </style>
 </head>
 <body>
-<div id="app">
-  <section class="pane">
-    <div class="head">Request</div>
-    <pre class="code" id="req"></pre>
-  </section>
-  <section class="pane">
-    <div class="head">Response</div>
-    <pre class="code" id="res"></pre>
-  </section>
+<div id="frame">
+  <div class="editors">
+    <section class="msg">
+      <div class="msg-title">Request <svg class="tab-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 6h12"/></svg></div>
+      <div class="tabs"><span class="tab on">Pretty</span><span class="tab">Raw</span><span class="tab">Hex</span><span class="tab">Chinese</span><span class="tab-gap"></span></div>
+      <pre class="code" id="req"></pre>
+      <div class="foot">
+        <svg class="gear" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1"/></svg>
+        <span class="search">Search</span>
+        <span class="hl">0 highlights</span>
+      </div>
+    </section>
+    <section class="msg">
+      <div class="msg-title">Response <svg class="tab-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 6h12"/></svg></div>
+      <div class="tabs"><span class="tab on">Pretty</span><span class="tab">Raw</span><span class="tab">Hex</span><span class="tab">Chinese</span><span class="tab-gap"></span></div>
+      <pre class="code" id="res"></pre>
+      <div class="foot">
+        <svg class="gear" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1"/></svg>
+        <span class="search">Search</span>
+        <span class="hl">0 highlights</span>
+        <span class="meta" id="meta"></span>
+      </div>
+    </section>
+  </div>
+  <aside class="rail">
+    <i>Inspector</i>
+    <i>Notes</i>
+    <i>Explanations</i>
+    <i>Custom actions</i>
+  </aside>
 </div>
-
 <script>
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -87,7 +134,6 @@ function hl(text) {
   const i = text.indexOf(sep);
   const head = i >= 0 ? text.slice(0, i) : text;
   const body = i >= 0 ? text.slice(i + sep.length) : '';
-
   const headLines = head.split(/\r?\n/).map((ln, idx) => {
     if (idx === 0 && /^(HTTP\/[\d.]+\s|GET\s|POST\s|PUT\s|DELETE\s|PATCH\s|HEAD\s|OPTIONS\s)/.test(ln)) return esc(ln);
     const m = ln.match(/^([A-Za-z0-9!#$%&'*+.^_`|~-]+):(.*)$/);
@@ -97,12 +143,9 @@ function hl(text) {
     if (lower === 'cookie' || lower === 'set-cookie') {
       const sp = (m[2].match(/^\s*/) || [''])[0];
       v = esc(sp) + colorCookie(m[2].slice(sp.length), lower === 'set-cookie');
-    } else {
-      v = esc(m[2]);
-    }
+    } else v = esc(m[2]);
     return '<span class="hn">' + esc(m[1]) + '</span>:' + v;
   });
-
   let bodyLines = [];
   if (body) {
     const t = body.trim();
@@ -113,10 +156,14 @@ function hl(text) {
   return headLines.concat(bodyLines.length ? [''] : []).concat(bodyLines)
     .map((h) => '<div class="ln">' + (h || '') + '</div>').join('');
 }
-
 window.render = function (data) {
   document.getElementById('req').innerHTML = hl(data.request || '');
   document.getElementById('res').innerHTML = hl(data.response || '');
+  const bytes = Number(data.bytes);
+  const ms = data.ms;
+  const meta = document.getElementById('meta');
+  const n = Number.isFinite(bytes) ? bytes : 0;
+  meta.textContent = Number.isFinite(Number(ms)) ? (n + ' bytes | ' + Math.round(Number(ms)) + ' millis') : (n + ' bytes');
   return true;
 };
 </script>

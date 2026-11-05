@@ -58,8 +58,35 @@ function normalize(t) {
     exported: String(t.exported || '').slice(0, 500),
     archived: t.archived === true,
     pinned: t.pinned === true,
+    workspaceId: String(t.workspaceId || '').slice(0, 64),
     updatedAt: Number(t.updatedAt) || Date.now(),
     createdAt: Number(t.createdAt) || Date.now()
+  };
+}
+
+function normalizeSpaces(list) {
+  const out = [];
+  const seen = new Set();
+  for (const s of Array.isArray(list) ? list : []) {
+    if (!s || typeof s !== 'object') continue;
+    const id = String(s.id || '').trim().slice(0, 64);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({
+      id,
+      name: String(s.name || '未命名').slice(0, 40),
+      open: s.open !== false,
+      createdAt: Number(s.createdAt) || Date.now()
+    });
+  }
+  return out;
+}
+
+function unpack(input) {
+  if (Array.isArray(input) || input == null) return { tasks: input || [], workspaces: null };
+  return {
+    tasks: Array.isArray(input.tasks) ? input.tasks : [],
+    workspaces: input.workspaces == null ? null : normalizeSpaces(input.workspaces)
   };
 }
 
@@ -67,6 +94,7 @@ function load() {
   try {
     const raw = JSON.parse(fs.readFileSync(file(), 'utf8'));
     const list = Array.isArray(raw) ? raw : (raw && raw.tasks);
+    const workspaces = normalizeSpaces(raw && !Array.isArray(raw) ? raw.workspaces : []);
     const tasks = [];
     const seen = new Set();
     let dropped = false;
@@ -77,17 +105,18 @@ function load() {
       tasks.push(item);
       if (tasks.length >= MAX) break;
     }
-    if (dropped) saveAll(tasks);
-    return { tasks };
+    if (dropped) saveAll({ tasks, workspaces });
+    return { tasks, workspaces };
   } catch (e) {
-    return { tasks: [] };
+    return { tasks: [], workspaces: [] };
   }
 }
 
 function saveAll(list) {
+  const packed = unpack(list);
   const tasks = [];
   const seen = new Set();
-  for (const item of (Array.isArray(list) ? list : []).map(normalize).filter(Boolean)) {
+  for (const item of packed.tasks.map(normalize).filter(Boolean)) {
     if (!hasContent(item)) continue;
     if (seen.has(item.id)) {
       tasks[tasks.findIndex((t) => t.id === item.id)] = item;
@@ -100,9 +129,11 @@ function saveAll(list) {
   fs.mkdirSync(dataDir(), { recursive: true });
   const dest = file();
   const tmp = dest + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ tasks }, null, 2));
+  const body = { tasks };
+  if (packed.workspaces) body.workspaces = packed.workspaces;
+  fs.writeFileSync(tmp, JSON.stringify(body, null, 2));
   fs.renameSync(tmp, dest);
-  return { tasks };
+  return { tasks, workspaces: packed.workspaces || [] };
 }
 
-module.exports = { load, saveAll, displayTitle, normalize, hasContent, file };
+module.exports = { load, saveAll, displayTitle, normalize, hasContent, normalizeSpaces, file };

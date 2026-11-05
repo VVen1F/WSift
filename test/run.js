@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.16', pkg.version === '0.6.16');
+  ok('版本 0.6.17', pkg.version === '0.6.17');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -313,6 +313,12 @@ function ok(name, cond, extra) {
   ok('浏览器页已去掉', !ui.includes('id="page-browser"') && ui.includes('function stopRun'));
   ok('清空要二次确认', ui.includes('id="confirmAck"') && ui.includes('我已了解'));
   ok('侧栏新建是图标', ui.includes('aria-label="新建任务"') && ui.includes('id="taskMenu"') && ui.includes('data-theme-choice="system"'));
+  ok('网关显示本机', ui.includes('127.0.0.1'));
+  const spaces = tasksMod.saveAll({ tasks: [{ id: 'in', title: '在工作区', detail: 'd', workspaceId: 'ws1' }], workspaces: [{ id: 'ws1', name: '麦当劳' }] });
+  ok('工作区能读回', spaces.workspaces[0].name === '麦当劳' && tasksMod.load().workspaces[0].name === '麦当劳' && tasksMod.load().tasks[0].workspaceId === 'ws1');
+  tasksMod.saveAll([]);
+  const shotHtml = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'shot.html'), 'utf8');
+  ok('截图有右侧栏和耗时', shotHtml.includes('Inspector') && shotHtml.includes('millis') && shotHtml.includes('Custom actions'));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

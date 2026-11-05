@@ -17,7 +17,7 @@ const S = {
   info: null
 };
 
-const TASKS = { list: [], id: null, busyId: null, showArchived: false };
+const TASKS = { list: [], workspaces: [], wsId: null, id: null, busyId: null, showArchived: false };
 let clearArmed = false;
 let clearTimer = 0;
 let saveChain = Promise.resolve();
@@ -229,6 +229,7 @@ async function doSend() {
   const r = await window.api.send({ raw, scheme, protocol });
   S.lastReq = raw;
   S.lastRes = r.text || '';
+  S.lastMs = Number(r.ms);
   $('#res').innerHTML = highlight(S.lastRes);
   const proto = (r.protocol || 'h1').toUpperCase();
   $('#statusText').innerHTML = r.ok
@@ -245,6 +246,7 @@ async function doShot() {
     const r = await window.api.capture({
       request: $('#req').value || S.lastReq,
       response: S.lastRes,
+      ms: S.lastMs,
       width: Number(S.settings.ui.shotWidth) || 1600
     });
     rememberShot(r.path);
@@ -650,7 +652,7 @@ function sortedTasks() {
 
 function saveTasksNow() {
   if (!window.api || !window.api.tasks) return Promise.resolve();
-  const job = () => window.api.tasks.save(TASKS.list).catch(() => {});
+  const job = () => window.api.tasks.save({ tasks: TASKS.list, workspaces: TASKS.workspaces }).catch(() => {});
   saveChain = saveChain.then(job, job);
   return saveChain;
 }
@@ -777,11 +779,43 @@ function taskRow(t, archivedRow) {
   if (!busy && archivedRow) {
     actions = `<button class="task-del" type="button" data-unarch="${esc(t.id)}">恢复</button>`;
   } else if (!busy) {
-    actions = `<button class="task-arch" type="button" data-arch="${esc(t.id)}" aria-label="归档任务">${ARCH_ICON}</button>` +
-      `<button class="task-del" type="button" data-del="${esc(t.id)}" aria-label="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 12h8l1-12"/></svg></button>`;
+    actions = `<button class="task-arch" type="button" data-arch="${esc(t.id)}" aria-label="放入已归档">${ARCH_ICON}</button>`;
   }
-  return `<div class="task${on ? ' on' : ''}${archivedRow ? ' archived' : ''}${t.pinned ? ' pinned' : ''}" data-id="${esc(t.id)}" role="button" tabindex="0">` +
-    `<span class="task-title">${esc(displayTitle(t))}</span>${actions}</div>`;
+    return `<div class="task${on ? ' on' : ''}${archivedRow ? ' archived' : ' in-ws'}${t.pinned ? ' pinned' : ''}" data-id="${esc(t.id)}" role="button" tabindex="0">` +
+    `<span class="task-title">${esc(displayTitle(t))}</span><span class="task-time">${esc(relTime(t.updatedAt || t.createdAt))}</span>${actions}</div>`;
+}
+
+function relTime(ts) {
+  const diff = Math.max(0, Date.now() - (Number(ts) || Date.now()));
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return min + '分钟';
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return hour + '小时';
+  return Math.floor(hour / 24) + '天';
+}
+
+function ensureWorkspaces() {
+  if (!Array.isArray(TASKS.workspaces)) TASKS.workspaces = [];
+  if (!TASKS.workspaces.length) {
+    TASKS.workspaces.push({ id: 'ws-default', name: '默认工作区', open: true, createdAt: Date.now() });
+  }
+  if (!TASKS.wsId || !TASKS.workspaces.some((w) => w.id === TASKS.wsId)) TASKS.wsId = TASKS.workspaces[0].id;
+  return TASKS.wsId;
+}
+
+function workspaceHtml() {
+  ensureWorkspaces();
+  const folder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 7.5h5.2l1.8 2H21v9.2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7.5z"/></svg>';
+  return TASKS.workspaces.map((w) => {
+    const mine = activeTasks().filter((t) => (t.workspaceId || 'ws-default') === w.id);
+    const open = w.open !== false;
+    let block = `<div class="ws${w.id === TASKS.wsId ? ' on' : ''}" data-ws="${esc(w.id)}" role="button" tabindex="0">` +
+      `<span class="ws-chev">${open ? '▾' : '▸'}</span>${folder}<span class="ws-name">${esc(w.name)}</span>` +
+      `<button class="icon-btn ws-add" type="button" data-ws-new="${esc(w.id)}" aria-label="新建任务"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>`;
+    if (open) block += mine.map((t) => taskRow(t, false)).join('');
+    return block;
+  }).join('');
 }
 
 function renderTaskList() {
@@ -795,23 +829,15 @@ function renderTaskList() {
   const archived = archivedTasks();
   const clearBtn = $('#btnTasksClear');
   if (clearBtn) clearBtn.hidden = tasks.length === 0;
-  if (!tasks.length && !archived.length) {
-    box.innerHTML = '<div class="task-empty">还没有报告</div>';
+  ensureWorkspaces();
+  if (!tasks.length && !archived.length && TASKS.workspaces.length <= 1) {
+    box.innerHTML = workspaceHtml() + '<div class="task-empty">还没有报告</div>';
     setClearArm(false);
     return;
   }
-  let html = '';
-  let last = '';
-  for (const t of tasks) {
-    const g = dayGroup(t.updatedAt || t.createdAt);
-    if (g !== last) {
-      html += `<div class="task-group">${esc(g)}</div>`;
-      last = g;
-    }
-    html += taskRow(t, false);
-  }
+  let html = workspaceHtml();
   if (archived.length) {
-    html += `<button class="task-arch-head" type="button" data-arch-toggle>归档 ${archived.length}</button>`;
+    html += `<button class="task-arch-head" type="button" data-arch-toggle>已归档会话 ${archived.length}</button>`;
     if (TASKS.showArchived) archived.forEach((t) => { html += taskRow(t, true); });
   }
   box.innerHTML = html;
@@ -848,6 +874,7 @@ function onTaskEdit() {
       exported: '',
       archived: false,
       pinned: false,
+      workspaceId: ensureWorkspaces(),
       updatedAt: now,
       createdAt: now
     };
@@ -930,6 +957,7 @@ function createTask(partial) {
     exported: partial.exported || '',
     archived: false,
     pinned: false,
+    workspaceId: partial.workspaceId || ensureWorkspaces(),
     updatedAt: now,
     createdAt: now
   };
@@ -960,7 +988,7 @@ function archiveTask(id) {
   }
   renderTaskList();
   saveTasksNow();
-  toast('已归档', false, { label: '撤销', run: () => unarchiveTask(id) });
+  toast('已放入已归档会话', false, { label: '撤销', run: () => unarchiveTask(id) });
 }
 
 function unarchiveTask(id) {
@@ -996,13 +1024,17 @@ function removeTask(id) {
 
 function clearTasks() {
   const viewing = currentTask();
-  TASKS.list.filter((t) => !t.archived).forEach((t) => stopRun(t.id));
-  TASKS.list = TASKS.list.filter((t) => t.archived && hasContent(t));
+  TASKS.list.forEach((t) => {
+    if (t.archived || !hasContent(t)) return;
+    stopRun(t.id);
+    t.archived = true;
+  });
   setClearArm(false);
+  TASKS.showArchived = true;
   if (!viewing || !viewing.archived) blankForm();
   else renderTaskList();
   saveTasksNow();
-  toast('已清空');
+  toast('已放入已归档会话');
 }
 
 function closeTaskMenu() {
@@ -1029,7 +1061,7 @@ function openTaskMenu(id, x, y) {
   }
   rows.push({ id: 'archive', label: t.archived ? '恢复' : '归档' });
   gap();
-  rows.push({ id: 'del', label: '删除', danger: true });
+  rows.push({ id: 'del', label: t.archived ? '彻底删除' : '放入已归档', danger: !!t.archived });
   menu.innerHTML = rows.map((item) => item.sep
     ? '<div class="sep"></div>'
     : `<button type="button" role="menuitem" data-menu="${item.id}" class="${item.danger ? 'danger' : ''}">${esc(item.label)}</button>`
@@ -1068,13 +1100,50 @@ function openTaskMenu(id, x, y) {
       return;
     }
     if (act === 'del') {
+      if (!t.archived) {
+        archiveTask(id);
+        return;
+      }
       openConfirm({
-        title: '删除报告',
-        text: '这份报告会从列表消失。',
+        title: '从已归档会话删除',
+        text: '这份报告会从已归档会话里去掉。',
         ok: '删除',
         run: () => removeTask(id)
       });
     }
+  };
+}
+
+function openWorkspaceDialog() {
+  const modal = $('#nameModal');
+  const input = $('#nameInput');
+  if (!modal || !input) return;
+  input.value = '';
+  clearTimeout(modal._t);
+  modal.classList.remove('out');
+  modal.hidden = false;
+  setTimeout(() => input.focus(), 30);
+  const close = () => {
+    modal.classList.add('out');
+    modal._t = setTimeout(() => { modal.hidden = true; modal.classList.remove('out'); }, 160);
+  };
+  const ok = () => {
+    const name = input.value.trim();
+    if (!name) return;
+    ensureWorkspaces();
+    const id = 'ws' + Date.now().toString(36);
+    TASKS.workspaces.unshift({ id, name, open: true, createdAt: Date.now() });
+    TASKS.wsId = id;
+    saveTasksNow();
+    renderTaskList();
+    close();
+  };
+  $('#nameOk').onclick = ok;
+  $('#nameCancel').onclick = close;
+  $('#nameX').onclick = close;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') ok();
+    if (e.key === 'Escape') close();
   };
 }
 
@@ -1130,6 +1199,29 @@ function bindTasks() {
   box.addEventListener('click', (e) => {
     if (e.target.closest('[data-arch-toggle]')) {
       TASKS.showArchived = !TASKS.showArchived;
+      renderTaskList();
+      return;
+    }
+    const addHere = e.target.closest('[data-ws-new]');
+    if (addHere) {
+      e.stopPropagation();
+      TASKS.wsId = addHere.dataset.wsNew;
+      const space = TASKS.workspaces.find((w) => w.id === TASKS.wsId);
+      if (space) space.open = true;
+      saveTasksNow();
+      requestNewTask();
+      return;
+    }
+    const ws = e.target.closest('.ws');
+    if (ws) {
+      const space = TASKS.workspaces.find((w) => w.id === ws.dataset.ws);
+      if (!space) return;
+      if (TASKS.wsId === space.id) space.open = space.open === false;
+      else {
+        TASKS.wsId = space.id;
+        space.open = true;
+      }
+      saveTasksNow();
       renderTaskList();
       return;
     }
@@ -1215,6 +1307,8 @@ function bindTasks() {
   if (neu) neu.addEventListener('click', () => requestNewTask());
   const neuTask = $('#btnNewTask');
   if (neuTask) neuTask.addEventListener('click', () => requestNewTask());
+  const wsNew = $('#btnWsNew');
+  if (wsNew) wsNew.addEventListener('click', () => openWorkspaceDialog());
   const label = $('#btnReports');
   if (label) label.addEventListener('click', () => go('report'));
 
@@ -1225,8 +1319,8 @@ function bindTasks() {
       if (!activeTasks().length) return;
       openConfirm({
         title: '清空报告',
-        text: '未归档的报告会从列表消失。正在生成的那一份会停掉。',
-        ok: '清空',
+        text: '未归档的报告会放进已归档会话。正在生成的那一份会停掉。',
+        ok: '归档',
         run: clearTasks
       });
     });
@@ -1256,9 +1350,12 @@ async function loadTasks() {
   try {
     const data = await window.api.tasks.list();
     TASKS.list = (data && data.tasks) || [];
+    TASKS.workspaces = (data && data.workspaces) || [];
   } catch (e) {
     TASKS.list = [];
+    TASKS.workspaces = [];
   }
+  ensureWorkspaces();
   const first = activeTasks()[0];
   if (first) selectTask(first.id);
   else blankForm();
@@ -2358,12 +2455,13 @@ function renderGateway(ri) {
     text.textContent = '服务未启动';
     return;
   }
-  const addr = ri.url.replace(/^https?:\/\//, '');
+  const port = (String(ri.url).match(/:(\d+)\/?$/) || [])[1] || '8765';
+  const shown = 'http://127.0.0.1:' + port;
   dot.classList.remove('off');
-  text.innerHTML = '网关 <b>' + esc(addr) + '</b>';
+  text.innerHTML = '网关 <b>127.0.0.1:' + esc(port) + '</b>';
   $('#gateway').onclick = async () => {
-    try { await navigator.clipboard.writeText(ri.url); } catch (e) { await window.api.clipboard(ri.url); }
-    toast('已复制 ' + ri.url);
+    try { await navigator.clipboard.writeText(shown); } catch (e) { await window.api.clipboard(shown); }
+    toast('已复制 ' + shown);
   };
 }
 

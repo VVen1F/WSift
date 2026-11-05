@@ -1032,7 +1032,7 @@ textarea.inp {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-right: 52px;
+  padding-right: 8px;
 }
 .task.archived { opacity: .55; }
 .task.pinned .task-title { font-weight: 500; }
@@ -1049,10 +1049,34 @@ textarea.inp {
   border-radius: 8px;
 }
 .task-arch-head:hover { background: var(--hover); color: var(--text); }
+.task-time {
+  flex: none;
+  margin-left: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--caption);
+}
+.task.in-ws { margin-left: 16px; }
+.ws-head {
+  display: flex; align-items: center; height: 36px;
+  padding: 0 4px 0 12px; color: var(--muted); font-size: 13px; line-height: 20px;
+}
+.ws-head > span { margin-right: auto; }
+.ws {
+  display: flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 4px 0 8px;
+  border-radius: var(--dsw-radius-md);
+  color: var(--text); font-size: 14px; line-height: 20px;
+}
+.ws:hover, .ws.on { background: var(--hover); }
+.ws > svg { width: 14px; height: 14px; flex: none; color: var(--caption); }
+.ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-chev { width: 12px; flex: none; color: var(--caption); font-size: 11px; }
+.ws-add { opacity: 0; }
+.ws:hover .ws-add, .ws.on .ws-add, .ws:focus-within .ws-add { opacity: 1; }
+.name-body { padding: 0 24px; }
 .task-arch {
-  position: absolute;
-  right: 28px;
-  top: 4px;
+  position: static;
   width: 24px;
   height: 24px;
   padding: 0;
@@ -1084,10 +1108,7 @@ textarea.inp {
   animation: modalEnter 150ms var(--ds-ease-in-out);
 }
 .task-meta, .task-del {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
   font-size: 12px;
   color: var(--muted);
 }

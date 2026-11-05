@@ -8,7 +8,7 @@ let pending = null;
 /**
  * 用隐藏窗口渲染 shot.html 并截图，保证图片与界面完全一致。
  */
-async function capture({ request, response, width = 1600, out }) {
+async function capture({ request, response, width = 1600, out, bytes, ms }) {
   const win = new BrowserWindow({
     show: false,
     frame: false,
@@ -26,8 +26,11 @@ async function capture({ request, response, width = 1600, out }) {
 
   try {
     await win.loadFile(path.join(__dirname, '..', 'renderer', 'shot.html'));
+    const responseText = response || '';
+    const size = Number.isFinite(Number(bytes)) ? Math.max(0, Math.round(Number(bytes))) : Buffer.byteLength(String(responseText), 'utf8');
+    const timing = Number.isFinite(Number(ms)) ? Math.max(0, Math.round(Number(ms))) : null;
     await win.webContents.executeJavaScript(
-      `window.render(${JSON.stringify({ request: request || '', response: response || '' })})`
+      `window.render(${JSON.stringify({ request: request || '', response: responseText, bytes: size, ms: timing })})`
     );
 
     const height = await win.webContents.executeJavaScript(

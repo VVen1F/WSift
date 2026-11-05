@@ -73,6 +73,7 @@ jobs:
         run: npm test
 
       - name: Build nsis
+        shell: bash
         run: |
           for i in 1 2 3 4; do
             npx electron-builder --win nsis --x64 --publish never && exit 0

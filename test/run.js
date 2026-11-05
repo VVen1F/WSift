@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.18', pkg.version === '0.6.36');
+  ok('版本 0.6.18', pkg.version === '0.6.37');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -324,7 +324,6 @@ function ok(name, cond, extra) {
   ok('请求侧有 MarkInfo 页签', shotHtml.includes('MarkInfo'));
   ok('归档管理是设置里的分区', ui.includes('data-sec="archive"') && ui.includes('id="sect-archive"'));
   ok('设置是左导航加右内容', ui.includes('id="settingsNav"') && ui.includes('class="settings-shell"'));
-  ok('版本元素缺失不崩', appSrc.includes("const ver = $('#ver')"));
   const shotMod = fs.readFileSync(path.join(__dirname, '..', 'electron', 'shot.js'), 'utf8');
   ok('截图接真实毫秒', shotMod.includes('ms: realMs') && shotMod.includes('Number.isFinite(Number(ms))'));
   ok('截图算字节数', shotMod.includes("Buffer.byteLength"));
@@ -339,6 +338,7 @@ function ok(name, cond, extra) {
   const appSrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
   ok('发送后记录毫秒', appSrc.includes('S.lastMs = r.ok'));
   ok('截图带上毫秒', appSrc.includes('ms: S.lastMs'));
+  ok('版本元素缺失不崩', appSrc.includes("const ver = $('#ver')"));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

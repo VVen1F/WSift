@@ -645,18 +645,32 @@ ipcMain.handle('llm:models', async (_e, provider) => {
   }
 });
 
+const liveChats = new Map();
+
 ipcMain.on('llm:chat', async (event, payload) => {
   const { id, provider, messages } = payload;
+  const ac = new AbortController();
+  liveChats.set(id, ac);
+  const send = (ch, body) => !event.sender.isDestroyed() && event.sender.send(ch, body);
   try {
     const text = await llm.chat({
       provider,
       messages,
-      onDelta: (delta) => !event.sender.isDestroyed() && event.sender.send('llm:delta', { id, delta })
+      signal: ac.signal,
+      onDelta: (delta) => send('llm:delta', { id, delta }),
+      onNote: (note) => send('llm:note', { id, note })
     });
-    !event.sender.isDestroyed() && event.sender.send('llm:done', { id, text });
+    send('llm:done', { id, text });
   } catch (err) {
-    !event.sender.isDestroyed() && event.sender.send('llm:error', { id, message: err.message });
+    send('llm:error', { id, message: err.message, code: err.code || '' });
+  } finally {
+    liveChats.delete(id);
   }
+});
+
+ipcMain.on('llm:cancel', (_e, id) => {
+  const ac = liveChats.get(id);
+  if (ac) ac.abort();
 });
 
 ipcMain.handle('update:check', async () => {

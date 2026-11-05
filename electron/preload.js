@@ -27,9 +27,10 @@ contextBridge.exposeInMainWorld('api', {
 
   models: (provider) => ipcRenderer.invoke('llm:models', provider),
 
-  chat({ provider, messages, onDelta, onDone, onError }) {
+  chat({ provider, messages, onDelta, onNote, onDone, onError }) {
     const id = 'c' + ++seq;
     const d = (_e, p) => p.id === id && onDelta && onDelta(p.delta);
+    const note = (_e, p) => p.id === id && onNote && onNote(p.note);
     const n = (_e, p) => {
       if (p.id !== id) return;
       cleanup();
@@ -38,18 +39,23 @@ contextBridge.exposeInMainWorld('api', {
     const r = (_e, p) => {
       if (p.id !== id) return;
       cleanup();
-      onError && onError(p.message);
+      onError && onError(p.message, p.code);
     };
     function cleanup() {
       ipcRenderer.off('llm:delta', d);
+      ipcRenderer.off('llm:note', note);
       ipcRenderer.off('llm:done', n);
       ipcRenderer.off('llm:error', r);
     }
     ipcRenderer.on('llm:delta', d);
+    ipcRenderer.on('llm:note', note);
     ipcRenderer.on('llm:done', n);
     ipcRenderer.on('llm:error', r);
     ipcRenderer.send('llm:chat', { id, provider, messages });
-    return id;
+    return {
+      id,
+      cancel() { ipcRenderer.send('llm:cancel', id); }
+    };
   },
 
   saveReport: (payload) => ipcRenderer.invoke('report:save', payload),

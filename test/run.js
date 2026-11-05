@@ -243,7 +243,15 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.3', pkg.version === '0.6.3');
+  ok('版本 0.6.4', pkg.version === '0.6.4');
+  const llmMod = require('../electron/llm.js');
+  ok('流式正文', llmMod.takeStreamEvent({ type: 'content_block_delta', delta: { text: '甲' } }).text === '甲');
+  ok('流式思考不进正文', llmMod.takeStreamEvent({ type: 'content_block_delta', delta: { thinking: '在看参数' } }).note === '在看参数' && !llmMod.takeStreamEvent({ type: 'content_block_delta', delta: { thinking: '在看参数' } }).text);
+  const browserMod = require('../electron/browser.js');
+  let devtoolsMsg = '';
+  try { browserMod.parseDevtools('Using unsafe HTTP verb GET to invoke /json/new'); }
+  catch (e) { devtoolsMsg = e.message; }
+  ok('调试端口纯文本不当成 JSON 异常', devtoolsMsg.indexOf('Using unsafe') === 0);
   const savedTasks = tasksMod.saveAll([
     { id: 'a', title: '', detail: '请求：\n```http\nGET /admin HTTP/1.1', markdown: '', apiKey: 'SECRETKEY' },
     { id: 'b', title: '自定义标题', markdown: '# 别的', detail: 'x' },

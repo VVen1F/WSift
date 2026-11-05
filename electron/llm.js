@@ -110,6 +110,49 @@ async function chatViaProxy(provider, messages, maxTokens = 4096) {
   return (j.choices && j.choices[0] && j.choices[0].message.content) || '';
 }
 
+/** 从一条流式事件里取出正文或思考片段。思考不写进报告。 */
+function takeStreamEvent(ev) {
+  if (!ev || typeof ev !== 'object') return {};
+  if (ev.type === 'content_block_delta' && ev.delta) {
+    if (typeof ev.delta.text === 'string' && ev.delta.text) return { text: ev.delta.text };
+    if (typeof ev.delta.thinking === 'string' && ev.delta.thinking) return { note: ev.delta.thinking };
+  }
+  const d = ev.choices && ev.choices[0] && ev.choices[0].delta;
+  if (d) {
+    if (typeof d.content === 'string' && d.content) return { text: d.content };
+    if (typeof d.reasoning_content === 'string' && d.reasoning_content) return { note: d.reasoning_content };
+  }
+  return {};
+}
+
+function textFromJSON(kind, data) {
+  if (data && data.error) {
+    const msg = data.error.message || data.error;
+    throw new Error(typeof msg === 'string' ? msg : '请求失败');
+  }
+  if (kind === 'anthropic') {
+    return (data.content || []).filter((c) => c.type === 'text').map((c) => c.text || '').join('');
+  }
+  return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+}
+
+function notePump(onNote) {
+  let buf = '';
+  let timer = null;
+  return {
+    push(s) {
+      if (!s || !onNote) return;
+      buf = (buf + s).slice(-240);
+      if (timer) return;
+      timer = setTimeout(() => { timer = null; onNote(buf); }, 100);
+    },
+    flush() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (buf && onNote) onNote(buf);
+    }
+  };
+}
+
 async function readSSE(res, onEvent) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -134,7 +177,7 @@ async function readSSE(res, onEvent) {
   }
 }
 
-async function chat({ provider, messages, onDelta, signal, temperature = 0.4, maxTokens = 4096 }) {
+async function chat({ provider, messages, onDelta, onNote, signal, temperature = 0.4, maxTokens = 4096 }) {
   if (!provider) throw new Error('未配置模型');
   messages = trimMessages(messages, provider.contextK);
   await throttle(provider);
@@ -151,15 +194,22 @@ async function chat({ provider, messages, onDelta, signal, temperature = 0.4, ma
 
   try {
     if (provider.kind === 'anthropic') {
-      return await chatAnthropic(provider, messages, onDelta, controller.signal, temperature, maxTokens);
+      return await chatAnthropic(provider, messages, onDelta, onNote, controller.signal, temperature, maxTokens);
     }
-    return await chatOpenAI(provider, messages, onDelta, controller.signal, temperature, maxTokens);
+    return await chatOpenAI(provider, messages, onDelta, onNote, controller.signal, temperature, maxTokens);
+  } catch (err) {
+    if ((signal && signal.aborted) || controller.signal.aborted || err.name === 'AbortError') {
+      const e = new Error('已停止');
+      e.code = 'ABORT';
+      throw e;
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function chatOpenAI(provider, messages, onDelta, signal, temperature, maxTokens) {
+async function chatOpenAI(provider, messages, onDelta, onNote, signal, temperature, maxTokens) {
   const res = await fetch(joinURL(provider.baseURL, '/chat/completions'), {
     method: 'POST',
     headers: headersFor(provider),
@@ -170,18 +220,27 @@ async function chatOpenAI(provider, messages, onDelta, signal, temperature, maxT
     const t = await res.text().catch(() => '');
     throw new Error(`模型返回 ${res.status}: ${t.slice(0, 300)}`);
   }
+  const ctype = (res.headers.get('content-type') || '').toLowerCase();
+  if (ctype.includes('application/json') && !ctype.includes('event-stream')) {
+    const text = textFromJSON('openai', await res.json());
+    if (text && onDelta) onDelta(text);
+    return text;
+  }
+  const notes = notePump(onNote);
   let text = '';
   await readSSE(res, (ev) => {
-    const d = ev.choices && ev.choices[0] && ev.choices[0].delta;
-    if (d && d.content) {
-      text += d.content;
-      onDelta && onDelta(d.content);
+    const part = takeStreamEvent(ev);
+    if (part.text) {
+      text += part.text;
+      if (onDelta) onDelta(part.text);
     }
+    if (part.note) notes.push(part.note);
   });
+  notes.flush();
   return text;
 }
 
-async function chatAnthropic(provider, messages, onDelta, signal, temperature, maxTokens) {
+async function chatAnthropic(provider, messages, onDelta, onNote, signal, temperature, maxTokens) {
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
   const rest = messages.filter((m) => m.role !== 'system');
   const res = await fetch(joinURL(provider.baseURL, '/v1/messages'), {
@@ -201,13 +260,23 @@ async function chatAnthropic(provider, messages, onDelta, signal, temperature, m
     const t = await res.text().catch(() => '');
     throw new Error(`模型返回 ${res.status}: ${t.slice(0, 300)}`);
   }
+  const ctype = (res.headers.get('content-type') || '').toLowerCase();
+  if (ctype.includes('application/json') && !ctype.includes('event-stream')) {
+    const text = textFromJSON('anthropic', await res.json());
+    if (text && onDelta) onDelta(text);
+    return text;
+  }
+  const notes = notePump(onNote);
   let text = '';
   await readSSE(res, (ev) => {
-    if (ev.type === 'content_block_delta' && ev.delta && ev.delta.text) {
-      text += ev.delta.text;
-      onDelta && onDelta(ev.delta.text);
+    const part = takeStreamEvent(ev);
+    if (part.text) {
+      text += part.text;
+      if (onDelta) onDelta(part.text);
     }
+    if (part.note) notes.push(part.note);
   });
+  notes.flush();
   return text;
 }
 
@@ -282,4 +351,4 @@ async function vision({ provider, images, prompt = VISION_PROMPT, maxTokens = 8,
   }
 }
 
-module.exports = { chat, listModels, joinURL, vision, VISION_PROMPT, SESSION_ID, trimMessages };
+module.exports = { chat, listModels, joinURL, vision, VISION_PROMPT, SESSION_ID, trimMessages, takeStreamEvent };

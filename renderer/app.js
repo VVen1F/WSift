@@ -274,7 +274,12 @@ function flattenProvider(p) {
     apiKey: acc.apiKey || '',
     accountName: acc.name || '',
     model: p.activeModel || (p.models || [])[0] || '',
-    models: p.models || []
+    models: p.models || [],
+    proxy: p.proxy || '',
+    sessionHeader: p.sessionHeader || '',
+    limitSec: p.limitSec || 0,
+    limitMin: p.limitMin || 0,
+    contextK: p.contextK || 0
   };
 }
 
@@ -337,28 +342,68 @@ async function generateReport() {
   TASKS.busyId = taskId;
   S.reportMd = '';
   task.markdown = '';
-  $('#mdPreview').innerHTML = '<div class="empty">生成中</div>';
-  $('#genStatus').textContent = '生成中';
-  $('#btnGen').disabled = true;
-  renderTaskList();
-
+  const started = Date.now();
   let buf = '';
+  let note = '';
   let raf = 0;
+  let revealed = false;
+  const preview = $('#mdPreview');
+  preview.classList.add('live');
+  const paintWait = () => {
+    if (TASKS.busyId !== taskId || TASKS.id !== taskId) return;
+    const sec = Math.max(0, Math.round((Date.now() - started) / 1000));
+    if (buf) {
+      $('#genStatus').textContent = '生成中 · ' + buf.length + ' 字 · ' + sec + 's';
+      return;
+    }
+    const label = note ? '思考中 · ' + sec + 's' : '等待模型 · ' + sec + 's';
+    $('#genStatus').textContent = label;
+    preview.innerHTML = '<div class="empty">' + esc(note ? note.slice(-80) : label) + '</div>';
+  };
+  paintWait();
+  const clock = setInterval(paintWait, 500);
+  syncGenButton();
+  renderTaskList();
+  const block = document.querySelector('.preview-block');
+  if (block) block.scrollIntoView({ block: 'nearest', behavior: motionOff() ? 'auto' : 'smooth' });
+
+  const stopClock = () => clearInterval(clock);
   const paint = () => {
     raf = 0;
-    if (TASKS.id === taskId) $('#mdPreview').innerHTML = mdToHtml(buf);
+    if (TASKS.id !== taskId) return;
+    preview.innerHTML = mdToHtml(buf);
+    preview.classList.add('live');
+    const sec = Math.max(0, Math.round((Date.now() - started) / 1000));
+    $('#genStatus').textContent = '生成中 · ' + buf.length + ' 字 · ' + sec + 's';
+    if (!revealed) {
+      revealed = true;
+      if (block) block.scrollIntoView({ block: 'nearest' });
+    }
   };
 
-  window.api.chat({
+  const finish = () => {
+    stopClock();
+    preview.classList.remove('live');
+    TASKS.busyId = null;
+    reportChat = null;
+    syncGenButton();
+    renderTaskList();
+  };
+
+  reportChat = window.api.chat({
     provider: prov,
     messages,
+    onNote: (n) => {
+      note = n || note;
+      if (!buf) paintWait();
+    },
     onDelta: (d) => {
       buf += d;
       const live = TASKS.list.find((x) => x.id === taskId);
       if (live) live.markdown = buf;
       if (TASKS.id === taskId) {
         S.reportMd = buf;
-        if (!raf) raf = setTimeout(paint, 90);
+        if (!raf) raf = setTimeout(paint, 80);
       }
     },
     onDone: (text) => {
@@ -375,23 +420,26 @@ async function generateReport() {
       if (TASKS.id === taskId) {
         S.reportMd = md;
         if (live && live.title) $('#rTitle').value = live.title;
-        $('#mdPreview').innerHTML = mdToHtml(md);
-        $('#genStatus').textContent = '已生成 · ' + md.length + ' 字';
+        preview.innerHTML = md ? mdToHtml(md) : '<div class="empty">模型没有返回正文</div>';
+        $('#genStatus').textContent = md ? '已生成 · ' + md.length + ' 字' : '没有正文';
       }
-      TASKS.busyId = null;
-      $('#btnGen').disabled = false;
-      renderTaskList();
+      finish();
       saveTasksNow();
     },
-    onError: (msg) => {
+    onError: (msg, code) => {
+      const stopped = code === 'ABORT' || msg === '已停止';
       if (TASKS.id === taskId) {
-        $('#genStatus').textContent = '失败';
-        $('#mdPreview').innerHTML = `<div class="empty">${esc(msg)}</div>`;
+        if (buf) {
+          preview.innerHTML = mdToHtml(buf);
+          $('#genStatus').textContent = stopped ? '已停止 · ' + buf.length + ' 字' : '失败';
+        } else {
+          preview.innerHTML = '<div class="empty">' + esc(stopped ? '已停止' : msg) + '</div>';
+          $('#genStatus').textContent = stopped ? '已停止' : '失败';
+        }
       }
-      TASKS.busyId = null;
-      $('#btnGen').disabled = false;
-      renderTaskList();
-      toast(msg, true);
+      finish();
+      if (!stopped) toast(msg, true);
+      else if (buf) saveTasksNow();
     }
   });
 }
@@ -424,7 +472,24 @@ async function saveReport() {
   return r;
 }
 
-$('#btnGen').addEventListener('click', generateReport);
+let reportChat = null;
+
+function syncGenButton() {
+  const gen = $('#btnGen');
+  if (!gen) return;
+  const busy = TASKS.busyId && TASKS.busyId === TASKS.id;
+  gen.textContent = busy ? '停止' : '生成';
+  gen.disabled = false;
+}
+
+function cancelReport() {
+  if (reportChat && reportChat.cancel) reportChat.cancel();
+}
+
+$('#btnGen').addEventListener('click', () => {
+  if (TASKS.busyId && TASKS.busyId === TASKS.id) return cancelReport();
+  generateReport();
+});
 $('#btnSave').addEventListener('click', saveReport);
 $('#btnCopy').addEventListener('click', async () => {
   if (!S.reportMd) return toast('还没有报告', true);
@@ -519,8 +584,9 @@ function applyTask(t) {
   $('#genStatus').textContent = S.reportMd ? '已生成 · ' + S.reportMd.length + ' 字' : '未生成';
   const reveal = $('#btnReveal');
   if (reveal) reveal.disabled = !S.reportDir;
-  const gen = $('#btnGen');
-  if (gen) gen.disabled = !!TASKS.busyId;
+  const preview = $('#mdPreview');
+  if (preview) preview.classList.toggle('live', TASKS.busyId === t.id);
+  syncGenButton();
 }
 
 function showReportEmpty() {
@@ -1796,8 +1862,7 @@ function renderModelPop() {
     pop.innerHTML = '<div class="mp-models"><div class="mp-empty">还没有配置模型</div></div>';
     return;
   }
-  const fetched = (LLM.models && LLM.models[prov.id]) || [];
-  const models = Array.from(new Set([...(prov.models || []), ...fetched]));
+  const models = Array.from(new Set([...(prov.models || []), prov.activeModel].filter(Boolean)));
 
   pop.innerHTML = `
     <div class="mp-models">
@@ -1807,7 +1872,7 @@ function renderModelPop() {
             <span>${esc(m)}</span>
             ${m === prov.activeModel ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>' : ''}
           </div>`).join('')
-        : '<div class="mp-empty">这个供应商还没有模型，去设置里加</div>'}
+        : '<div class="mp-empty">还没勾选模型。到设置里选。</div>'}
     </div>
     <div class="mp-prov">
       <div class="mp-h">供应商</div>
@@ -1855,6 +1920,20 @@ function closeModelPop() {
   if (pill) pill.classList.remove('on');
 }
 
+function placeModelPop() {
+  const pop = $('#modelPop');
+  const pill = $('#btnModelPick');
+  if (!pop || !pill) return;
+  const r = pill.getBoundingClientRect();
+  const width = Math.min(440, window.innerWidth - 24);
+  const left = Math.max(12, Math.min(r.left, window.innerWidth - width - 12));
+  const space = Math.max(160, r.top - 16);
+  pop.style.left = left + 'px';
+  pop.style.width = width + 'px';
+  pop.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+  pop.style.maxHeight = Math.min(320, space) + 'px';
+}
+
 function toggleModelPop() {
   const pop = $('#modelPop');
   const pill = $('#btnModelPick');
@@ -1863,6 +1942,7 @@ function toggleModelPop() {
     pop.hidden = false;
     pill.classList.add('on');
     renderModelPop();
+    placeModelPop();
   } else {
     closeModelPop();
   }

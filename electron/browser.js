@@ -33,17 +33,36 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function getJSON(url) {
+/** 调试端口有时回纯文本（例如 GET /json/new 被拒）。不要再抛 JSON 解析异常。 */
+function parseDevtools(text) {
+  const raw = String(text || '').trim();
+  if (!raw) throw new Error('调试端口没有返回内容');
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new Error(raw.replace(/\s+/g, ' ').slice(0, 180));
+  }
+}
+
+function devtools(url, method) {
   return new Promise((resolve, reject) => {
-    const req = http.get(url, { timeout: 2000 }, (res) => {
+    const u = new URL(url);
+    const req = http.request({
+      hostname: u.hostname,
+      port: u.port,
+      path: u.pathname + u.search,
+      method: method || 'GET',
+      timeout: 2000
+    }, (res) => {
       let b = '';
       res.on('data', (c) => (b += c));
       res.on('end', () => {
-        try { resolve(JSON.parse(b)); } catch (e) { reject(e); }
+        try { resolve(parseDevtools(b)); } catch (e) { reject(e); }
       });
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.end();
   });
 }
 
@@ -51,7 +70,7 @@ async function waitPort(p, ms = 10000) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     try {
-      return await getJSON(`http://127.0.0.1:${p}/json/version`);
+      return await devtools(`http://127.0.0.1:${p}/json/version`);
     } catch (e) {
       await sleep(220);
     }
@@ -123,7 +142,7 @@ async function ensure(p = 9222) {
   if (!bin) throw new Error('没找到 Chrome，可设置 CHROME 环境变量');
 
   try {
-    await getJSON(`http://127.0.0.1:${port}/json/version`);
+    await devtools(`http://127.0.0.1:${port}/json/version`);
   } catch (e) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-chrome-'));
     proc = spawn(bin, [
@@ -140,13 +159,7 @@ async function ensure(p = 9222) {
     await sleep(300);
   }
 
-  const list = await getJSON(`http://127.0.0.1:${port}/json/list`);
-  pageTarget = (list || []).find((t) => t.type === 'page');
-  if (!pageTarget) {
-    await getJSON(`http://127.0.0.1:${port}/json/new?about:blank`);
-    const again = await getJSON(`http://127.0.0.1:${port}/json/list`);
-    pageTarget = (again || []).find((t) => t.type === 'page');
-  }
+  pageTarget = await findPage();
   if (!pageTarget) throw new Error('没有可用的页面');
 
   cdp = new CDP(pageTarget.webSocketDebuggerUrl);
@@ -156,6 +169,29 @@ async function ensure(p = 9222) {
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   return { port };
+}
+
+function pickPage(list) {
+  return (Array.isArray(list) ? list : []).find((t) => t && t.type === 'page' && t.webSocketDebuggerUrl);
+}
+
+async function findPage() {
+  for (let i = 0; i < 8; i++) {
+    const page = pickPage(await devtools(`http://127.0.0.1:${port}/json/list`));
+    if (page) return page;
+    await sleep(200);
+  }
+  // 新版 Chrome 拒绝 GET /json/new，只接受 PUT。GET 的报错是纯文本。
+  let created = null;
+  try {
+    created = await devtools(`http://127.0.0.1:${port}/json/new?about:blank`, 'PUT');
+  } catch (e) {
+    created = null;
+  }
+  if (created && created.webSocketDebuggerUrl) return created;
+  const page = pickPage(await devtools(`http://127.0.0.1:${port}/json/list`));
+  if (!page) throw new Error('没有可用的页面');
+  return page;
 }
 
 async function navigate(url) {
@@ -219,5 +255,5 @@ function shutdown() {
 
 module.exports = {
   ensure, navigate, evaluate, screenshotPage, dismissDialog,
-  onDialog, onDialogClosed, status, shutdown, chromePath
+  onDialog, onDialogClosed, status, shutdown, chromePath, parseDevtools
 };

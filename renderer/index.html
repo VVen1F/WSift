@@ -373,36 +373,53 @@
 </div>
 
 <div class="modal" id="provModal" hidden>
-  <div class="modal-card">
+  <div class="modal-card pm-card">
     <div class="modal-head">
       <b>新建模型配置</b>
       <button class="modal-x" id="pmClose" aria-label="关闭">×</button>
     </div>
-    <p class="modal-sub">新建后不会自动激活。</p>
+    <p class="modal-sub">新建后不会自动激活，请在卡片上「设为激活」以启用。</p>
     <div class="form">
-      <label class="f">名称<input class="inp" id="pmName" placeholder="例如 OpenAI 生产" /></label>
-      <label class="f">格式
-        <select class="inp" id="pmKind">
-          <option value="openai">OpenAI 兼容</option>
-          <option value="anthropic">Anthropic</option>
-        </select>
-      </label>
+      <div class="row pm-top">
+        <label class="f">名称<input class="inp" id="pmName" placeholder="例如：OpenAI 生产" /></label>
+        <label class="f pm-kind">格式
+          <select class="inp" id="pmKind">
+            <option value="openai">OpenAI 兼容</option>
+            <option value="anthropic" selected>Anthropic</option>
+          </select>
+        </label>
+      </div>
       <label class="f">模型
-        <input class="inp" id="pmModel" placeholder="claude-opus-4-8" />
+        <span class="pm-model">
+          <input class="inp" id="pmModel" value="glm-4.6" spellcheck="false" />
+          <button type="button" class="btn pm-refresh" id="pmModelFetch" aria-label="拉取模型" title="拉取模型">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-13.7 5.6L4 16"/><path d="M4 20v-4h4"/><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8"/><path d="M20 4v4h-4"/></svg>
+          </button>
+        </span>
       </label>
-      <div class="row actions"><button class="btn ghost" id="pmModelFetch">拉取模型</button></div>
-      <label class="f">Base URL<input class="inp" id="pmBase" placeholder="https://api.openai.com/v1" /></label>
-      <label class="f">API Key<input class="inp" id="pmKey" type="password" placeholder="sk-…" /></label>
-      <label class="f">代理<small>http 或 socks5，留空直连</small><input class="inp" id="pmProxy" placeholder="http://127.0.0.1:8080" /></label>
-      <label class="f">自定义会话头<small>留空则不发送</small><input class="inp" id="pmSession" placeholder="如 x-session-id" /></label>
-      <label class="f">每秒<input class="inp" id="pmSec" type="number" min="0" placeholder="0" /></label>
-      <label class="f">每分钟<input class="inp" id="pmMin" type="number" min="0" placeholder="0" /></label>
-      <label class="f">上下文 K<input class="inp" id="pmCtx" type="number" min="0" placeholder="0" /></label>
+      <label class="f">Base URL（可选）<input class="inp" id="pmBase" value="https://open.bigmodel.cn/api/anthropic" spellcheck="false" /></label>
+      <label class="f">代理（可选）
+        <input class="inp" id="pmProxy" placeholder="socks5://user:pass@127.0.0.1:1080 · http://127.0.0.1:8080" spellcheck="false" />
+        <small>仅 LLM 出站请求走此代理，支持 http、https、socks5，可带账号密码（如 socks5://user:pass@host:port，密码含特殊字符需 URL 编码）。留空表示直连。走代理时整段返回，不流式。</small>
+      </label>
+      <label class="f">自定义会话头（可选）
+        <input class="inp" id="pmSession" placeholder="如 x-session-id（留空=不发送）" spellcheck="false" />
+        <small>填写头名后，每次请求都会带上这个 HTTP 头，头值是本进程固定的 session id。用于按 session id 做提示缓存或粘性路由的网关。留空则不发送。</small>
+      </label>
+      <label class="f">API Key<input class="inp" id="pmKey" type="password" placeholder="sk-..." autocomplete="off" /></label>
+      <div class="row pm-limits">
+        <label class="f">每秒限速<input class="inp" id="pmSec" type="number" min="0" value="0" /></label>
+        <label class="f">每分钟限速<input class="inp" id="pmMin" type="number" min="0" value="0" /></label>
+        <label class="f">上下文窗口(K)<input class="inp" id="pmCtx" type="number" min="0" value="0" /></label>
+      </div>
+      <small class="pm-hint">限速 0 表示不限，同一服务的请求共享。上下文窗口单位 K（千 token），0 表示不裁；超出后从最早的消息开始丢，系统提示保留。</small>
     </div>
-    <div class="row actions">
-      <button class="btn" id="pmTest">测试连接</button>
-      <span class="spacer"></span>
-      <button class="btn primary" id="pmCreate">新建</button>
+    <div class="row actions pm-actions">
+      <button class="btn" id="pmTest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.1 3.8L17 8l-3.9 1.2L12 13l-1.1-3.8L7 8l3.9-1.2L12 3z"/><path d="M18 14l.6 1.8L20.5 16.5 18.6 17.1 18 19l-.6-1.9L15.5 16.5l1.9-.7L18 14z"/></svg>
+        测试连接
+      </button>
+      <button class="btn primary" id="pmCreate">+ 新建</button>
     </div>
     <div class="form-note" id="pmStatus"></div>
   </div>

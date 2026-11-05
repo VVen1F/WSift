@@ -11,7 +11,7 @@ const DEFAULTS = {
   providers: [
     {
       id: 'glm',
-      name: '智谱 GLM',
+      name: 'GLM',
       kind: 'anthropic',
       baseURL: 'https://open.bigmodel.cn/api/anthropic',
       modelsURL: 'https://open.bigmodel.cn/api/paas/v4/models',

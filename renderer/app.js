@@ -780,20 +780,28 @@ $('#btnDataDir').addEventListener('click', () => window.api.openPath(S.info.user
 
 /* ---------------- 新建模型配置 ---------------- */
 
+// 内置 GLM 便利项：协议、模型、地址与 store 里的预设保持一致。名称留给用户填。
+const GLM_FORM = {
+  kind: 'anthropic',
+  model: 'glm-4.6',
+  baseURL: 'https://open.bigmodel.cn/api/anthropic',
+  modelsURL: 'https://open.bigmodel.cn/api/paas/v4/models'
+};
+
 function openProvModal() {
   const m = $('#provModal');
   m.hidden = false;
   $('#pmStatus').textContent = '';
   $('#pmName').value = '';
-  $('#pmModel').value = '';
-  $('#pmBase').value = 'https://api.openai.com/v1';
+  $('#pmKind').value = GLM_FORM.kind;
+  $('#pmModel').value = GLM_FORM.model;
+  $('#pmBase').value = GLM_FORM.baseURL;
   $('#pmKey').value = '';
   $('#pmProxy').value = '';
   $('#pmSession').value = '';
   $('#pmSec').value = '0';
   $('#pmMin').value = '0';
   $('#pmCtx').value = '0';
-  $('#pmKind').value = 'openai';
   $('#pmName').focus();
 }
 
@@ -802,12 +810,13 @@ function closeProvModal() {
 }
 
 function draftProvider() {
+  const baseURL = $('#pmBase').value.trim();
   return {
     id: 'p' + Date.now().toString(36),
     name: $('#pmName').value.trim() || '未命名服务',
     kind: $('#pmKind').value,
-    baseURL: $('#pmBase').value.trim(),
-    modelsURL: '',
+    baseURL,
+    modelsURL: baseURL === GLM_FORM.baseURL ? GLM_FORM.modelsURL : '',
     enabled: true,
     accounts: [{ id: 'acc' + Date.now().toString(36), name: '默认', apiKey: $('#pmKey').value.trim() }],
     activeAccountId: '',

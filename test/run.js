@@ -59,6 +59,15 @@ function ok(name, cond, extra) {
 
   ok('http.send 导出', typeof httpc.send === 'function');
   ok('settings 默认值', store.load().providers.length >= 1);
+  const glm = store.DEFAULTS.providers.find((p) => p.id === 'glm');
+  const brand = /智谱|智普|zhipu/i;
+  ok('内置 GLM 预设', !!(glm && glm.kind === 'anthropic' && glm.activeModel === 'glm-4.6' && glm.baseURL === 'https://open.bigmodel.cn/api/anthropic' && !(glm.accounts || []).some((a) => a.apiKey)));
+  ok('预设名称不含厂商品牌', !!(glm && glm.name && !brand.test(glm.name)));
+  const surfaced = ['README.md', 'renderer/index.html', 'renderer/app.js', 'renderer/style.css', 'electron/store.js', 'electron/llm.js']
+    .map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'))
+    .join('\n');
+  ok('界面与说明不含智谱品牌', !brand.test(surfaced));
+  ok('新建表单预填 GLM', surfaced.includes(glm.baseURL) && surfaced.includes('例如：OpenAI 生产') && surfaced.includes("model: 'glm-4.6'"));
   ok('settings 含统计', typeof store.load().stats === 'object');
   ok('模板内置 5 套', templates.list().length === 5);
   ok('模板占位符替换', report.fillTemplate('# {{title}}', { title: 'T' }) === '# T');

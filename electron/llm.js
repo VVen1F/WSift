@@ -214,7 +214,7 @@ async function chatAnthropic(provider, messages, onDelta, signal, temperature, m
 async function listModels(provider) {
   const url = provider.modelsURL ||
     (provider.kind === 'anthropic' ? joinURL(provider.baseURL, '/v1/models') : joinURL(provider.baseURL, '/models'));
-  // 智谱的 models 走 OpenAI 风格鉴权
+  // 单独配了 modelsURL 时，模型列表走 OpenAI 风格的 Bearer 鉴权
   const headers = provider.modelsURL
     ? { 'content-type': 'application/json', authorization: `Bearer ${provider.apiKey || ''}` }
     : headersFor(provider);

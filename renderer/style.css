@@ -1240,3 +1240,6 @@ textarea.inp {
 .switch[aria-checked="true"]::after { transform: translateX(16px); background: var(--on-accent); }
 .switch:disabled { cursor: default; opacity: .5; }
 .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 网络设置里的代理地址比其他输入框宽 */
+.kin.wide { width: 280px; max-width: 280px; }

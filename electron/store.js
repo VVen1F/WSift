@@ -47,6 +47,7 @@ const DEFAULTS = {
     autoShot: false,
     protocol: 'auto',
     remotePort: 8765,
+    proxy: '',
     maskKeys: true,
     confirmQuit: false,
     launchAtLogin: false

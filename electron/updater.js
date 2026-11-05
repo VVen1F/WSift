@@ -3,6 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const net = require('./net');
 
 const OWNER = 'VVen1F';
 const REPO = 'refract';
@@ -30,28 +31,13 @@ function pickAsset(assets, platform, arch) {
   return list.find((a) => /AppImage$/i.test(a.name)) || list.find((a) => /\.(zip|exe)$/i.test(a.name)) || null;
 }
 
-/** 5xx 和网络错误重试几次，GitHub 的 CDN 偶尔 504。 */
-async function fetchRetry(url, opts = {}, tries = 3) {
-  let last;
-  for (let i = 0; i < tries; i++) {
-    try {
-      const res = await fetch(url, opts);
-      if (res.ok || res.status < 500) return res;
-      last = new Error(`HTTP ${res.status}`);
-    } catch (e) {
-      last = e;
-    }
-    if (i < tries - 1) await new Promise((r) => setTimeout(r, 800 * (i + 1)));
-  }
-  throw last;
-}
-
-async function check(current) {
-  const res = await fetchRetry(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, {
-    headers: { accept: 'application/vnd.github+json', 'user-agent': 'refract' }
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const rel = await res.json();
+async function check(current, opts = {}) {
+  const rel = await net.retry(() =>
+    net.fetchJSON(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, {
+      headers: { accept: 'application/vnd.github+json' },
+      proxy: opts.proxy || ''
+    })
+  );
   const latest = String(rel.tag_name || '').replace(/^v/, '');
   const assets = rel.assets || [];
   const asset = pickAsset(assets);
@@ -65,24 +51,11 @@ async function check(current) {
   };
 }
 
-async function download(url, onProgress) {
-  const res = await fetchRetry(url, { headers: { 'user-agent': 'refract' } });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const total = Number(res.headers.get('content-length')) || 0;
+async function download(url, onProgress, opts = {}) {
   const name = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'update.bin');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-update-'));
   const file = path.join(dir, name);
-  const fd = fs.openSync(file, 'w');
-  const reader = res.body.getReader();
-  let received = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    fs.writeSync(fd, Buffer.from(value));
-    received += value.length;
-    onProgress && onProgress({ received, total, percent: total ? Math.round((received / total) * 100) : 0 });
-  }
-  fs.closeSync(fd);
+  await net.retry(() => net.download(url, file, { proxy: opts.proxy || '', onProgress }));
   return file;
 }
 

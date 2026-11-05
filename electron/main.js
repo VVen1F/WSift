@@ -689,7 +689,8 @@ ipcMain.on('llm:cancel', (_e, id) => {
 
 ipcMain.handle('update:check', async () => {
   try {
-    return { ok: true, ...(await updater.check(app.getVersion())) };
+    const proxy = (store.load().ui || {}).proxy || '';
+    return { ok: true, ...(await updater.check(app.getVersion(), { proxy })) };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -697,9 +698,10 @@ ipcMain.handle('update:check', async () => {
 
 ipcMain.handle('update:download', async (event, url) => {
   try {
+    const proxy = (store.load().ui || {}).proxy || '';
     const file = await updater.download(url, (p) => {
       if (!event.sender.isDestroyed()) event.sender.send('update:progress', p);
-    });
+    }, { proxy });
     return { ok: true, file };
   } catch (err) {
     return { ok: false, error: err.message };

@@ -2092,6 +2092,7 @@ async function bindSettingsPage(ri) {
   $('#setBackupAuto').value = bk.auto || 'off';
   $('#setBackupKeep').value = String(bk.keep || 7);
   $('#setPort').value = ui.remotePort || 8765;
+  $('#setProxy').value = ui.proxy || '';
 
   $('#setWidth').addEventListener('input', (e) => {
     S.settings.ui.shotWidth = Number(e.target.value) || 1600;
@@ -2133,6 +2134,11 @@ async function bindSettingsPage(ri) {
   $('#setBackupKeep').addEventListener('change', (e) => {
     S.settings.backup.keep = Number(e.target.value) || 7;
     persist();
+  });
+  $('#setProxy').addEventListener('change', (e) => {
+    S.settings.ui.proxy = e.target.value.trim();
+    persist();
+    toast(S.settings.ui.proxy ? '代理已保存' : '已关闭代理');
   });
   $('#setPort').addEventListener('change', (e) => {
     S.settings.ui.remotePort = Number(e.target.value) || 8765;

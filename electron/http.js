@@ -303,4 +303,4 @@ function dechunk(buf) {
   return Buffer.concat(out);
 }
 
-module.exports = { send, parseRequest, decodeResponse, dechunk };
+module.exports = { send, parseRequest, decodeResponse, dechunk, parseProxy, openSocket };

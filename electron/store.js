@@ -16,6 +16,10 @@ const DEFAULTS = {
       baseURL: 'https://open.bigmodel.cn/api/anthropic',
       modelsURL: 'https://open.bigmodel.cn/api/paas/v4/models',
       enabled: true,
+      sessionHeader: '',
+      limitSec: 0,
+      limitMin: 0,
+      contextK: 0,
       accounts: [{ id: 'glm-a1', name: '默认', apiKey: '' }],
       activeAccountId: 'glm-a1',
       models: ['glm-4.6'],
@@ -96,6 +100,10 @@ function migrateProvider(p) {
     baseURL: p.baseURL || '',
     modelsURL: p.modelsURL || '',
     enabled: p.enabled !== false,
+    sessionHeader: p.sessionHeader || '',
+    limitSec: Math.max(0, Number(p.limitSec) || 0),
+    limitMin: Math.max(0, Number(p.limitMin) || 0),
+    contextK: Math.max(0, Number(p.contextK) || 0),
     accounts,
     activeAccountId,
     models,
@@ -158,7 +166,11 @@ function resolveProvider(cfg, id) {
     apiKey: acc.apiKey || '',
     accountName: acc.name || '',
     model: p.activeModel || (p.models || [])[0] || '',
-    models: p.models || []
+    models: p.models || [],
+    sessionHeader: p.sessionHeader || '',
+    limitSec: p.limitSec || 0,
+    limitMin: p.limitMin || 0,
+    contextK: p.contextK || 0
   };
 }
 

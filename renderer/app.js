@@ -520,6 +520,13 @@ function providerDetailHTML(id) {
     </div>
     <div class="krow"><div class="klabel">Base URL</div><input class="inp" style="flex:1;max-width:none" id="pdBase" value="${esc(p.baseURL)}" /></div>
     <div class="krow"><div class="klabel">模型列表地址<small>留空按协议猜</small></div><input class="inp" style="flex:1;max-width:none" id="pdModelsURL" value="${esc(p.modelsURL || '')}" /></div>
+    <div class="krow"><div class="klabel">自定义会话头<small>留空则不发送</small></div><input class="inp" style="flex:1;max-width:none" id="pdSession" value="${esc(p.sessionHeader || '')}" placeholder="如 x-session-id" /></div>
+    <div class="krow">
+      <div class="klabel">限速与上下文<small>0 = 不限</small></div>
+      <input class="inp kin" id="pdSec" type="number" min="0" placeholder="每秒" value="${Number(p.limitSec) || 0}" />
+      <input class="inp kin" id="pdMin" type="number" min="0" placeholder="每分钟" value="${Number(p.limitMin) || 0}" />
+      <input class="inp kin" id="pdCtx" type="number" min="0" placeholder="上下文 K" value="${Number(p.contextK) || 0}" />
+    </div>
   </div>
 
   <div class="pd-sec">
@@ -575,6 +582,10 @@ function bindProviderDetail(id) {
   $('#pdKind').addEventListener('change', (e) => { p.kind = e.target.value; persist(); });
   $('#pdBase').addEventListener('input', (e) => { p.baseURL = e.target.value; persist(); });
   $('#pdModelsURL').addEventListener('input', (e) => { p.modelsURL = e.target.value; persist(); });
+  $('#pdSession').addEventListener('input', (e) => { p.sessionHeader = e.target.value; persist(); });
+  $('#pdSec').addEventListener('input', (e) => { p.limitSec = Number(e.target.value) || 0; persist(); });
+  $('#pdMin').addEventListener('input', (e) => { p.limitMin = Number(e.target.value) || 0; persist(); });
+  $('#pdCtx').addEventListener('input', (e) => { p.contextK = Number(e.target.value) || 0; persist(); });
 
   document.querySelectorAll('#pdAccounts .acc-item').forEach((el) => {
     const aid = el.dataset.aid;
@@ -761,6 +772,10 @@ function openProvModal() {
   $('#pmModel').value = '';
   $('#pmBase').value = 'https://api.openai.com/v1';
   $('#pmKey').value = '';
+  $('#pmSession').value = '';
+  $('#pmSec').value = '0';
+  $('#pmMin').value = '0';
+  $('#pmCtx').value = '0';
   $('#pmKind').value = 'openai';
   $('#pmName').focus();
 }
@@ -780,7 +795,11 @@ function draftProvider() {
     accounts: [{ id: 'acc' + Date.now().toString(36), name: '默认', apiKey: $('#pmKey').value.trim() }],
     activeAccountId: '',
     models: $('#pmModel').value.trim() ? [$('#pmModel').value.trim()] : [],
-    activeModel: $('#pmModel').value.trim()
+    activeModel: $('#pmModel').value.trim(),
+    sessionHeader: $('#pmSession').value.trim(),
+    limitSec: Number($('#pmSec').value) || 0,
+    limitMin: Number($('#pmMin').value) || 0,
+    contextK: Number($('#pmCtx').value) || 0
   };
 }
 

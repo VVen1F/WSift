@@ -397,6 +397,13 @@
       </div>
       <div class="krow"><div class="klabel">Base URL</div><input class="inp" style="flex:1;max-width:none" id="pmBase" placeholder="https://api.openai.com/v1" /></div>
       <div class="krow"><div class="klabel">API Key</div><input class="inp" style="flex:1;max-width:none" id="pmKey" type="password" placeholder="sk-…" /></div>
+      <div class="krow"><div class="klabel">自定义会话头<small>留空则不发送</small></div><input class="inp" style="flex:1;max-width:none" id="pmSession" placeholder="如 x-session-id" /></div>
+      <div class="krow">
+        <div class="klabel">限速与上下文<small>0 = 不限</small></div>
+        <input class="inp kin" id="pmSec" type="number" min="0" placeholder="每秒" />
+        <input class="inp kin" id="pmMin" type="number" min="0" placeholder="每分钟" />
+        <input class="inp kin" id="pmCtx" type="number" min="0" placeholder="上下文 K" />
+      </div>
     </div>
     <div class="row actions" style="margin-top:16px">
       <button class="btn" id="pmTest">测试连接</button>

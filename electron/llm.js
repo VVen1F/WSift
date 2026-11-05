@@ -6,6 +6,49 @@ function joinURL(base, suffix) {
   return String(base || '').replace(/\/+$/, '') + suffix;
 }
 
+const SESSION_ID = 'refract-' + Math.random().toString(36).slice(2, 10);
+const queues = new Map();
+
+/** 自定义会话头：值固定为本次进程的 session id，便于网关做粘性/缓存。 */
+function headersFor(p) {
+  const h = authHeaders(p);
+  if (p.sessionHeader) h[String(p.sessionHeader).toLowerCase()] = SESSION_ID;
+  return h;
+}
+
+/** 每秒 / 每分钟限速，服务级共享。 */
+async function throttle(p) {
+  const sec = Number(p.limitSec) || 0;
+  const min = Number(p.limitMin) || 0;
+  if (!sec && !min) return;
+  const key = p.id || 'default';
+  const now = Date.now();
+  const q = queues.get(key) || { sec: [], min: [] };
+  q.sec = q.sec.filter((t) => now - t < 1000);
+  q.min = q.min.filter((t) => now - t < 60000);
+  let wait = 0;
+  if (sec && q.sec.length >= sec) wait = Math.max(wait, 1000 - (now - q.sec[0]));
+  if (min && q.min.length >= min) wait = Math.max(wait, 60000 - (now - q.min[0]));
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  const t = Date.now();
+  q.sec.push(t);
+  q.min.push(t);
+  queues.set(key, q);
+}
+
+/** 上下文窗口（K token）超了就从最早的消息开始丢，系统提示保留。 */
+function trimMessages(messages, contextK) {
+  if (!contextK) return messages;
+  const budget = contextK * 1000 * 3;
+  const size = (m) => String(m.content || '').length;
+  let total = messages.reduce((n, m) => n + size(m), 0);
+  if (total <= budget) return messages;
+  const out = messages.slice();
+  const sys = out[0] && out[0].role === 'system' ? out.shift() : null;
+  while (out.length > 1 && total > budget) total -= size(out.shift());
+  return sys ? [sys, ...out] : out;
+}
+
 function authHeaders(p) {
   if (p.kind === 'anthropic') {
     return {
@@ -64,7 +107,7 @@ async function chat({ provider, messages, onDelta, signal, temperature = 0.4, ma
 async function chatOpenAI(provider, messages, onDelta, signal, temperature, maxTokens) {
   const res = await fetch(joinURL(provider.baseURL, '/chat/completions'), {
     method: 'POST',
-    headers: authHeaders(provider),
+    headers: headersFor(provider),
     body: JSON.stringify({ model: provider.model, messages, stream: true, temperature, max_tokens: maxTokens }),
     signal
   });
@@ -88,7 +131,7 @@ async function chatAnthropic(provider, messages, onDelta, signal, temperature, m
   const rest = messages.filter((m) => m.role !== 'system');
   const res = await fetch(joinURL(provider.baseURL, '/v1/messages'), {
     method: 'POST',
-    headers: authHeaders(provider),
+    headers: headersFor(provider),
     body: JSON.stringify({
       model: provider.model,
       system,
@@ -119,7 +162,7 @@ async function listModels(provider) {
   // 智谱的 models 走 OpenAI 风格鉴权
   const headers = provider.modelsURL
     ? { 'content-type': 'application/json', authorization: `Bearer ${provider.apiKey || ''}` }
-    : authHeaders(provider);
+    : headersFor(provider);
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`获取模型失败 ${res.status}`);
   const json = await res.json();
@@ -162,7 +205,7 @@ async function vision({ provider, images, prompt = VISION_PROMPT, maxTokens = 8,
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: authHeaders(provider),
+      headers: headersFor(provider),
       body: JSON.stringify(body),
       signal: ac.signal
     });
@@ -177,4 +220,4 @@ async function vision({ provider, images, prompt = VISION_PROMPT, maxTokens = 8,
   }
 }
 
-module.exports = { chat, listModels, joinURL, vision, VISION_PROMPT };
+module.exports = { chat, listModels, joinURL, vision, VISION_PROMPT, SESSION_ID, trimMessages };

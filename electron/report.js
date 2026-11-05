@@ -33,7 +33,7 @@ function today() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-function buildMessages({ material, template, meta = {} }) {
+function buildMessages({ material, template, meta = {}, extra }) {
   const facts = [
     `模板：\n${template || ''}`,
     `系统名称：${meta.product || '未提供'}`,
@@ -43,7 +43,8 @@ function buildMessages({ material, template, meta = {} }) {
     `日期：${meta.date || today()}`,
     '',
     '材料（请求、响应、现象、测试记录）：',
-    material || '（无）'
+    material || '（无）',
+    extra ? `\n其他要求：${extra}` : ''
   ].join('\n');
 
   return [
@@ -68,14 +69,15 @@ const CHAT_SYSTEM = `你是 Refract 里的助手，帮用户做漏洞测试和�
 用户要求写报告时，直接输出完整 Markdown 正文，不要用代码块包住整篇，
 标题、结构、语气严格遵守下面的写作约束。`;
 
-function buildChatMessages({ material, template, meta = {}, question }) {
+function buildChatMessages({ material, template, meta = {}, question, extra }) {
   const facts = [
     meta.product ? `系统名称：${meta.product}` : '',
     meta.url ? `影响地址：${meta.url}` : '',
     meta.type ? `漏洞类型：${meta.type}` : '',
     meta.level ? `危害等级：${meta.level}` : '',
     template ? `报告模板：\n${template}` : '',
-    material ? `材料：\n${material}` : ''
+    material ? `材料：\n${material}` : '',
+    extra ? `其他要求：${extra}` : ''
   ].filter(Boolean).join('\n\n');
 
   return [

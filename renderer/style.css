@@ -230,7 +230,7 @@ pre.code .l1 { color: var(--text); }
 .status .spacer { flex: 1; }
 
 /* ---------- 表单 ---------- */
-.form { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.form { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: auto; flex: 1; min-height: 0; }
 .row { display: flex; gap: 10px; }
 .row > * { flex: 1; min-width: 0; }
 label.f { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; color: var(--muted); }
@@ -259,7 +259,7 @@ textarea.inp {
 
 /* ---------- 报告 ---------- */
 .report-grid { flex: 1; display: flex; gap: 10px; min-height: 0; }
-.report-grid .left { width: 340px; flex: 0 0 340px; }
+.report-grid .left { width: 430px; flex: 0 0 430px; }
 .report-grid .right { flex: 1; min-width: 0; }
 
 .md {

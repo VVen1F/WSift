@@ -236,7 +236,7 @@ document.addEventListener('keydown', (e) => {
 
 $('#btnToReport').addEventListener('click', () => {
   if (!S.lastRes) return toast('先发送一次请求', true);
-  $('#rMaterial').value =
+  $('#rDetail').value =
     '请求：\n```http\n' + (S.lastReq || $('#req').value) + '\n```\n\n响应：\n```http\n' + S.lastRes + '\n```';
   go('report');
   toast('已作为材料放入报告页');
@@ -254,23 +254,40 @@ function fillTemplateSelect() {
   sel.innerHTML = S.templates.map((t) => `<option value="${t.id}">${esc(t.name)}（${esc(t.platform)}）</option>`).join('');
 }
 
+function deriveMeta(material) {
+  const host = /^\s*host:\s*(\S+)/im.exec(material || '');
+  const url = /https?:\/\/[^\s'"<>`]+/.exec(material || '');
+  const hostName = host ? host[1].split(':')[0] : '';
+  return {
+    product: '',
+    url: url ? url[0] : hostName ? 'https://' + hostName : '',
+    type: '',
+    host: hostName
+  };
+}
+
+function mdTitle(md) {
+  const m = /^#\s+(.+)$/m.exec(md || '');
+  return (m ? m[1] : '报告').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 40) || '报告';
+}
+
 async function generateReport() {
   const prov = activeProvider();
   if (!prov || !prov.apiKey) return toast('先在设置里配置模型和 API Key', true);
 
   const tpl = S.templates.find((t) => t.id === $('#rTemplate').value) || S.templates[0];
   const extra = $('#rExtra').value.trim();
-  const material = $('#rMaterial').value + (extra ? '\n\n补充要求：' + extra : '');
+  const cred = $('#rCred').value.trim();
+  const detail = $('#rDetail').value.trim();
+  if (!detail) return toast('先把漏洞详情填上', true);
+
+  const material = (cred ? '账号密码：\n' + cred + '\n\n' : '') + detail;
 
   const messages = await window.api.compose({
     material,
     template: tpl ? tpl.body : '',
-    meta: {
-      product: $('#rProduct').value,
-      url: $('#rUrl').value,
-      type: $('#rType').value,
-      level: $('#rLevel').value
-    }
+    meta: deriveMeta(material),
+    extra
   });
 
   S.reportMd = '';
@@ -314,7 +331,7 @@ function imagesSection() {
 
 async function saveReport() {
   if (!S.reportMd) return toast('先生成报告', true);
-  const title = ($('#rProduct').value || 'report').slice(0, 40);
+  const title = mdTitle(S.reportMd);
   const md = S.reportMd.replace(/\s+$/, '') + imagesSection();
   const r = await window.api.saveReport({ markdown: md, images: S.images, title });
   S.reportDir = r.dir;
@@ -709,12 +726,7 @@ async function sendChat(text) {
   const messages = await window.api.chatMessages({
     material,
     template: tpl ? tpl.body : '',
-    meta: {
-      product: $('#rProduct').value,
-      url: $('#rUrl').value,
-      type: $('#rType').value,
-      level: $('#rLevel').value
-    },
+    meta: deriveMeta(material),
     question: q
   });
 
@@ -784,7 +796,7 @@ function bindHome() {
       const r = await window.api.saveReport({
         markdown: m.text,
         images: S.images,
-        title: ($('#rProduct').value || 'report').slice(0, 40)
+        title: mdTitle(m.text)
       });
       S.reportDir = r.dir;
       S.settings.stats.reports = (S.settings.stats.reports || 0) + 1;
@@ -816,7 +828,6 @@ async function boot() {
 
   $('#btnReveal').disabled = true;
   $('#updateText').textContent = `当前版本 v${S.info.version}`;
-  $('#rLevel').value = '中';
   $('#protocol').value = (S.settings.ui && S.settings.ui.protocol) || 'auto';
   const ri = await window.api.remoteInfo();
   if (ri && ri.url) {

@@ -142,22 +142,15 @@
         <div class="card left">
           <div class="card-h">报告材料</div>
           <div class="form">
-            <label class="f">系统名称<input class="inp" id="rProduct" placeholder="示例：某某社区创作平台" /></label>
-            <label class="f">影响地址<input class="inp" id="rUrl" placeholder="https://" /></label>
-            <div class="row">
-              <label class="f">漏洞类型<input class="inp" id="rType" placeholder="越权 / SQL 注入" /></label>
-              <label class="f">等级
-                <select class="inp" id="rLevel">
-                  <option>中</option><option>高</option><option>严重</option><option>低</option>
-                </select>
-              </label>
-            </div>
             <label class="f">模板<select class="inp" id="rTemplate"></select></label>
-            <label class="f">材料（请求、响应、现象）
-              <textarea class="inp" id="rMaterial" style="min-height:150px" placeholder="粘请求和响应，或写清现象"></textarea>
+            <label class="f">账号密码
+              <textarea class="inp" id="rCred" style="min-height:62px" placeholder="测试账号、口令，没有就留空"></textarea>
             </label>
-            <label class="f">补充要求（可选）
-              <textarea class="inp" id="rExtra" style="min-height:52px" placeholder="例如：强调未授权访问"></textarea>
+            <label class="f" style="flex:1;min-height:220px">漏洞详情
+              <textarea class="inp" id="rDetail" style="flex:1;min-height:200px" placeholder="粘请求和响应，写清现象、复现条件，越具体越好"></textarea>
+            </label>
+            <label class="f">其他要求
+              <textarea class="inp" id="rExtra" style="min-height:62px" placeholder="可选，例如：强调未授权访问"></textarea>
             </label>
             <div class="row">
               <button class="btn primary" id="btnGen">生成报告</button>

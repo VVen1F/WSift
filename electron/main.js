@@ -174,20 +174,129 @@ const shotDir = () => {
 };
 const stampName = (p) => `${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}${p}`;
 
+let burstCtl = null;
+
+async function captureBurst() {
+  const dir = fs.mkdtempSync(path.join(app.getPath('temp'), 'refract-dlg-'));
+  const stops = [150, 600, 1200, 2200, 3800, 6000, 9000];
+  const frames = [];
+  const started = Date.now();
+  burstCtl = { stop: false };
+
+  for (const t of stops) {
+    if (burstCtl.stop) break;
+    const wait = t - (Date.now() - started);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    if (burstCtl.stop) break;
+    const file = path.join(dir, `f${t}.png`);
+    try {
+      const r = await shot.captureScreen(file);
+      frames.push({ t, path: file, size: r.size || fs.statSync(file).size });
+    } catch (e) {
+      if (e.code === 'NO_PERM') return { dir, frames, perm: false, error: e.message };
+    }
+  }
+  return { dir, frames, perm: true };
+}
+
+function pickLargest(frames) {
+  let best = null;
+  for (const f of frames) if (!best || f.size > best.size) best = f;
+  return best;
+}
+
+async function pickByVision(frames) {
+  const cfg = store.load();
+  const prov = (cfg.providers || []).find((p) => p.id === cfg.activeProviderId) || (cfg.providers || [])[0];
+  if (!prov || !prov.apiKey) return null;
+  const picks = frames.filter((f) => f.t >= 400).slice(0, 4);
+  if (!picks.length) return null;
+
+  const { nativeImage } = require('electron');
+  const images = picks.map((f) => {
+    const small = nativeImage.createFromPath(f.path).resize({ width: 720 }).toPNG();
+    return { mime: 'image/png', data: small.toString('base64') };
+  });
+
+  const text = await llm.vision({ provider: prov, images, timeout: 6000 });
+  const m = String(text || '').match(/\d+/);
+  const n = m ? parseInt(m[0], 10) : 0;
+  return n >= 1 && n <= picks.length ? picks[n - 1] : null;
+}
+
 browser.onDialog(async (info) => {
-  let shot = null;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('browser:dialog', { phase: 'open', type: info.type, message: info.message });
+  }
+
+  let chosen = null;
   let error = null;
+  let method = 'none';
+  let count = 0;
+
   try {
-    const r = await shot.captureScreen(path.join(shotDir(), stampName('-dialog.png')));
-    shot = r.path;
+    const burst = await captureBurst();
+    count = burst.frames.length;
+    if (!burst.perm) {
+      error = burst.error;
+    } else if (burst.frames.length) {
+      try {
+        chosen = await pickByVision(burst.frames);
+        if (chosen) method = 'ai';
+      } catch (e) {
+        error = '视觉判断失败：' + e.message;
+      }
+      if (!chosen) {
+        chosen = pickLargest(burst.frames);
+        method = 'size';
+      }
+    }
+
+    if (chosen) {
+      const dest = path.join(shotDir(), stampName('-dialog.png'));
+      fs.copyFileSync(chosen.path, dest);
+      chosen = { path: dest };
+    }
+    try { fs.rmSync(burst.dir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
   } catch (e) {
     error = e.message;
+  } finally {
+    burstCtl = null;
   }
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('browser:dialog', {
-      type: info.type, message: info.message, shot, error
+      phase: 'done',
+      type: info.type,
+      message: info.message,
+      shot: chosen ? chosen.path : null,
+      method,
+      frames: count,
+      error
     });
   }
+});
+
+browser.onDialogClosed(() => {
+  if (burstCtl) burstCtl.stop = true;
+});
+
+ipcMain.handle('perm:screen', () => ({ status: shot.screenAccess(), platform: process.platform }));
+ipcMain.handle('perm:request', async () => {
+  try {
+    const { desktopCapturer } = require('electron');
+    await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1, height: 1 } });
+  } catch (e) {
+    /* 触发系统授权框即可 */
+  }
+  return { status: shot.screenAccess(), platform: process.platform };
+});
+ipcMain.handle('perm:open', async () => {
+  if (process.platform === 'darwin') {
+    await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    return { ok: true };
+  }
+  return { ok: false, error: '这个平台不需要单独授权' };
 });
 
 ipcMain.handle('browser:status', () => browser.status());

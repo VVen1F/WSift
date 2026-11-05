@@ -63,6 +63,11 @@ const BRIDGE = `(function(){
     clipboard: (t) => navigator.clipboard.writeText(t).then(() => true).catch(() => false),
     saveReport: (p) => j('/api/report/save', {method:'POST', body: JSON.stringify(p)}),
     imageUrl: (p) => '/api/shot?path=' + encodeURIComponent(p),
+    perm: {
+      screen: () => Promise.resolve({ status: 'granted', platform: 'remote' }),
+      request: () => Promise.resolve({ status: 'granted', platform: 'remote' }),
+      open: () => Promise.resolve({ ok: false, error: '远程模式请在本机授权' })
+    },
     browser: {
       status: () => j('/api/browser/status'),
       go: (url) => j('/api/browser/go', {method:'POST', body: JSON.stringify({url})}),

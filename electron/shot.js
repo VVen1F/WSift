@@ -59,12 +59,37 @@ async function capture({ request, response, width = 1600, out }) {
  * 整屏截图：把浏览器外壳、alert 弹窗一起拍进去。
  * macOS 用 screencapture，其它平台退回 desktopCapturer。
  */
+/** macOS 屏幕录制权限状态：granted / denied / not-determined / restricted */
+function screenAccess() {
+  if (process.platform !== 'darwin') return 'granted';
+  try {
+    return require('electron').systemPreferences.getMediaAccessStatus('screen');
+  } catch (e) {
+    return 'unknown';
+  }
+}
+
 async function captureScreen(out) {
-  const { execFileSync } = require('child_process');
+  const { execFile } = require('child_process');
   const target = out || path.join(app.getPath('temp'), `refract-screen-${Date.now()}.png`);
   if (process.platform === 'darwin') {
-    execFileSync('screencapture', ['-x', '-o', target]);
-    return { path: target };
+    try {
+      // 用异步的，别把主进程卡住
+      await new Promise((resolve, reject) => {
+        execFile('screencapture', ['-x', '-o', target], { timeout: 5000 }, (err) =>
+          err ? reject(err) : resolve()
+        );
+      });
+    } catch (e) {
+      throw Object.assign(new Error('screencapture 失败：' + e.message), { code: 'NO_PERM' });
+    }
+    let size = 0;
+    try { size = fs.statSync(target).size; } catch (e) { size = 0; }
+    if (size < 20 * 1024) {
+      // 没权限时拍出来基本是全黑/全白，压缩后很小
+      throw Object.assign(new Error('屏幕录制权限没开，截出来是空白'), { code: 'NO_PERM' });
+    }
+    return { path: target, size };
   }
   const { desktopCapturer, screen } = require('electron');
   const sources = await desktopCapturer.getSources({
@@ -76,4 +101,4 @@ async function captureScreen(out) {
   return { path: target };
 }
 
-module.exports = { capture, captureScreen };
+module.exports = { capture, captureScreen, screenAccess };

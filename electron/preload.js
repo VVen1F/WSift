@@ -68,6 +68,12 @@ contextBridge.exposeInMainWorld('api', {
 
   clipboard: (text) => ipcRenderer.invoke('clipboard:write', text),
 
+  perm: {
+    screen: () => ipcRenderer.invoke('perm:screen'),
+    request: () => ipcRenderer.invoke('perm:request'),
+    open: () => ipcRenderer.invoke('perm:open')
+  },
+
   browser: {
     status: () => ipcRenderer.invoke('browser:status'),
     open: () => ipcRenderer.invoke('browser:ensure'),

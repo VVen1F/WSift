@@ -27,6 +27,7 @@ let port = 9222;
 let cdp = null;
 let pageTarget = null;
 let dialogCb = null;
+let dialogClosedCb = null;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -151,6 +152,7 @@ async function ensure(p = 9222) {
   cdp = new CDP(pageTarget.webSocketDebuggerUrl);
   await cdp.open();
   cdp.on('Page.javascriptDialogOpening', (p) => { if (dialogCb) dialogCb(p); });
+  cdp.on('Page.javascriptDialogClosed', (p) => { if (dialogClosedCb) dialogClosedCb(p); });
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   return { port };
@@ -196,6 +198,10 @@ function onDialog(fn) {
   dialogCb = fn;
 }
 
+function onDialogClosed(fn) {
+  dialogClosedCb = fn;
+}
+
 function status() {
   return {
     running: !!cdp,
@@ -213,5 +219,5 @@ function shutdown() {
 
 module.exports = {
   ensure, navigate, evaluate, screenshotPage, dismissDialog,
-  onDialog, status, shutdown, chromePath
+  onDialog, onDialogClosed, status, shutdown, chromePath
 };

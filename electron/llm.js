@@ -127,4 +127,54 @@ async function listModels(provider) {
   return arr.map((m) => m.id || m.name).filter(Boolean);
 }
 
-module.exports = { chat, listModels, joinURL };
+const VISION_PROMPT = `下面几张图是同一块屏幕在不同时刻的截图。
+判断哪一张里出现了浏览器弹出的 JavaScript 对话框（alert / confirm / prompt），
+特征是屏幕中间浮着一个小方块，里面有文字和按钮，周围页面被压暗。
+只回复一个数字：图片编号（从 1 开始）。都没有就回复 0。不要解释。`;
+
+function imagePart(provider, img) {
+  return provider.kind === 'anthropic'
+    ? { type: 'image', source: { type: 'base64', media_type: img.mime, data: img.data } }
+    : { type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.data}` } };
+}
+
+/** 让带视觉的模型看几张图，返回原始文本。 */
+async function vision({ provider, images, prompt = VISION_PROMPT, maxTokens = 8, timeout = 8000 }) {
+  const url = provider.kind === 'anthropic'
+    ? joinURL(provider.baseURL, '/v1/messages')
+    : joinURL(provider.baseURL, '/chat/completions');
+
+  const parts = images.map((i) => imagePart(provider, i));
+  const body = provider.kind === 'anthropic'
+    ? {
+        model: provider.model,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: [...parts, { type: 'text', text: prompt }] }]
+      }
+    : {
+        model: provider.model,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...parts] }]
+      };
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeout);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: authHeaders(provider),
+      body: JSON.stringify(body),
+      signal: ac.signal
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || '视觉请求失败');
+    if (provider.kind === 'anthropic') {
+      return (data.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('');
+    }
+    return (data.choices && data.choices[0] && data.choices[0].message.content) || '';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = { chat, listModels, joinURL, vision, VISION_PROMPT };

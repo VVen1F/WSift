@@ -577,6 +577,47 @@ $('#btnDoUpdate').addEventListener('click', async () => {
 });
 
 
+/* ---------------- 权限 ---------------- */
+
+const PERM_TEXT = {
+  granted: '已授权',
+  denied: '被拒绝，需要到系统设置里手动打开',
+  'not-determined': '还没授权',
+  restricted: '被系统策略限制',
+  unknown: '读不到状态'
+};
+
+async function refreshPerm() {
+  const el = $('#permText');
+  if (!el || !window.api.perm) return;
+  const r = await window.api.perm.screen();
+  el.classList.remove('ok', 'bad');
+  if (r.platform !== 'darwin') {
+    el.textContent = '当前平台不需要单独授权';
+    $('#btnPermAsk').disabled = true;
+    return;
+  }
+  el.textContent = PERM_TEXT[r.status] || r.status;
+  el.classList.add(r.status === 'granted' ? 'ok' : 'bad');
+}
+
+function bindPerm() {
+  if (!window.api.perm) return;
+  $('#btnPermAsk').addEventListener('click', async () => {
+    const r = await window.api.perm.request();
+    if (r.status === 'granted') {
+      await refreshPerm();
+      return toast('已经有权限了');
+    }
+    await window.api.perm.open();
+    toast('已打开系统设置，勾上 Refract 后回来点重新检测');
+  });
+  $('#btnPermCheck').addEventListener('click', async () => {
+    await refreshPerm();
+    toast('权限：' + $('#permText').textContent);
+  });
+}
+
 /* ---------------- 设置菜单 ---------------- */
 
 function bindSettingsMenu() {
@@ -687,10 +728,17 @@ function bindBrowser() {
 
   if (window.api.browser && window.api.browser.onDialog) {
     window.api.browser.onDialog((d) => {
-      $('#bwLog').textContent = `捕获弹窗（${d.type || 'alert'}）：${d.message}`;
-      if (d.shot) showBrowserShot(d.shot, '弹窗整屏截图');
-      if (d.error) $('#bwLog').textContent += ' · 截图失败：' + d.error;
-      toast('检测到弹窗，已整屏截图');
+      if (d.phase === 'open') {
+        $('#bwLog').textContent = `捕获弹窗（${d.type || 'alert'}）：${d.message} · 连拍中…`;
+        return;
+      }
+      const how = d.method === 'ai' ? 'AI 挑图' : d.frames > 1 ? `按画面挑（${d.frames} 张）` : '';
+      $('#bwLog').textContent = `捕获弹窗（${d.type || 'alert'}）：${d.message}` + (how ? ' · ' + how : '');
+      if (d.shot) showBrowserShot(d.shot, '弹窗截图');
+      if (d.error) {
+        $('#bwLog').textContent += ' · ' + d.error;
+        if (/权限|空白/.test(d.error)) toast('屏幕录制权限没开：设置 → 常规 → 去授权', true);
+      }
     });
   }
 }
@@ -881,6 +929,8 @@ async function boot() {
   $('#protocol').value = (S.settings.ui && S.settings.ui.protocol) || 'auto';
   const ri = await window.api.remoteInfo();
   bindSettingsMenu();
+  bindPerm();
+  refreshPerm();
   renderGateway(ri);
   if (ri && ri.url) {
     $('#remoteText').innerHTML = '局域网内其他设备打开：<br><b>' + esc(ri.url) + '</b>';

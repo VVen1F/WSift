@@ -41,7 +41,8 @@
 
 **模型**
 - OpenAI 兼容与 Anthropic 兼容两种协议，可加多个服务，随时切换
-- 内置智谱 GLM 预设（Anthropic 协议，`glm-4.6`），填上 API Key 就能用
+- 内置智谱 GLM 预设（Anthropic 协议，`glm-4.6`），填上自己的 API Key 就能用
+- **仓库和安装包都不含任何 API Key**，谁用谁自己填，Key 只写在本机 `settings.json`
 - 支持流式输出，可测试连接、拉取模型列表并直接选
 
 **更新**

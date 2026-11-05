@@ -438,7 +438,7 @@ function renderProviders() {
         <label class="f">模型${modelField(p)}</label>
       </div>
       <label class="f">API Key（只存本机）
-        <input class="inp" data-k="apiKey" type="password" value="${esc(p.apiKey)}" />
+        <input class="inp" data-k="apiKey" type="password" placeholder="填你自己的 Key" value="${esc(p.apiKey)}" />
       </label>
       <div class="row" style="max-width:340px">
         <button class="btn ghost" data-act="use">设为默认</button>

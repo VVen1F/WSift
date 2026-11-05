@@ -89,26 +89,6 @@
       </div>
     </section>
 
-    <!-- 浏览器 -->
-    <section class="page" id="page-browser">
-      <div class="toolbar">
-        <input class="inp url" id="bwUrl" placeholder="https://example.com/?q=<script>alert(1)</script>" spellcheck="false" />
-        <button class="btn primary" id="bwGo">打开</button>
-        <button class="btn" id="bwShot">页面截图</button>
-        <button class="btn" id="bwScreen">整屏截图</button>
-        <span class="spacer"></span>
-        <button class="btn ghost" id="bwClose">关闭浏览器</button>
-      </div>
-      <div class="sheet">
-        <div class="pane-h">预览 <span id="bwInfo" class="pane-meta"></span></div>
-        <div class="bw-body" id="bwBody">
-          <div class="empty" id="bwEmpty">打开一个地址，截图会出现在这里</div>
-          <img id="bwImg" alt="" hidden />
-        </div>
-        <div class="status"><span id="bwLog">就绪</span></div>
-      </div>
-    </section>
-
     <!-- 报告 -->
     <section class="page on" id="page-report">
       <div class="narrow report-col" id="reportCol">
@@ -396,6 +376,20 @@
   </div>
 </div>
 
+<div class="modal" id="confirmModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal-head">
+      <b id="confirmTitle">清空报告</b>
+      <button class="modal-x" id="confirmX" type="button" aria-label="关闭">×</button>
+    </div>
+    <p class="modal-sub" id="confirmText">未归档的报告会从列表消失。</p>
+    <label class="ack"><input type="checkbox" id="confirmAck" /> 我已了解</label>
+    <div class="row actions">
+      <button class="btn" id="confirmCancel" type="button">取消</button>
+      <button class="btn primary" id="confirmOk" type="button" disabled>清空</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script src="app.js"></script>
 </body>

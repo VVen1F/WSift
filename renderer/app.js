@@ -24,6 +24,13 @@ let saveChain = Promise.resolve();
 
 /* ---------------- 基础 ---------------- */
 
+window.addEventListener('unhandledrejection', (e) => {
+  const reason = e.reason;
+  const msg = reason && reason.message ? reason.message : String(reason || '出错了');
+  console.error(reason);
+  try { toast(msg, true); } catch (err) { /* 提示本身失败时不再抛 */ }
+});
+
 function toast(msg, isErr, action) {
   const t = $('#toast');
   t.replaceChildren();
@@ -195,12 +202,16 @@ function mdToHtml(md) {
 /* ---------------- 导航 ---------------- */
 
 function go(page) {
-  $$('.nav').forEach((b) => b.classList.toggle('on', b.dataset.page === page));
-  const neu = $('#btnNewTask');
-  if (neu) neu.classList.toggle('on', page === 'report');
-  $$('.page').forEach((p) => p.classList.toggle('on', p.id === 'page-' + page));
-  if (page === 'report') syncReportVisibility();
-  renderTaskList();
+  try {
+    $$('.nav').forEach((b) => b.classList.toggle('on', b.dataset.page === page));
+    const neu = $('#btnNewTask');
+    if (neu) neu.classList.toggle('on', page === 'report');
+    $$('.page').forEach((p) => p.classList.toggle('on', p.id === 'page-' + page));
+    if (page === 'report') syncReportVisibility();
+    renderTaskList();
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 $$('.nav').forEach((b) => b.addEventListener('click', () => { if (b.dataset.page) go(b.dataset.page); }));
@@ -336,28 +347,58 @@ function mdTitle(md) {
   return line.replace(/^#+\s*/, '').replace(/[\s]*复测\s*$/g, '').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 80) || '报告';
 }
 
+const runs = new Map();
+
+function stopRun(id) {
+  const run = runs.get(id);
+  runs.delete(id);
+  if (run && run.cancel) {
+    try { run.cancel(); } catch (e) { /* 停止失败也不要打断当前操作 */ }
+  }
+  if (run && run.clock) clearInterval(run.clock);
+  if (TASKS.busyId === id) TASKS.busyId = null;
+}
+
+function safeDom(fn) {
+  try { fn(); } catch (e) { console.error(e); }
+}
+
 async function generateReport() {
   const prov = activeProvider();
   if (!prov || !prov.apiKey) return toast('先在设置里配置模型和 API Key', true);
   let task = currentTask();
   if (!task && formHasContent()) task = onTaskEdit();
   if (!task) return toast('先把漏洞详情填上', true);
-  if (TASKS.busyId) return toast('等当前报告生成完', true);
+  if (runs.has(task.id) || TASKS.busyId === task.id) return;
+  if (TASKS.starting) return;
+  TASKS.starting = true;
 
   readFormInto(task, false);
   const tpl = S.templates.find((t) => t.id === task.templateId) || null;
   const extra = (task.extra || '').trim();
   const cred = (task.cred || '').trim();
   const detail = (task.detail || '').trim();
-  if (!detail) return toast('先把漏洞详情填上', true);
+  if (!detail) {
+    TASKS.starting = false;
+    return toast('先把漏洞详情填上', true);
+  }
 
   const material = (cred ? '账号密码：\n' + cred + '\n\n' : '') + detail;
-  const messages = await window.api.compose({
-    material,
-    template: tpl ? tpl.body : '',
-    meta: deriveMeta(material),
-    extra
-  });
+  let messages;
+  try {
+    messages = await window.api.compose({
+      material,
+      template: tpl ? tpl.body : '',
+      meta: deriveMeta(material),
+      extra
+    });
+  } catch (e) {
+    TASKS.starting = false;
+    return toast(e.message || '生成失败', true);
+  }
+  TASKS.starting = false;
+  if (!TASKS.list.some((t) => t.id === task.id)) return;
+  if (runs.has(task.id)) return;
 
   const taskId = task.id;
   TASKS.busyId = taskId;
@@ -368,47 +409,66 @@ async function generateReport() {
   let note = '';
   let raf = 0;
   let revealed = false;
-  const preview = $('#mdPreview');
-  preview.classList.add('live');
+  const viewing = () => TASKS.id === taskId && document.getElementById('page-report') && document.getElementById('page-report').classList.contains('on');
   const paintWait = () => {
-    if (TASKS.busyId !== taskId || TASKS.id !== taskId) return;
-    const sec = Math.max(0, Math.round((Date.now() - started) / 1000));
-    if (buf) {
-      $('#genStatus').textContent = '生成中 · ' + buf.length + ' 字 · ' + sec + 's';
-      return;
-    }
-    const label = note ? '思考中 · ' + sec + 's' : '等待模型 · ' + sec + 's';
-    $('#genStatus').textContent = label;
-    preview.innerHTML = '<div class="empty">' + esc(note ? note.slice(-80) : label) + '</div>';
+    if (!runs.has(taskId) || !viewing()) return;
+    safeDom(() => {
+      const preview = $('#mdPreview');
+      const status = $('#genStatus');
+      if (!preview || !status) return;
+      const sec = Math.max(0, Math.round((Date.now() - started) / 1000));
+      if (buf) {
+        status.textContent = '生成中 · ' + buf.length + ' 字 · ' + sec + 's';
+        return;
+      }
+      const label = note ? '思考中 · ' + sec + 's' : '等待模型 · ' + sec + 's';
+      status.textContent = label;
+      preview.innerHTML = '<div class="empty">' + esc(note ? note.slice(-80) : label) + '</div>';
+      preview.classList.add('live');
+    });
   };
-  paintWait();
   const clock = setInterval(paintWait, 500);
+  const run = { cancel: null, clock };
+  runs.set(taskId, run);
+  paintWait();
   syncGenButton();
   renderTaskList();
-  const block = document.querySelector('.preview-block');
-  if (block) block.scrollIntoView({ block: 'nearest', behavior: motionOff() ? 'auto' : 'smooth' });
+  safeDom(() => {
+    const block = document.querySelector('.preview-block');
+    if (block && viewing()) block.scrollIntoView({ block: 'nearest', behavior: motionOff() ? 'auto' : 'smooth' });
+  });
 
-  const stopClock = () => clearInterval(clock);
   const paint = () => {
     raf = 0;
-    if (TASKS.id !== taskId) return;
-    preview.innerHTML = mdToHtml(buf);
-    preview.classList.add('live');
-    const sec = Math.max(0, Math.round((Date.now() - started) / 1000));
-    $('#genStatus').textContent = '生成中 · ' + buf.length + ' 字 · ' + sec + 's';
-    if (!revealed) {
-      revealed = true;
-      if (block) block.scrollIntoView({ block: 'nearest' });
-    }
+    if (!viewing()) return;
+    safeDom(() => {
+      const preview = $('#mdPreview');
+      const status = $('#genStatus');
+      if (!preview || !status) return;
+      preview.innerHTML = mdToHtml(buf);
+      preview.classList.add('live');
+      const sec = Math.max(0, Math.round((Date.now() - started) / 1000));
+      status.textContent = '生成中 · ' + buf.length + ' 字 · ' + sec + 's';
+      if (!revealed) {
+        revealed = true;
+        const block = document.querySelector('.preview-block');
+        if (block) block.scrollIntoView({ block: 'nearest' });
+      }
+    });
   };
 
   const finish = () => {
-    stopClock();
-    preview.classList.remove('live');
-    TASKS.busyId = null;
-    reportChat = null;
-    syncGenButton();
-    renderTaskList();
+    const current = runs.get(taskId);
+    if (current && current.clock) clearInterval(current.clock);
+    runs.delete(taskId);
+    if (TASKS.busyId === taskId) TASKS.busyId = null;
+    if (reportChat && reportChat.id === (current && current.id)) reportChat = null;
+    safeDom(() => {
+      const preview = $('#mdPreview');
+      if (preview && viewing()) preview.classList.remove('live');
+      syncGenButton();
+      renderTaskList();
+    });
   };
 
   reportChat = window.api.chat({
@@ -438,31 +498,43 @@ async function generateReport() {
         }
         live.updatedAt = Date.now();
       }
-      if (TASKS.id === taskId) {
+      if (viewing()) {
         S.reportMd = md;
-        if (live && live.title) $('#rTitle').value = live.title;
-        preview.innerHTML = md ? mdToHtml(md) : '<div class="empty">模型没有返回正文</div>';
-        $('#genStatus').textContent = md ? '已生成 · ' + md.length + ' 字' : '没有正文';
+        safeDom(() => {
+          if (live && live.title && $('#rTitle')) $('#rTitle').value = live.title;
+          const preview = $('#mdPreview');
+          const status = $('#genStatus');
+          if (preview) preview.innerHTML = md ? mdToHtml(md) : '<div class="empty">模型没有返回正文</div>';
+          if (status) status.textContent = md ? '已生成 · ' + md.length + ' 字' : '没有正文';
+        });
       }
       finish();
       saveTasksNow();
     },
     onError: (msg, code) => {
       const stopped = code === 'ABORT' || msg === '已停止';
-      if (TASKS.id === taskId) {
-        if (buf) {
-          preview.innerHTML = mdToHtml(buf);
-          $('#genStatus').textContent = stopped ? '已停止 · ' + buf.length + ' 字' : '失败';
-        } else {
-          preview.innerHTML = '<div class="empty">' + esc(stopped ? '已停止' : msg) + '</div>';
-          $('#genStatus').textContent = stopped ? '已停止' : '失败';
-        }
+      if (viewing()) {
+        safeDom(() => {
+          const preview = $('#mdPreview');
+          const status = $('#genStatus');
+          if (buf && preview) {
+            preview.innerHTML = mdToHtml(buf);
+            if (status) status.textContent = stopped ? '已停止 · ' + buf.length + ' 字' : '失败';
+          } else if (preview) {
+            preview.innerHTML = '<div class="empty">' + esc(stopped ? '已停止' : msg) + '</div>';
+            if (status) status.textContent = stopped ? '已停止' : '失败';
+          }
+        });
       }
       finish();
       if (!stopped) toast(msg, true);
       else if (buf) saveTasksNow();
     }
   });
+  if (reportChat) {
+    run.cancel = reportChat.cancel;
+    run.id = reportChat.id;
+  }
 }
 
 function imagesSection() {
@@ -504,12 +576,20 @@ function syncGenButton() {
 }
 
 function cancelReport() {
-  if (reportChat && reportChat.cancel) reportChat.cancel();
+  if (TASKS.id) stopRun(TASKS.id);
+  safeDom(() => {
+    syncGenButton();
+    renderTaskList();
+  });
 }
 
 $('#btnGen').addEventListener('click', () => {
-  if (TASKS.busyId && TASKS.busyId === TASKS.id) return cancelReport();
-  generateReport();
+  try {
+    if ((TASKS.busyId && TASKS.busyId === TASKS.id) || (TASKS.id && runs.has(TASKS.id))) return cancelReport();
+    generateReport();
+  } catch (e) {
+    toast(e.message || '生成失败', true);
+  }
 });
 $('#btnSave').addEventListener('click', saveReport);
 $('#btnCopy').addEventListener('click', async () => {
@@ -893,8 +973,8 @@ function removeTask(id) {
   const idx = TASKS.list.findIndex((t) => t.id === id);
   if (idx < 0) return;
   if (TASKS.id && TASKS.id !== id) readFormInto(currentTask());
+  stopRun(id);
   TASKS.list.splice(idx, 1);
-  if (TASKS.busyId === id) TASKS.busyId = null;
   if (TASKS.id === id) {
     const next = activeTasks()[0] || null;
     if (next) {
@@ -910,13 +990,44 @@ function removeTask(id) {
 
 function clearTasks() {
   const viewing = currentTask();
+  TASKS.list.filter((t) => !t.archived).forEach((t) => stopRun(t.id));
   TASKS.list = TASKS.list.filter((t) => t.archived && hasContent(t));
-  TASKS.busyId = null;
   setClearArm(false);
   if (!viewing || !viewing.archived) blankForm();
   else renderTaskList();
   saveTasksNow();
   toast('已清空');
+}
+
+function openConfirm(opts) {
+  const modal = $('#confirmModal');
+  const ok = $('#confirmOk');
+  const ack = $('#confirmAck');
+  if (!modal || !ok || !ack) {
+    if (opts.run) opts.run();
+    return;
+  }
+  $('#confirmTitle').textContent = opts.title || '确认';
+  $('#confirmText').textContent = opts.text || '';
+  ok.textContent = opts.ok || '确认';
+  ack.checked = false;
+  ok.disabled = true;
+  modal.hidden = false;
+  const close = () => {
+    modal.hidden = true;
+    ok.onclick = null;
+    $('#confirmCancel').onclick = null;
+    $('#confirmX').onclick = null;
+    ack.onchange = null;
+  };
+  ack.onchange = () => { ok.disabled = !ack.checked; };
+  ok.onclick = () => {
+    if (!ack.checked) return;
+    close();
+    if (opts.run) opts.run();
+  };
+  $('#confirmCancel').onclick = close;
+  $('#confirmX').onclick = close;
 }
 
 function setClearArm(on) {
@@ -1005,15 +1116,13 @@ function bindTasks() {
   if (clr) {
     clr.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (!TASKS.list.length) return;
-      if (!clearArmed) {
-        setClearArm(true);
-        clearTimeout(clearTimer);
-        clearTimer = setTimeout(() => setClearArm(false), 2500);
-        return;
-      }
-      clearTimeout(clearTimer);
-      clearTasks();
+      if (!activeTasks().length) return;
+      openConfirm({
+        title: '清空报告',
+        text: '未归档的报告会从列表消失。正在生成的那一份会停掉。',
+        ok: '清空',
+        run: clearTasks
+      });
     });
   }
   document.addEventListener('click', (e) => {
@@ -2342,7 +2451,7 @@ async function bwScreenShot() {
 }
 
 function bindBrowser() {
-  if (!window.api.browser) return;
+  if (!window.api.browser || !$('#bwGo')) return;
   $('#bwGo').addEventListener('click', async () => {
     const url = $('#bwUrl').value.trim();
     if (!url) return;
@@ -2385,10 +2494,7 @@ function bindBrowser() {
   }
 }
 
-/* ---------------- 首页 ---------------- */
-
-const HOME = { files: [], msgs: [], busy: false };
-let emptyNode = null;
+/* ---------------- 统计 ---------------- */
 
 function renderStats() {
   const st = S.settings.stats || { shots: 0, reports: 0 };
@@ -2396,160 +2502,6 @@ function renderStats() {
   if (el) el.textContent = `截图 ${st.shots || 0} · 报告 ${st.reports || 0} · 模板 ${S.templates.length}`;
 }
 
-function renderChips() {
-  const box = $('#chips');
-  if (!box) return;
-  box.innerHTML = HOME.files
-    .map((f, i) => `<span class="chip"><b>${esc(f.name)}</b><i data-i="${i}">×</i></span>`)
-    .join('');
-  box.querySelectorAll('i').forEach((el) => {
-    el.addEventListener('click', () => {
-      HOME.files.splice(Number(el.dataset.i), 1);
-      renderChips();
-    });
-  });
-}
-
-async function addFiles(list) {
-  for (const f of Array.from(list || [])) {
-    if (f.size > 400 * 1024) {
-      toast(f.name + ' 太大，跳过', true);
-      continue;
-    }
-    try {
-      HOME.files.push({ name: f.name, text: await f.text() });
-    } catch (e) {
-      toast('读取 ' + f.name + ' 失败', true);
-    }
-  }
-  if (HOME.files.length > 3) HOME.files = HOME.files.slice(-3);
-  renderChips();
-}
-
-function renderHome() {
-  const log = $('#chatLog');
-  if (!HOME.msgs.length) {
-    if (!log.contains(emptyNode) && emptyNode) log.innerHTML = '', log.appendChild(emptyNode);
-    return;
-  }
-  log.innerHTML = HOME.msgs
-    .map((m, i) => {
-      if (m.role === 'user') {
-        return `<div class="msg user"><div class="who">你</div><div class="bubble">${esc(m.text)}</div></div>`;
-      }
-      return `<div class="msg ai"><div class="who">Refract</div><div class="bubble md">${mdToHtml(m.text || '')}</div>
-        <div class="acts">
-          <button class="btn ghost" data-act="copy" data-i="${i}" title="复制" aria-label="复制"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
-          <button class="btn ghost" data-act="save" data-i="${i}" title="存为报告" aria-label="存为报告"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></button>
-        </div></div>`;
-    })
-    .join('');
-  log.scrollTop = log.scrollHeight;
-}
-
-async function sendChat(text) {
-  const q = (text != null ? text : $('#chatInput').value).trim();
-  if (!q || HOME.busy) return;
-  const prov = activeProvider();
-  if (!prov || !prov.apiKey) return toast('先在设置里配置模型和 API Key', true);
-
-  setChatting(true);
-  HOME.msgs.push({ role: 'user', text: q });
-  const ai = { role: 'ai', text: '' };
-  HOME.msgs.push(ai);
-  if (text == null) $('#chatInput').value = '';
-  autoGrow();
-  $('#btnChatSend').disabled = true;
-  HOME.busy = true;
-  renderHome();
-
-  const material = HOME.files.map((f) => `【${f.name}】\n${f.text}`).join('\n\n');
-  const tpl = S.templates.find((t) => t.id === $('#rTemplate').value) || null;
-  const messages = await window.api.chatMessages({
-    material,
-    template: tpl ? tpl.body : '',
-    meta: deriveMeta(material),
-    question: q
-  });
-
-  let raf = 0;
-  window.api.chat({
-    provider: prov,
-    messages,
-    onDelta: (d) => {
-      ai.text += d;
-      if (!raf) raf = setTimeout(() => { raf = 0; renderHome(); }, 90);
-    },
-    onDone: (t) => { ai.text = t || ai.text; HOME.busy = false; renderHome(); },
-    onError: (msg) => { ai.text = '出错了：' + msg; HOME.busy = false; renderHome(); }
-  });
-}
-
-function autoGrow() {
-  const ta = $('#chatInput');
-  if (!ta) return;
-  ta.style.height = 'auto';
-  ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
-}
-
-function bindHome() {
-  if (!$('#chatInput')) return;
-  emptyNode = $('#chatEmpty');
-  const page = $('#page-home');
-  const comp = $('.composer');
-
-  ['dragenter', 'dragover'].forEach((t) =>
-    comp.addEventListener(t, (e) => { e.preventDefault(); comp.classList.add('over'); })
-  );
-  ['dragleave', 'drop'].forEach((t) =>
-    comp.addEventListener(t, (e) => { e.preventDefault(); comp.classList.remove('over'); })
-  );
-  comp.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
-
-  // 页面别的地方拖进来也不要触发浏览器打开文件
-  ['dragover', 'drop'].forEach((t) => page.addEventListener(t, (e) => e.preventDefault()));
-  $('#btnAttach').addEventListener('click', () => $('#filePick').click());
-  $('#filePick').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
-
-  $('#btnChatSend').addEventListener('click', () => sendChat());
-  $('#chatInput').addEventListener('input', autoGrow);
-  $('#chatInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
-  });
-
-  document.querySelectorAll('.quick .q-chip').forEach((b) => {
-    b.addEventListener('click', () => {
-      const q = b.dataset.q;
-      if (q === 'test') return go('repeater');
-      if (q === 'report') return sendChat('根据附件写一份完整的漏洞报告。');
-      if (q === 'risk') return sendChat('看看这个请求或这段流量有没有风险，按严重程度列出来。');
-    });
-  });
-
-  $('#chatLog').addEventListener('click', async (e) => {
-    const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const m = HOME.msgs[Number(btn.dataset.i)];
-    if (!m) return;
-    if (btn.dataset.act === 'copy') {
-      try { await navigator.clipboard.writeText(m.text); } catch (err) { await window.api.clipboard(m.text); }
-      toast('已复制');
-    }
-    if (btn.dataset.act === 'save') {
-      let title = mdTitle(m.text);
-      if (!title || title === '报告') {
-        const line = String(m.text || '').split(/\r?\n/).map((s) => s.trim()).find((s) => s && !/^```/.test(s));
-        title = line ? line.replace(/^#+\s*/, '').slice(0, 40) : '';
-      }
-      createTask({
-        markdown: m.text,
-        title,
-        images: S.pendingShots.splice(0, S.pendingShots.length)
-      });
-      await saveReport();
-    }
-  });
-}
 
 /* ---------------- 启动 ---------------- */
 
@@ -2582,8 +2534,6 @@ async function boot() {
     S.settings.ui.protocol = e.target.value;
     persist();
   });
-  bindHome();
-  bindComposer();
   bindBrowser();
   renderStats();
 }

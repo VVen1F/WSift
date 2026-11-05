@@ -743,6 +743,126 @@ $('#btnProvTest') && $('#btnProvTest').addEventListener('click', async () => {
 $('#btnDataDir').addEventListener('click', () => window.api.openPath(S.info.userData));
 
 
+
+/* ---------------- 云端同步 ---------------- */
+
+const SYNC_KIND_TEXT = { off: '关闭', webdav: 'WebDAV', github: 'GitHub' };
+
+function syncSummaryText() {
+  const sy = S.settings.sync || {};
+  const kind = SYNC_KIND_TEXT[sy.kind] || '关闭';
+  const last = sy.lastAt ? ' · ' + new Date(sy.lastAt).toLocaleString() : '';
+  return kind + last;
+}
+
+function bindSyncPanel() {
+  const sy = S.settings.sync;
+  const rerender = () => renderSync();
+
+  const kind = $('#syncKind');
+  if (kind) {
+    kind.addEventListener('change', (e) => {
+      sy.kind = e.target.value;
+      persist();
+      rerender();
+    });
+  }
+
+  const bind = (id, obj, key) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('input', () => { obj[key] = el.value; persist(); });
+  };
+  bind('#wdUrl', sy.webdav, 'url');
+  bind('#wdUser', sy.webdav, 'user');
+  bind('#wdPass', sy.webdav, 'pass');
+  bind('#wdPath', sy.webdav, 'path');
+  bind('#ghRepo', sy.github, 'repo');
+  bind('#ghBranch', sy.github, 'branch');
+  bind('#ghPath', sy.github, 'path');
+  bind('#ghToken', sy.github, 'token');
+
+  const setStatus = (t, bad) => {
+    const el = $('#syncStatus');
+    el.textContent = t;
+    el.style.color = bad ? '#c0392b' : '';
+  };
+
+  $('#btnSyncTest').addEventListener('click', async () => {
+    setStatus('测试中…');
+    const r = await window.api.sync.test();
+    setStatus(r.ok ? r.message || '连接成功' : '失败：' + r.error, !r.ok);
+  });
+
+  $('#btnSyncPush').addEventListener('click', async () => {
+    setStatus('上传中…');
+    const r = await window.api.sync.push();
+    if (r.ok) {
+      setStatus('已上传 · ' + new Date().toLocaleTimeString());
+      $('#syncSummary').textContent = syncSummaryText();
+      S.settings.sync.lastAt = new Date().toISOString();
+      toast('已同步到云端');
+    } else {
+      setStatus('失败：' + r.error, true);
+    }
+  });
+
+  $('#btnSyncPull').addEventListener('click', async () => {
+    setStatus('下载中…');
+    const r = await window.api.sync.pull();
+    if (!r.ok) return setStatus('失败：' + r.error, true);
+    S.settings = r.settings;
+    renderLLM();
+    fillTemplateSelect();
+    renderSync();
+    toast('已拉取远端设置，重启后全部生效');
+  });
+}
+
+function renderSync() {
+  const summary = $('#syncSummary');
+  if (!summary) return;
+  summary.textContent = syncSummaryText();
+
+  const panel = $('#syncPanel');
+  if (!panel || panel.hidden) return;
+  const sy = S.settings.sync;
+  const w = sy.webdav;
+  const g = sy.github;
+
+  panel.innerHTML = `
+    <div class="klist">
+      <div class="krow">
+        <div class="klabel">方式</div>
+        <select class="inp kin" id="syncKind">
+          <option value="off"${sy.kind === 'off' ? ' selected' : ''}>关闭</option>
+          <option value="webdav"${sy.kind === 'webdav' ? ' selected' : ''}>WebDAV</option>
+          <option value="github"${sy.kind === 'github' ? ' selected' : ''}>GitHub</option>
+        </select>
+      </div>
+      ${sy.kind === 'webdav' ? `
+      <div class="krow"><div class="klabel">地址</div><input class="inp" style="flex:1;max-width:none" id="wdUrl" value="${esc(w.url)}" placeholder="https://dav.example.com/dav/files/me" /></div>
+      <div class="krow"><div class="klabel">用户名</div><input class="inp kin" id="wdUser" value="${esc(w.user)}" /></div>
+      <div class="krow"><div class="klabel">密码</div><input class="inp kin" type="password" id="wdPass" value="${esc(w.pass)}" /></div>
+      <div class="krow"><div class="klabel">远端文件名</div><input class="inp kin" id="wdPath" value="${esc(w.path)}" /></div>` : ''}
+      ${sy.kind === 'github' ? `
+      <div class="krow"><div class="klabel">仓库<small>owner/repo</small></div><input class="inp kin" id="ghRepo" value="${esc(g.repo)}" placeholder="me/dotfiles" /></div>
+      <div class="krow"><div class="klabel">分支</div><input class="inp kin" id="ghBranch" value="${esc(g.branch)}" /></div>
+      <div class="krow"><div class="klabel">路径</div><input class="inp" style="flex:1;max-width:none" id="ghPath" value="${esc(g.path)}" /></div>
+      <div class="krow"><div class="klabel">Token<small>只存本机</small></div><input class="inp" style="flex:1;max-width:none" type="password" id="ghToken" value="${esc(g.token)}" /></div>` : ''}
+    </div>
+    ${sy.kind === 'off' ? '' : `
+    <div class="row actions" style="margin-top:12px">
+      <button class="btn" id="btnSyncTest">测试连接</button>
+      <button class="btn primary" id="btnSyncPush">上传</button>
+      <button class="btn" id="btnSyncPull">下载</button>
+      <span class="spacer"></span>
+      <span class="muted" id="syncStatus">${esc(sy.lastResult || '')}</span>
+    </div>`}`;
+
+  bindSyncPanel();
+}
+
 /* ---------------- 设置页 ---------------- */
 
 function renderBackupList(items) {
@@ -880,6 +1000,13 @@ async function bindSettingsPage(ri) {
   });
   $('#btnBackupShow').addEventListener('click', () => window.api.backup.show());
   refreshBackup();
+
+  $('#btnSyncSetup').addEventListener('click', () => {
+    const panel = $('#syncPanel');
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) renderSync();
+  });
+  renderSync();
 
   // 导出 / 导入
   $('#btnExport').addEventListener('click', async () => {

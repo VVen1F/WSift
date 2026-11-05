@@ -117,6 +117,43 @@ function ok(name, cond, extra) {
   ok('能读回来', Array.isArray(backup.restore(bkList[0].path).providers));
   ok('到期判断', backup.due({ backup: { auto: '1h', lastAt: new Date().toISOString() } }) === false);
 
+  console.log('\n[云端同步]');
+  const sync = require('../electron/sync.js');
+  const files = {};
+  const dav = http.createServer((reqq, ress) => {
+    if (reqq.method === 'PUT') {
+      let b = '';
+      reqq.on('data', (c) => (b += c));
+      reqq.on('end', () => { files[reqq.url] = b; ress.writeHead(201); ress.end(); });
+      return;
+    }
+    if (reqq.method === 'GET') {
+      if (!files[reqq.url]) { ress.writeHead(404); return ress.end(); }
+      ress.writeHead(200);
+      return ress.end(files[reqq.url]);
+    }
+    if (reqq.method === 'HEAD') { ress.writeHead(files[reqq.url] ? 200 : 404); return ress.end(); }
+    ress.writeHead(405); ress.end();
+  });
+  await new Promise((r) => dav.listen(0, '127.0.0.1', r));
+  const davPort = dav.address().port;
+  const syncCfg = {
+    sync: { kind: 'webdav', webdav: { url: `http://127.0.0.1:${davPort}/dav`, user: 'u', pass: 'p', path: 's.json' }, github: {} },
+    backup: { withKeys: false },
+    providers: [{ id: 'g', accounts: [{ id: 'a', apiKey: 'SECRETKEY' }], models: ['m'], activeModel: 'm' }],
+    ui: {}
+  };
+  const up = await sync.push(syncCfg);
+  ok('WebDAV 上传成功', up.ok === true);
+  const stored = files['/dav/s.json'] || '';
+  ok('上传内容不含 Key', stored.length > 0 && !stored.includes('SECRETKEY'));
+  ok('上传内容不含同步凭据', !stored.includes('"sync"'));
+  const down = await sync.pull(syncCfg);
+  ok('WebDAV 下载成功', down.providers.length === 1);
+  const t = await sync.test(syncCfg);
+  ok('WebDAV 连通性', t.ok === true && /成功/.test(t.message));
+  dav.close();
+
   console.log('\n[旧配置迁移]');
   const oldProv = { id: 'x', name: 'X', kind: 'openai', baseURL: 'u', apiKey: 'k1', model: 'm1' };
   const mig = store.migrateProvider(oldProv);

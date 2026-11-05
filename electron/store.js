@@ -52,6 +52,13 @@ const DEFAULTS = {
     withKeys: false,
     lastAt: ''
   },
+  sync: {
+    kind: 'off',
+    webdav: { url: '', user: '', pass: '', path: 'refract-settings.json' },
+    github: { repo: '', branch: 'main', path: 'refract-settings.json', token: '' },
+    lastAt: '',
+    lastResult: ''
+  },
   stats: { shots: 0, reports: 0 }
 };
 
@@ -113,6 +120,12 @@ function load() {
     report: { ...DEFAULTS.report, ...(raw.report || {}) },
     ui: { ...DEFAULTS.ui, ...(raw.ui || {}) },
     backup: { ...DEFAULTS.backup, ...(raw.backup || {}) },
+    sync: {
+      ...DEFAULTS.sync,
+      ...(raw.sync || {}),
+      webdav: { ...DEFAULTS.sync.webdav, ...((raw.sync && raw.sync.webdav) || {}) },
+      github: { ...DEFAULTS.sync.github, ...((raw.sync && raw.sync.github) || {}) }
+    },
     stats: { ...DEFAULTS.stats, ...(raw.stats || {}) },
     providers,
     activeProviderId: providers.some((p) => p.id === raw.activeProviderId) ? raw.activeProviderId : providers[0].id

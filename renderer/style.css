@@ -522,3 +522,11 @@ textarea.inp {
 
 .kval.ok { color: #1a8c34; }
 .kval.bad { color: #c0392b; }
+
+/* ---------- 云端同步面板 ---------- */
+.sync-panel {
+  margin-top: 8px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel);
+}
+.sync-panel .krow:last-child { border-bottom: 0; }

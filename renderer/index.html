@@ -279,6 +279,12 @@
             <h3>同步与备份</h3>
             <div class="klist">
               <div class="krow">
+                <div class="klabel">云端同步<small>WebDAV，或 GitHub 仓库里的一个文件</small></div>
+                <div class="kval" id="syncSummary">关闭</div>
+                <button class="btn" id="btnSyncSetup">设置</button>
+              </div>
+              <div id="syncPanel" class="sync-panel" hidden></div>
+              <div class="krow">
                 <div class="klabel">导出<small>把设置写成一份 JSON</small></div>
                 <select class="inp kin" id="setWithKeys" style="max-width:120px"><option value="0">不带 Key</option><option value="1">带上 Key</option></select>
                 <button class="btn" id="btnExport">导出…</button>

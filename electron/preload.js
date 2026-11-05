@@ -76,6 +76,11 @@ contextBridge.exposeInMainWorld('api', {
     show: () => ipcRenderer.invoke('backup:show'),
     dir: () => ipcRenderer.invoke('backup:dir')
   },
+  sync: {
+    test: () => ipcRenderer.invoke('sync:test'),
+    push: () => ipcRenderer.invoke('sync:push'),
+    pull: () => ipcRenderer.invoke('sync:pull')
+  },
   app: {
     loginItem: (enable) => ipcRenderer.invoke('app:loginItem', enable)
   },

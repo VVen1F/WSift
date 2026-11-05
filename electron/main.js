@@ -13,6 +13,7 @@ const updater = require('./updater');
 const browser = require('./browser');
 const remote = require('./remote');
 const backup = require('./backup');
+const sync = require('./sync');
 
 let mainWindow = null;
 let remoteInfo = null;
@@ -315,6 +316,39 @@ browser.onDialogClosed(() => {
   if (burstCtl) burstCtl.stop = true;
 });
 
+ipcMain.handle('sync:test', async () => {
+  try {
+    const r = await sync.test(store.load());
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('sync:push', async () => {
+  try {
+    const cfg = store.load();
+    const r = await sync.push(cfg);
+    cfg.sync.lastAt = new Date().toISOString();
+    cfg.sync.lastResult = '上传成功';
+    store.save(cfg);
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('sync:pull', async () => {
+  try {
+    const cfg = store.load();
+    const remote = await sync.pull(cfg);
+    const merged = store.save({ ...cfg, ...remote, sync: cfg.sync });
+    return { ok: true, settings: merged };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle('backup:dir', () => backup.dirOf(store.load()));
 
 ipcMain.handle('backup:now', () => {
@@ -435,7 +469,13 @@ ipcMain.handle('settings:export', async (_e, withKeys) => {
   try {
     const cfg = store.load();
     const out = JSON.parse(JSON.stringify(cfg));
-    if (!withKeys) out.providers = (out.providers || []).map((p) => ({ ...p, apiKey: '' }));
+    if (!withKeys) {
+      out.providers = (out.providers || []).map((p) => ({
+        ...p,
+        accounts: (p.accounts || []).map((a) => ({ ...a, apiKey: '' }))
+      }));
+      out.sync = { ...(out.sync || {}), webdav: { ...((out.sync && out.sync.webdav) || {}), pass: '' }, github: { ...((out.sync && out.sync.github) || {}), token: '' } };
+    }
     const r = await dialog.showSaveDialog({
       defaultPath: 'refract-settings.json',
       filters: [{ name: 'JSON', extensions: ['json'] }]

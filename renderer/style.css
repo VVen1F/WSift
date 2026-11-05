@@ -18,6 +18,7 @@
   --fs: 13px;
   --col: 780px;
   --ctrl: 200px;
+  --scroll: rgba(0, 0, 0, 0.28);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,8 +35,21 @@
     --on-accent: #000000;
     --code-bg: #000000;
     --sel: rgba(255, 255, 255, 0.1);
+    --scroll: rgba(255, 255, 255, 0.32);
   }
 }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-corner { background: transparent; }
 
 * { box-sizing: border-box; }
 

@@ -2575,6 +2575,8 @@ function showSettingsSection(key) {
     const sec = document.getElementById('sect-' + k);
     if (sec) sec.hidden = k !== key;
   });
+  if (key === 'llm' && typeof renderLLM === 'function') renderLLM();
+  if (key === 'archive' && typeof renderArchive === 'function') renderArchive();
   document.querySelectorAll('#settingsNav button[data-sec]').forEach((b) => {
     b.classList.toggle('on', b.dataset.sec === key);
   });

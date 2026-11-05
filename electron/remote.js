@@ -25,7 +25,9 @@ const BRIDGE = `(function(){
     capture: (p) => j('/api/capture', {method:'POST', body: JSON.stringify(p)}),
     settings: {
       get: () => j('/api/settings'),
-      set: (s) => j('/api/settings', {method:'POST', body: JSON.stringify(s)})
+      set: (s) => j('/api/settings', {method:'POST', body: JSON.stringify(s)}),
+      export: () => Promise.resolve({ok:false, error:'远程模式请在本机导出'}),
+      import: () => Promise.resolve({ok:false, error:'远程模式请在本机导入'})
     },
     templates: {
       list: () => j('/api/templates'),

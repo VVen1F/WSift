@@ -12,7 +12,9 @@ contextBridge.exposeInMainWorld('api', {
 
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
-    set: (s) => ipcRenderer.invoke('settings:set', s)
+    set: (s) => ipcRenderer.invoke('settings:set', s),
+    export: (withKeys) => ipcRenderer.invoke('settings:export', withKeys),
+    import: () => ipcRenderer.invoke('settings:import')
   },
 
   templates: {

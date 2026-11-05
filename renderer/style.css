@@ -281,8 +281,9 @@ textarea.inp {
 
 /* ---------- 设置 ---------- */
 .settings { padding: 14px 16px; overflow: auto; display: flex; flex-direction: column; gap: 18px; }
-.sect { display: flex; flex-direction: column; gap: 8px; }
-.sect h3 { margin: 0; font-size: 12px; color: var(--muted); font-weight: 560; letter-spacing: .3px; text-transform: uppercase; }
+.sect { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+.sect:first-child { padding-top: 0; border-top: 0; }
+.sect h3 { margin: 0; font-size: 13px; color: var(--text); font-weight: 600; letter-spacing: -.1px; }
 .prov {
   border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
   display: flex; flex-direction: column; gap: 8px; background: var(--panel);
@@ -384,4 +385,43 @@ textarea.inp {
   max-width: 100%; border-radius: 8px;
   border: 1px solid var(--line);
   box-shadow: 0 8px 28px rgba(0, 0, 0, .10);
+}
+
+/* ---------- 侧栏底部 ---------- */
+.side-foot { position: relative; padding: 6px 6px 4px; border-top: 1px solid var(--line); }
+.side-foot .nav { width: 100%; }
+.side-foot .nav.open { background: var(--hover); }
+
+.pop {
+  position: absolute; left: 6px; right: 6px; bottom: 100%; margin-bottom: 6px;
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .18); padding: 4px; z-index: 60;
+  transform-origin: bottom left;
+  animation: popIn .15s cubic-bezier(.2, .9, .3, 1.1);
+}
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+.pop button {
+  display: block; width: 100%; text-align: left; border: 0; background: none;
+  padding: 8px 10px; border-radius: 8px; font: inherit; font-size: 12.5px;
+  color: var(--text); cursor: default;
+}
+.pop button:hover { background: var(--hover); }
+
+.gateway {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 10px; border-radius: 8px;
+  font-size: 11.5px; color: var(--muted);
+}
+.gateway:hover { background: var(--hover); color: var(--text); }
+.gateway b { font-weight: 500; }
+.gdot { width: 7px; height: 7px; border-radius: 50%; background: #28c840; box-shadow: 0 0 0 3px rgba(40, 200, 64, .16); }
+.gdot.off { background: #c9c9cf; box-shadow: none; }
+
+.sect.flash { animation: flash 0.9s ease-out; }
+@keyframes flash {
+  from { background: rgba(0, 113, 227, .07); }
+  to { background: transparent; }
 }

@@ -179,7 +179,7 @@ function go(page) {
   $$('.page').forEach((p) => p.classList.toggle('on', p.id === 'page-' + page));
 }
 
-$$('.nav').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
+$$('.nav').forEach((b) => b.addEventListener('click', () => { if (b.dataset.page) go(b.dataset.page); }));
 
 /* ---------------- 测试 ---------------- */
 
@@ -577,6 +577,56 @@ $('#btnDoUpdate').addEventListener('click', async () => {
 });
 
 
+/* ---------------- 设置菜单 ---------------- */
+
+function bindSettingsMenu() {
+  const pop = $('#settingsPop');
+  const btn = $('#navSettings');
+  if (!pop || !btn) return;
+
+  const close = () => { pop.hidden = true; btn.classList.remove('open'); };
+  const toggle = () => {
+    pop.hidden = !pop.hidden;
+    btn.classList.toggle('open', !pop.hidden);
+  };
+
+  btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+  pop.addEventListener('click', (e) => e.stopPropagation());
+
+  pop.querySelectorAll('button[data-sec]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const key = b.dataset.sec;
+      go('settings');
+      close();
+      const sec = document.getElementById('sect-' + key);
+      if (!sec) return;
+      sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      sec.classList.add('flash');
+      setTimeout(() => sec.classList.remove('flash'), 900);
+    });
+  });
+
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+}
+
+function renderGateway(ri) {
+  const dot = $('#gwDot');
+  const text = $('#gwText');
+  if (!ri || !ri.url) {
+    dot.classList.add('off');
+    text.textContent = '服务未启动';
+    return;
+  }
+  const addr = ri.url.replace(/^https?:\/\//, '');
+  dot.classList.remove('off');
+  text.innerHTML = '网关 <b>' + esc(addr) + '</b>';
+  $('#gateway').onclick = async () => {
+    try { await navigator.clipboard.writeText(ri.url); } catch (e) { await window.api.clipboard(ri.url); }
+    toast('已复制 ' + ri.url);
+  };
+}
+
 /* ---------------- 浏览器 ---------------- */
 
 function showBrowserShot(path, note) {
@@ -830,6 +880,8 @@ async function boot() {
   $('#updateText').textContent = `当前版本 v${S.info.version}`;
   $('#protocol').value = (S.settings.ui && S.settings.ui.protocol) || 'auto';
   const ri = await window.api.remoteInfo();
+  bindSettingsMenu();
+  renderGateway(ri);
   if (ri && ri.url) {
     $('#remoteText').innerHTML = '局域网内其他设备打开：<br><b>' + esc(ri.url) + '</b>';
     $('#remoteText').onclick = () => window.api.clipboard(ri.url);
@@ -842,6 +894,23 @@ async function boot() {
     persist();
     toast('端口已保存，重启后生效');
   });
+  $('#btnExport').addEventListener('click', async () => {
+    const withKeys = $('#setWithKeys').value === '1';
+    const r = await window.api.settings.export(withKeys);
+    if (r.canceled) return;
+    if (r.ok) toast('已导出到 ' + r.path);
+    else toast('导出失败：' + r.error, true);
+  });
+  $('#btnImport').addEventListener('click', async () => {
+    const r = await window.api.settings.import();
+    if (r.canceled) return;
+    if (!r.ok) return toast('导入失败：' + r.error, true);
+    S.settings = r.settings;
+    renderProviders();
+    fillTemplateSelect();
+    toast('已导入，重启后全部生效');
+  });
+
   $('#btnCopyRemote').addEventListener('click', async () => {
     const txt = (ri && ri.url) || '';
     if (!txt) return toast('还没有地址', true);

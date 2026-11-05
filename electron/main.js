@@ -241,6 +241,44 @@ ipcMain.handle('browser:close', () => {
 ipcMain.handle('settings:get', () => store.load());
 ipcMain.handle('settings:set', (_e, s) => store.save(s));
 
+ipcMain.handle('settings:export', async (_e, withKeys) => {
+  try {
+    const cfg = store.load();
+    const out = JSON.parse(JSON.stringify(cfg));
+    if (!withKeys) out.providers = (out.providers || []).map((p) => ({ ...p, apiKey: '' }));
+    const r = await dialog.showSaveDialog({
+      defaultPath: 'refract-settings.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (r.canceled || !r.filePath) return { canceled: true };
+    fs.writeFileSync(r.filePath, JSON.stringify(out, null, 2));
+    return { ok: true, path: r.filePath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('settings:import', async () => {
+  try {
+    const r = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (r.canceled || !r.filePaths[0]) return { canceled: true };
+    const raw = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
+    const cur = store.load();
+    const merged = store.save({
+      ...cur,
+      ...raw,
+      ui: { ...cur.ui, ...(raw.ui || {}) },
+      providers: raw.providers && raw.providers.length ? raw.providers : cur.providers
+    });
+    return { ok: true, settings: merged };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle('templates:list', () => templates.list());
 ipcMain.handle('templates:upsert', (_e, t) => templates.upsert(t));
 ipcMain.handle('templates:remove', (_e, id) => templates.remove(id));

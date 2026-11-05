@@ -2937,7 +2937,8 @@ function renderStats() {
 
 async function boot() {
   S.info = await window.api.info();
-  $('#ver').textContent = 'v' + S.info.version;
+  const ver = $('#ver');
+  if (ver) ver.textContent = 'v' + S.info.version;
   S.settings = await window.api.settings.get();
   bindTheme();
   bindArchive();

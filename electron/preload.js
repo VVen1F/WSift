@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   saveReport: (payload) => ipcRenderer.invoke('report:save', payload),
+  exportReport: (payload) => ipcRenderer.invoke('report:exportZip', payload),
   compose: (payload) => ipcRenderer.invoke('report:compose', payload),
   chatMessages: (payload) => ipcRenderer.invoke('report:chat', payload),
 

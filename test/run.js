@@ -32,7 +32,8 @@ const stub = {
   },
   Menu: { buildFromTemplate: () => ({}), setApplicationMenu: () => {} },
   shell: { openExternal: () => {}, showItemInFolder: () => {}, openPath: () => {} },
-  dialog: { showSaveDialog: () => Promise.resolve({ canceled: true }) }
+  dialog: { showSaveDialog: () => Promise.resolve({ canceled: true }) },
+  nativeTheme: { shouldUseDarkColors: false }
 };
 
 const origLoad = Module._load;
@@ -172,14 +173,49 @@ function ok(name, cond, extra) {
   ok('model 变成模型列表', mig.models[0] === 'm1' && mig.activeModel === 'm1');
 
   console.log('\n[报告保存]');
-  const saved = report.save({ markdown: '# t', images: [], title: 'demo', baseDir: path.join(process.env.REFRACT_DATA_DIR, 'reports') });
+  const reportRoot = path.join(process.env.REFRACT_DATA_DIR, 'reports');
+  const saved = report.save({ markdown: '# t', images: [], title: 'demo', baseDir: reportRoot });
   ok('生成 report.md', fs.existsSync(saved.md));
+
+  const png = path.join(process.env.REFRACT_DATA_DIR, 'one.png');
+  fs.writeFileSync(png, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1, 2, 3]));
+  const gone = path.join(process.env.REFRACT_DATA_DIR, 'gone.png');
+  const zipped = report.exportZip({
+    markdown: '# 某社区草稿保存接口存在越权\n\n现象。\n',
+    images: [png, gone],
+    title: '某社区草稿保存接口存在越权',
+    baseDir: reportRoot
+  });
+  const zipmod = require('../electron/zip.js');
+  const entries = zipmod.read(fs.readFileSync(zipped.zip));
+  const names = entries.map((e) => e.name).sort();
+  ok('zip 含 report.md', names.some((n) => n.endsWith('/report.md')));
+  ok('zip 图片路径', names.some((n) => n.endsWith('/images/01.png')) && !names.some((n) => n.includes('gone')));
+  const mdEntry = entries.find((e) => e.name.endsWith('/report.md'));
+  const mdText = mdEntry.data.toString('utf8');
+  ok('md 相对路径对得上', mdText.includes('](images/01.png)') && names.includes(mdEntry.name.replace(/report\.md$/, 'images/01.png')));
+  ok('zip 图片字节', entries.find((e) => e.name.endsWith('/images/01.png')).data.equals(fs.readFileSync(png)));
+  const scanned = report.scanVars('{{title}} {{nope}} {{title}}');
+  ok('模板占位符校验', scanned.unknown.length === 1 && scanned.unknown[0] === 'nope' && scanned.used.includes('title'));
+
+  console.log('\n[截图尺寸]');
+  const shot = require('../electron/shot.js');
+  const px = shot.capturePixelSize({ size: { width: 1920, height: 1080 }, scaleFactor: 1.5 });
+  ok('Windows HiDPI 用物理像素', px.width === 2880 && px.height === 1620 && px.scale === 1.5);
+  ok('全黑位图', shot.bitmapMostlyBlank(Buffer.alloc(32, 0)) === true);
+  const mixed = Buffer.alloc(64, 40);
+  mixed[0] = 20; mixed[1] = 180; mixed[2] = 20;
+  ok('有内容不是黑帧', shot.bitmapMostlyBlank(mixed) === false);
+
+  const pkg = require('../package.json');
+  ok('产品名未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
+  ok('有 Windows NSIS', pkg.build.win && pkg.build.win.target.some((t) => t.target === 'nsis'));
 
   console.log('\n[主进程]');
   require('../electron/main.js');
   await new Promise((r) => setTimeout(r, 50));
   ok('注册了 IPC', handlers.size >= 10, `实际 ${handlers.size}`);
-  for (const ch of ['http:send', 'shot:capture', 'settings:get', 'templates:list', 'llm:chat', 'report:save', 'update:check']) {
+  for (const ch of ['http:send', 'shot:capture', 'settings:get', 'templates:list', 'llm:chat', 'report:save', 'report:exportZip', 'update:check']) {
     ok(`IPC ${ch}`, handlers.has(ch));
   }
 

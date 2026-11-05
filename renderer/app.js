@@ -368,8 +368,20 @@ async function saveReport() {
   return r;
 }
 
+async function exportReportZip() {
+  if (!S.reportMd) return toast('先生成报告', true);
+  const title = mdTitle(S.reportMd);
+  const md = S.reportMd.replace(/\s+$/, '') + imagesSection();
+  const r = await window.api.exportReport({ markdown: md, images: S.images, title });
+  S.reportDir = r.zip;
+  toast('已导出 ' + r.zip);
+  $('#btnReveal').disabled = false;
+  return r;
+}
+
 $('#btnGen').addEventListener('click', generateReport);
 $('#btnSave').addEventListener('click', saveReport);
+$('#btnExportZip').addEventListener('click', exportReportZip);
 $('#btnCopy').addEventListener('click', async () => {
   if (!S.reportMd) return toast('还没有报告', true);
   try {
@@ -381,7 +393,7 @@ $('#btnCopy').addEventListener('click', async () => {
 });
 $('#btnReveal').addEventListener('click', () => {
   if (!S.reportDir) return toast('先保存一次', true);
-  window.api.showItem(S.reportDir + '/report.md');
+  window.api.showItem(S.reportDir);
 });
 
 /* ---------------- 模板 ---------------- */
@@ -397,6 +409,26 @@ function renderTplList() {
   });
 }
 
+function renderTplVars() {
+  const el = $('#tplVars');
+  const body = $('#tplBody');
+  if (!el || !body || !window.api) return;
+  const text = body.value || '';
+  const used = [];
+  const re = /\{\{\s*(\w+)\s*\}\}/g;
+  let m;
+  while ((m = re.exec(text))) if (!used.includes(m[1])) used.push(m[1]);
+  const known = ['title', 'type', 'level', 'url', 'date', 'description', 'steps', 'impact', 'fix', 'account', 'product', 'author'];
+  const unknown = used.filter((k) => !known.includes(k));
+  if (!used.length) {
+    el.textContent = '可用占位符 title、url、type、level、date';
+    return;
+  }
+  el.textContent = unknown.length
+    ? '未知占位符 ' + unknown.join('、')
+    : '占位符 ' + used.join('、');
+}
+
 function selectTpl(id) {
   S.tplId = id;
   const t = S.templates.find((x) => x.id === id);
@@ -405,6 +437,7 @@ function selectTpl(id) {
   $('#tplPlatform').value = t.platform;
   $('#tplBody').value = t.body;
   renderTplList();
+  renderTplVars();
 }
 
 async function saveTpl() {
@@ -414,21 +447,28 @@ async function saveTpl() {
     platform: $('#tplPlatform').value.trim() || '自定义',
     body: $('#tplBody').value
   };
+  const unknown = (t.body.match(/\{\{\s*(\w+)\s*\}\}/g) || [])
+    .map((s) => s.replace(/\{\{|\}\}|\s/g, ''))
+    .filter((k, i, a) => a.indexOf(k) === i)
+    .filter((k) => !['title', 'type', 'level', 'url', 'date', 'description', 'steps', 'impact', 'fix', 'account', 'product', 'author'].includes(k));
   await window.api.templates.upsert(t);
   S.templates = await window.api.templates.list();
   if (!S.tplId) S.tplId = S.templates[S.templates.length - 1].id;
   renderTplList();
   fillTemplateSelect();
-  toast('模板已保存');
+  renderTplVars();
+  toast(unknown.length ? '已保存。未知占位符 ' + unknown.join('、') : '模板已保存');
 }
 
 $('#btnTplSave').addEventListener('click', saveTpl);
+$('#tplBody').addEventListener('input', renderTplVars);
 $('#btnTplNew').addEventListener('click', () => {
   S.tplId = null;
   $('#tplName').value = '';
   $('#tplPlatform').value = '自定义';
   $('#tplBody').value = '# {{title}}\n\n## 漏洞描述\n\n{{description}}\n';
   renderTplList();
+  renderTplVars();
 });
 $('#btnTplDel').addEventListener('click', async () => {
   if (!S.tplId) return;
@@ -475,19 +515,13 @@ function providerListHTML() {
       const on = p.id === activeId;
       const key = providerKey(p);
       return `<div class="llm-card ${on ? 'on' : ''}" data-id="${p.id}">
-        <div class="lc-top">
-          <button class="star ${on ? 'on' : ''}" data-act="star" title="${on ? '当前激活' : '设为激活'}">${on ? '★' : '☆'}</button>
+        <div class="lc-main">
           <b>${esc(p.name)}</b>
-          <span class="badge">${p.kind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</span>
-          <span class="spacer"></span>
-          <span class="lc-state ${p.enabled === false ? 'off' : ''}">${p.enabled === false ? '已关闭' : '正常'}</span>
+          <span class="lc-meta">${esc(p.activeModel || '未选模型')} · ${key ? '…' + esc(key.slice(-4)) : '未填 Key'} · ${(p.models || []).length} 个模型</span>
         </div>
-        <div class="lc-model">${esc(p.activeModel || '—')}</div>
-        <div class="lc-meta">${key ? '…' + esc(key.slice(-4)) : '未填 Key'} · ${(p.models || []).length} 个模型</div>
-        <div class="lc-actions">
-          <button class="btn ${on ? '' : 'primary'}" data-act="activate">${on ? '已激活' : '设为激活'}</button>
-          <button class="btn ghost danger" data-act="del" title="删除">🗑</button>
-        </div>
+        <span class="lc-state ${p.enabled === false ? 'off' : ''}">${p.enabled === false ? '已关闭' : '正常'}</span>
+        <button class="btn ${on ? '' : 'primary'}" data-act="activate">${on ? '已激活' : '激活'}</button>
+        <button class="btn ghost" data-act="del">删除</button>
       </div>`;
     })
     .join('')}</div>`;
@@ -691,19 +725,6 @@ function bindProviderList() {
       renderLLM();
     });
 
-    const star = card.querySelector('[data-act="star"]');
-    if (star) {
-      star.addEventListener('click', (e) => {
-        e.stopPropagation();
-        S.settings.activeProviderId = id;
-        p.enabled = true;
-        persist();
-        renderLLM();
-        syncModelPill();
-        toast('已激活 ' + p.name);
-      });
-    }
-
     const act = card.querySelector('[data-act="activate"]');
     if (act) {
       act.addEventListener('click', (e) => {
@@ -841,7 +862,7 @@ function bindProvModal() {
     closeProvModal();
     renderLLM();
     syncModelPill();
-    toast('已新建，点卡片上的「设为激活」启用');
+    toast('已新建。在列表里点激活');
   });
 }
 
@@ -886,7 +907,7 @@ function bindSyncPanel() {
   const setStatus = (t, bad) => {
     const el = $('#syncStatus');
     el.textContent = t;
-    el.style.color = bad ? '#c0392b' : '';
+    el.classList.toggle('bad', !!bad);
   };
 
   $('#btnSyncTest').addEventListener('click', async () => {
@@ -1203,21 +1224,109 @@ async function refreshPerm() {
   el.classList.add(r.status === 'granted' ? 'ok' : 'bad');
 }
 
+const PERM = { timer: 0, onFocus: null, pending: null };
+
+function stopPermWatch() {
+  if (PERM.timer) clearInterval(PERM.timer);
+  PERM.timer = 0;
+  if (PERM.onFocus) {
+    window.removeEventListener('focus', PERM.onFocus);
+    document.removeEventListener('visibilitychange', PERM.onFocus);
+    PERM.onFocus = null;
+  }
+}
+
+function startPermWatch() {
+  stopPermWatch();
+  const tick = async () => {
+    if (document.hidden) return;
+    const r = await window.api.perm.screen();
+    if (r.platform === 'darwin' && r.status === 'granted') await onPermGranted();
+  };
+  PERM.onFocus = () => { tick(); };
+  window.addEventListener('focus', PERM.onFocus);
+  document.addEventListener('visibilitychange', PERM.onFocus);
+  PERM.timer = setInterval(tick, 1500);
+}
+
+async function onPermGranted() {
+  stopPermWatch();
+  const modal = $('#permModal');
+  if (modal) modal.hidden = true;
+  await refreshPerm();
+  const fn = PERM.pending;
+  PERM.pending = null;
+  toast(fn ? '已授权，正在补拍' : '已授权');
+  if (fn) await fn();
+}
+
+function showPermModal(mode) {
+  const modal = $('#permModal');
+  if (!modal) return;
+  modal.dataset.mode = mode;
+  if (mode === 'black') {
+    $('#permTitle').textContent = '截图是黑屏';
+    $('#permBody').textContent = '权限已打开，但这张图几乎是全黑。退出 Refract 再打开，然后重新截图。';
+    $('#permGo').textContent = '知道了';
+  } else {
+    $('#permTitle').textContent = '需要屏幕录制权限';
+    $('#permBody').textContent = '整屏截图要读取屏幕。打开系统设置，勾选 Refract。授权后回到窗口会自动再截一次。';
+    $('#permGo').textContent = '打开系统设置';
+  }
+  modal.hidden = false;
+}
+
+function closePermModal() {
+  const modal = $('#permModal');
+  if (modal) modal.hidden = true;
+  stopPermWatch();
+  PERM.pending = null;
+}
+
+async function beginPermLoop(retry) {
+  const info = await window.api.perm.screen();
+  if (!info || info.platform !== 'darwin') return false;
+  PERM.pending = retry || null;
+  showPermModal('need');
+  startPermWatch();
+  return true;
+}
+
 function bindPerm() {
   if (!window.api.perm) return;
   $('#btnPermAsk').addEventListener('click', async () => {
-    const r = await window.api.perm.request();
+    const r = await window.api.perm.screen();
+    if (r.platform !== 'darwin') return toast('这个平台不需要单独授权');
     if (r.status === 'granted') {
       await refreshPerm();
-      return toast('已经有权限了');
+      return toast('已授权');
     }
-    await window.api.perm.open();
-    toast('已打开系统设置，勾上 Refract 后回来点重新检测');
+    showPermModal('need');
+    startPermWatch();
   });
   $('#btnPermCheck').addEventListener('click', async () => {
     await refreshPerm();
     toast('权限：' + $('#permText').textContent);
   });
+  const go = $('#permGo');
+  const cancel = $('#permCancel');
+  const close = $('#permClose');
+  if (go) {
+    go.addEventListener('click', async () => {
+      if ($('#permModal').dataset.mode === 'black') return closePermModal();
+      await window.api.perm.open();
+      toast('已打开系统设置');
+      startPermWatch();
+    });
+  }
+  if (cancel) cancel.addEventListener('click', closePermModal);
+  if (close) close.addEventListener('click', closePermModal);
+  const modal = $('#permModal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target.id === 'permModal') closePermModal();
+    });
+  }
 }
 
 /* ---------------- 设置菜单 ---------------- */
@@ -1243,7 +1352,7 @@ function bindSettingsMenu() {
       close();
       const sec = document.getElementById('sect-' + key);
       if (!sec) return;
-      sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      scrollToEl(sec);
       sec.classList.add('flash');
       setTimeout(() => sec.classList.remove('flash'), 900);
     });
@@ -1276,9 +1385,18 @@ function renderGateway(ri) {
 function greeting() {
   const h = new Date().getHours();
   if (h < 5) return '夜深了';
-  if (h < 12) return '上午好呀';
-  if (h < 18) return '下午好呀';
-  return '晚上好呀';
+  if (h < 12) return '上午好';
+  if (h < 18) return '下午好';
+  return '晚上好';
+}
+
+function motionOff() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function scrollToEl(el) {
+  if (!el) return;
+  el.scrollIntoView({ block: 'start', behavior: motionOff() ? 'auto' : 'smooth' });
 }
 
 function setChatting(on) {
@@ -1290,17 +1408,16 @@ function setChatting(on) {
   const after = wrap.getBoundingClientRect();
   const dy = before.top - after.top;
   const dx = before.left - after.left;
-  if (Math.abs(dy) > 1 || Math.abs(dx) > 1) {
-    wrap.style.transition = 'none';
-    wrap.style.transform = `translate(${dx}px, ${dy}px)`;
-    void wrap.offsetHeight;
-    wrap.style.transition = 'transform .5s cubic-bezier(.2, .8, .2, 1)';
-    wrap.style.transform = 'translate(0, 0)';
-    setTimeout(() => {
-      wrap.style.transition = '';
-      wrap.style.transform = '';
-    }, 540);
-  }
+  if (motionOff() || (Math.abs(dy) < 1 && Math.abs(dx) < 1)) return;
+  wrap.style.transition = 'none';
+  wrap.style.transform = `translate(${dx}px, ${dy}px)`;
+  void wrap.offsetHeight;
+  wrap.style.transition = 'transform .22s cubic-bezier(.2, .8, .2, 1)';
+  wrap.style.transform = 'translate(0, 0)';
+  setTimeout(() => {
+    wrap.style.transition = '';
+    wrap.style.transform = '';
+  }, 240);
 }
 
 function syncModelPill() {
@@ -1366,7 +1483,7 @@ function renderModelPop() {
       go('settings');
       setTimeout(() => {
         const sec = document.getElementById('sect-llm');
-        if (sec) sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        scrollToEl(sec);
       }, 60);
     });
   }
@@ -1446,10 +1563,21 @@ async function bwScreenShot() {
   if (r.ok) {
     showBrowserShot(r.path, '整屏截图');
     $('#bwLog').textContent = '已保存 ' + r.path;
-    S.images.push(r.path);
-  } else {
-    $('#bwLog').textContent = '截图失败：' + r.error;
+    if (!S.images.includes(r.path)) S.images.push(r.path);
+    return;
   }
+  if (r.code === 'NEED_PERM' || r.code === 'NO_PERM') {
+    $('#bwLog').textContent = '等待屏幕录制权限';
+    const opened = await beginPermLoop(() => bwScreenShot());
+    if (!opened) $('#bwLog').textContent = '截图失败：' + (r.error || '未授权');
+    return;
+  }
+  if (r.code === 'BLACK_FRAME') {
+    $('#bwLog').textContent = '截图是黑屏';
+    showPermModal('black');
+    return;
+  }
+  $('#bwLog').textContent = '截图失败：' + (r.error || '');
 }
 
 function bindBrowser() {
@@ -1485,9 +1613,14 @@ function bindBrowser() {
       const how = d.method === 'ai' ? 'AI 挑图' : d.frames > 1 ? `按画面挑（${d.frames} 张）` : '';
       $('#bwLog').textContent = `捕获弹窗（${d.type || 'alert'}）：${d.message}` + (how ? ' · ' + how : '');
       if (d.shot) showBrowserShot(d.shot, '弹窗截图');
-      if (d.error) {
+      if (d.code === 'NEED_PERM' || d.code === 'NO_PERM') {
+        $('#bwLog').textContent += ' · 等待屏幕录制权限';
+        beginPermLoop(() => bwScreenShot());
+      } else if (d.code === 'BLACK_FRAME') {
+        $('#bwLog').textContent += ' · 截图是黑屏';
+        showPermModal('black');
+      } else if (d.error) {
         $('#bwLog').textContent += ' · ' + d.error;
-        if (/权限|空白/.test(d.error)) toast('屏幕录制权限没开：设置 → 常规 → 去授权', true);
       }
     });
   }

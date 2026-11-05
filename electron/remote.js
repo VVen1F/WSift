@@ -62,6 +62,7 @@ const BRIDGE = `(function(){
     },
     clipboard: (t) => navigator.clipboard.writeText(t).then(() => true).catch(() => false),
     saveReport: (p) => j('/api/report/save', {method:'POST', body: JSON.stringify(p)}),
+    exportReport: (p) => j('/api/report/export', {method:'POST', body: JSON.stringify(p)}),
     imageUrl: (p) => '/api/shot?path=' + encodeURIComponent(p),
     perm: {
       screen: () => Promise.resolve({ status: 'granted', platform: 'remote' }),
@@ -224,6 +225,10 @@ function start(opts) {
         return send(res, 200, JSON.stringify(report.save(await readBody(req))));
       }
 
+      if (req.method === 'POST' && p === '/api/report/export') {
+        return send(res, 200, JSON.stringify(report.exportZip(await readBody(req))));
+      }
+
       if (req.method === 'GET' && p === '/api/update/check') {
         try {
           const { app } = require('electron');
@@ -251,10 +256,15 @@ function start(opts) {
           } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
         }
         if (action === 'screen') {
+          if (shot.needsScreenGrant()) {
+            return send(res, 200, JSON.stringify({ ok: false, code: 'NEED_PERM', status: shot.screenAccess(), error: '屏幕录制未授权' }));
+          }
           try {
             const r = await shot.captureScreen(path.join(shotsDir(), new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14) + '-screen.png'));
             return send(res, 200, JSON.stringify({ ok: true, path: r.path }));
-          } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+          } catch (e) {
+            return send(res, 200, JSON.stringify({ ok: false, code: e.code || 'ERR', error: e.message }));
+          }
         }
         if (action === 'close') { browser.shutdown(); return send(res, 200, JSON.stringify({ ok: true })); }
       }

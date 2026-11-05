@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, Menu, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, shell, dialog, nativeTheme } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -38,7 +38,7 @@ function createWindow() {
     minHeight: 600,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: '#f5f5f7',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#000000' : '#ffffff',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -218,6 +218,7 @@ async function captureBurst() {
   const frames = [];
   const started = Date.now();
   burstCtl = { stop: false };
+  let failed = null;
 
   for (const t of stops) {
     if (burstCtl.stop) break;
@@ -229,10 +230,17 @@ async function captureBurst() {
       const r = await shot.captureScreen(file);
       frames.push({ t, path: file, size: r.size || fs.statSync(file).size });
     } catch (e) {
-      if (e.code === 'NO_PERM') return { dir, frames, perm: false, error: e.message };
+      if (e.code === 'NEED_PERM' || e.code === 'NO_PERM' || e.code === 'BLACK_FRAME') {
+        failed = e;
+        break;
+      }
     }
   }
-  return { dir, frames, perm: true };
+  if (failed && failed.code === 'BLACK_FRAME') {
+    return { dir, frames, perm: true, code: 'BLACK_FRAME', error: failed.message };
+  }
+  if (failed) return { dir, frames, perm: false, code: 'NEED_PERM', error: failed.message };
+  return { dir, frames, perm: true, code: '' };
 }
 
 function pickLargest(frames) {
@@ -267,13 +275,15 @@ browser.onDialog(async (info) => {
 
   let chosen = null;
   let error = null;
+  let code = '';
   let method = 'none';
   let count = 0;
 
   try {
     const burst = await captureBurst();
     count = burst.frames.length;
-    if (!burst.perm) {
+    code = burst.code || '';
+    if (!burst.perm || burst.code === 'BLACK_FRAME') {
       error = burst.error;
     } else if (burst.frames.length) {
       try {
@@ -308,6 +318,7 @@ browser.onDialog(async (info) => {
       shot: chosen ? chosen.path : null,
       method,
       frames: count,
+      code,
       error
     });
   }
@@ -451,11 +462,14 @@ ipcMain.handle('browser:shot', async () => {
   }
 });
 ipcMain.handle('browser:screen', async () => {
+  if (shot.needsScreenGrant()) {
+    return { ok: false, code: 'NEED_PERM', status: shot.screenAccess(), error: '屏幕录制未授权' };
+  }
   try {
     const r = await shot.captureScreen(path.join(shotDir(), stampName('-screen.png')));
     return { ok: true, path: r.path };
   } catch (e) {
-    return { ok: false, error: e.message };
+    return { ok: false, code: e.code || 'ERR', status: e.status || shot.screenAccess(), error: e.message };
   }
 });
 ipcMain.handle('browser:close', () => {
@@ -516,6 +530,7 @@ ipcMain.handle('templates:remove', (_e, id) => templates.remove(id));
 ipcMain.handle('templates:reset', () => templates.reset());
 
 ipcMain.handle('report:save', (_e, payload) => report.save(payload));
+ipcMain.handle('report:exportZip', (_e, payload) => report.exportZip(payload));
 ipcMain.handle('report:compose', (_e, payload) => report.buildMessages(payload));
 ipcMain.handle('report:chat', (_e, payload) => report.buildChatMessages(payload));
 

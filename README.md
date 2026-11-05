@@ -4,6 +4,8 @@
 
 0.6.0：界面收成黑白行式，报告导出为 zip，并提供 Windows 安装包。
 
+0.6.9：设置里可以改截图目录，并打开已有截图的文件夹。
+
 0.6.8：安装后没有内置模板。把 .md 拖进模板页即可新建。
 
 0.6.7：报告改成纯文本。名称、文件夹和压缩包用同一句，截图前放原始请求。
@@ -120,7 +122,7 @@ npm run dist:linux   # 可选，产出 AppImage
 | 内容 | 路径 |
 | --- | --- |
 | 设置、模板 | macOS `~/Library/Application Support/Refract/`，Windows `%APPDATA%\Refract\` |
-| 截图 | 同上 `shots/` |
+| 截图 | 同上 `shots/`，可在设置里改到别的文件夹 |
 | 报告 | `文档/Refract/<时间>-<标题>/`，旁边有同名 `.zip` |
 | 报告草稿 | 同上 `tasks.json` |
 

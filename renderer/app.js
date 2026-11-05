@@ -1560,6 +1560,26 @@ async function bindSettingsPage(ri) {
     S.settings.ui.shotWidth = Number(e.target.value) || 1600;
     persist();
   });
+  const paintShotDir = async () => {
+    if (!window.api.shots) return;
+    const d = await window.api.shots.dir();
+    const el = $('#shotDirText');
+    if (!el) return;
+    const shown = (typeof d === 'string' && d) ? d : '';
+    el.textContent = S.settings.ui.shotDir ? shown : (shown ? '默认 · ' + shown : '默认');
+    el.title = shown;
+  };
+  if (window.api.shots) {
+    $('#btnShotDir').addEventListener('click', async () => {
+      const r = await window.api.shots.choose();
+      if (!r || r.canceled) return;
+      S.settings.ui.shotDir = r.dir || '';
+      persist();
+      paintShotDir();
+    });
+    $('#btnShotShow').addEventListener('click', () => window.api.shots.show());
+    paintShotDir();
+  }
   $('#setAutoShot').addEventListener('change', (e) => {
     S.settings.ui.autoShot = e.target.value === '1';
     persist();
@@ -2207,8 +2227,8 @@ function renderHome() {
       }
       return `<div class="msg ai"><div class="who">Refract</div><div class="bubble md">${mdToHtml(m.text || '')}</div>
         <div class="acts">
-          <button class="btn ghost" data-act="copy" data-i="${i}">复制</button>
-          <button class="btn ghost" data-act="save" data-i="${i}">保存为报告</button>
+          <button class="btn ghost" data-act="copy" data-i="${i}" title="复制" aria-label="复制"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+          <button class="btn ghost" data-act="save" data-i="${i}" title="存为报告" aria-label="存为报告"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></button>
         </div></div>`;
     })
     .join('');

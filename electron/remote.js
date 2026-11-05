@@ -121,7 +121,10 @@ function start(opts) {
 
   const root = path.join(__dirname, '..', 'renderer');
   const shotsDir = () => {
-    const dir = path.join(require('electron').app.getPath('userData'), 'shots');
+    const store = require('./store');
+    let custom = '';
+    try { custom = String((store.load().ui || {}).shotDir || '').trim(); } catch (e) { custom = ''; }
+    const dir = custom || path.join(require('electron').app.getPath('userData'), 'shots');
     fs.mkdirSync(dir, { recursive: true });
     return dir;
   };

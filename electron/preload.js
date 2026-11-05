@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld('api', {
   imageUrl: (p) => 'file://' + p,
   send: (payload) => ipcRenderer.invoke('http:send', payload),
   capture: (payload) => ipcRenderer.invoke('shot:capture', payload),
+  shots: {
+    dir: () => ipcRenderer.invoke('shots:dir'),
+    choose: () => ipcRenderer.invoke('shots:choose'),
+    show: () => ipcRenderer.invoke('shots:show')
+  },
 
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),

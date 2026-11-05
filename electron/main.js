@@ -195,8 +195,7 @@ ipcMain.handle('http:send', async (_e, payload) => {
 });
 
 ipcMain.handle('shot:capture', async (_e, payload) => {
-  const dir = path.join(app.getPath('userData'), 'shots');
-  fs.mkdirSync(dir, { recursive: true });
+  const dir = shotDir();
   const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
   const out = path.join(dir, `${stamp}.png`);
   const res = await shot.capture({
@@ -209,7 +208,9 @@ ipcMain.handle('shot:capture', async (_e, payload) => {
 });
 
 const shotDir = () => {
-  const dir = path.join(app.getPath('userData'), 'shots');
+  let custom = '';
+  try { custom = String((store.load().ui || {}).shotDir || '').trim(); } catch (e) { custom = ''; }
+  const dir = custom || path.join(app.getPath('userData'), 'shots');
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 };
@@ -470,6 +471,18 @@ ipcMain.handle('backup:restore', (_e, file) => {
   } catch (e) {
     return { ok: false, error: e.message };
   }
+});
+
+ipcMain.handle('shots:dir', () => shotDir());
+ipcMain.handle('shots:choose', async () => {
+  const r = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return { canceled: true };
+  return { ok: true, dir: r.filePaths[0] };
+});
+ipcMain.handle('shots:show', async () => {
+  const dir = shotDir();
+  await shell.openPath(dir);
+  return { ok: true, dir };
 });
 
 ipcMain.handle('backup:choose', async () => {

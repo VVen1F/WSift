@@ -43,6 +43,7 @@ const DEFAULTS = {
   ui: {
     theme: 'system',
     shotWidth: 1600,
+    shotDir: '',
     autoShot: false,
     protocol: 'auto',
     remotePort: 8765,

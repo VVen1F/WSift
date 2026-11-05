@@ -597,8 +597,19 @@ textarea.inp {
 }
 .msg.ai .bubble { width: 100%; font-size: 13.5px; line-height: 1.7; user-select: text; }
 .msg .who { display: none; }
-.msg .acts { display: flex; gap: 6px; }
-.msg .acts .btn { height: 26px; font-size: 12px; }
+.msg .acts {
+  display: flex; gap: 2px; min-height: 28px;
+  opacity: 0;
+  transition: opacity .15s var(--ease);
+}
+.msg:hover .acts, .msg:focus-within .acts { opacity: 1; }
+.msg .acts .btn {
+  width: 28px; height: 28px; padding: 0;
+  border-color: transparent;
+  display: grid; place-items: center;
+}
+.msg .acts svg { width: 15px; height: 15px; }
+@media (hover: none) { .msg .acts { opacity: 1; } }
 
 .chip {
   display: inline-flex; align-items: center; gap: 7px;

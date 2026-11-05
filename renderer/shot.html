@@ -228,6 +228,7 @@ function bodyOf(text) {
 /** Burp 单行报文默认停在 Raw，多行的才显示 Pretty。 */
 function pickView(text) {
   const body = bodyOf(text).trim();
+  if (!body) return 'pretty';
   return body.includes('\n') ? 'pretty' : 'raw';
 }
 

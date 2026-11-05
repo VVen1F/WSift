@@ -641,7 +641,11 @@ function dayGroup(ts) {
 }
 
 function sortedTasks() {
-  return TASKS.list.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+  return TASKS.list.slice().sort((a, b) => {
+    const pin = (b.pinned === true) - (a.pinned === true);
+    if (pin) return pin;
+    return (b.updatedAt || 0) - (a.updatedAt || 0) || (b.createdAt || 0) - (a.createdAt || 0);
+  });
 }
 
 function saveTasksNow() {
@@ -776,7 +780,7 @@ function taskRow(t, archivedRow) {
     actions = `<button class="task-arch" type="button" data-arch="${esc(t.id)}" aria-label="归档任务">${ARCH_ICON}</button>` +
       `<button class="task-del" type="button" data-del="${esc(t.id)}">删除</button>`;
   }
-  return `<div class="task${on ? ' on' : ''}${archivedRow ? ' archived' : ''}" data-id="${esc(t.id)}" role="button" tabindex="0">` +
+  return `<div class="task${on ? ' on' : ''}${archivedRow ? ' archived' : ''}${t.pinned ? ' pinned' : ''}" data-id="${esc(t.id)}" role="button" tabindex="0">` +
     `<span class="task-title">${esc(displayTitle(t))}</span>${actions}</div>`;
 }
 
@@ -843,6 +847,7 @@ function onTaskEdit() {
       images: [],
       exported: '',
       archived: false,
+      pinned: false,
       updatedAt: now,
       createdAt: now
     };
@@ -924,6 +929,7 @@ function createTask(partial) {
     images: incoming.images,
     exported: partial.exported || '',
     archived: false,
+    pinned: false,
     updatedAt: now,
     createdAt: now
   };
@@ -940,7 +946,7 @@ function createTask(partial) {
 
 function archiveTask(id) {
   const t = TASKS.list.find((x) => x.id === id);
-  if (!t || t.archived || TASKS.busyId === id) return;
+  if (!t || t.archived) return;
   if (TASKS.id === id) readFormInto(t);
   if (!hasContent(t)) return;
   t.archived = true;
@@ -999,6 +1005,78 @@ function clearTasks() {
   toast('已清空');
 }
 
+function closeTaskMenu() {
+  const menu = $('#taskMenu');
+  if (!menu || menu.hidden) return;
+  menu.classList.add('out');
+  clearTimeout(menu._t);
+  menu._t = setTimeout(() => {
+    menu.hidden = true;
+    menu.classList.remove('out');
+  }, 150);
+}
+
+function openTaskMenu(id, x, y) {
+  const t = TASKS.list.find((item) => item.id === id);
+  const menu = $('#taskMenu');
+  if (!t || !menu) return;
+  const rows = [];
+  if (!t.archived) {
+    rows.push({ id: 'pin', label: t.pinned ? '取消置顶' : '置顶' });
+    rows.push({ id: 'rename', label: '重命名' });
+    rows.push({ sep: true });
+  }
+  rows.push({ id: 'archive', label: t.archived ? '恢复' : '归档' });
+  rows.push({ sep: true });
+  rows.push({ id: 'del', label: '删除', danger: true });
+  menu.innerHTML = rows.map((item) => item.sep
+    ? '<div class="sep"></div>'
+    : `<button type="button" role="menuitem" data-menu="${item.id}" class="${item.danger ? 'danger' : ''}">${esc(item.label)}</button>`
+  ).join('');
+  menu.hidden = false;
+  menu.classList.remove('out');
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = Math.max(12, Math.min(x, window.innerWidth - rect.width - 12)) + 'px';
+  menu.style.top = Math.max(12, Math.min(y, window.innerHeight - rect.height - 12)) + 'px';
+  menu.onclick = (e) => {
+    const btn = e.target.closest('[data-menu]');
+    if (!btn) return;
+    e.stopPropagation();
+    const act = btn.dataset.menu;
+    closeTaskMenu();
+    if (act === 'pin') {
+      t.pinned = !t.pinned;
+      saveTasksNow();
+      renderTaskList();
+      return;
+    }
+    if (act === 'rename') {
+      selectTask(id);
+      const field = $('#rTitle');
+      if (field) {
+        field.focus();
+        field.select();
+      }
+      return;
+    }
+    if (act === 'archive') {
+      if (t.archived) unarchiveTask(id);
+      else archiveTask(id);
+      return;
+    }
+    if (act === 'del') {
+      openConfirm({
+        title: '删除报告',
+        text: '这份报告会从列表消失。',
+        ok: '删除',
+        run: () => removeTask(id)
+      });
+    }
+  };
+}
+
 function openConfirm(opts) {
   const modal = $('#confirmModal');
   const ok = $('#confirmOk');
@@ -1012,9 +1090,15 @@ function openConfirm(opts) {
   ok.textContent = opts.ok || '确认';
   ack.checked = false;
   ok.disabled = true;
+  clearTimeout(modal._t);
+  modal.classList.remove('out');
   modal.hidden = false;
   const close = () => {
-    modal.hidden = true;
+    modal.classList.add('out');
+    modal._t = setTimeout(() => {
+      modal.hidden = true;
+      modal.classList.remove('out');
+    }, 160);
     ok.onclick = null;
     $('#confirmCancel').onclick = null;
     $('#confirmX').onclick = null;
@@ -1087,6 +1171,21 @@ function bindTasks() {
   };
   box.addEventListener('mouseover', (e) => placeArchTip(e.target.closest('.task-arch')));
   box.addEventListener('mouseleave', () => placeArchTip(null));
+  box.addEventListener('contextmenu', (e) => {
+    const row = e.target.closest('.task');
+    if (!row) return;
+    e.preventDefault();
+    openTaskMenu(row.dataset.id, e.clientX, e.clientY);
+  });
+  if (!bindTasks._menuDoc) {
+    bindTasks._menuDoc = true;
+    document.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest || !e.target.closest('#taskMenu')) closeTaskMenu();
+    }, true);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeTaskMenu();
+    });
+  }
   box.addEventListener('keydown', (e) => {
     const row = e.target.closest('.task');
     if (!row) return;
@@ -2156,6 +2255,45 @@ function bindPerm() {
 
 /* ---------------- 设置菜单 ---------------- */
 
+function resolvedDark(pref) {
+  if (pref === 'dark') return true;
+  if (pref === 'light') return false;
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+function applyTheme(pref) {
+  const mode = pref === 'light' || pref === 'dark' ? pref : 'system';
+  document.documentElement.toggleAttribute('data-ds-dark-theme', resolvedDark(mode));
+  document.querySelectorAll('[data-theme-choice]').forEach((b) => {
+    const on = b.dataset.themeChoice === mode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+function bindTheme() {
+  const ui = (S.settings && S.settings.ui) || {};
+  applyTheme(ui.theme || 'system');
+  document.querySelectorAll('[data-theme-choice]').forEach((b) => {
+    if (b._themeBound) return;
+    b._themeBound = true;
+    b.addEventListener('click', () => {
+      const mode = b.dataset.themeChoice || 'system';
+      S.settings.ui.theme = mode;
+      applyTheme(mode);
+      persist();
+    });
+  });
+  if (!bindTheme._media) {
+    bindTheme._media = true;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => {
+      if (!S.settings || !S.settings.ui || !S.settings.ui.theme || S.settings.ui.theme === 'system') applyTheme('system');
+    };
+    if (media.addEventListener) media.addEventListener('change', onChange);
+  }
+}
+
 function showSettingsSection(key) {
   const keys = ['general', 'network', 'llm', 'backup', 'about'];
   if (keys.indexOf(key) < 0) key = 'general';
@@ -2509,6 +2647,7 @@ async function boot() {
   S.info = await window.api.info();
   $('#ver').textContent = 'v' + S.info.version;
   S.settings = await window.api.settings.get();
+  bindTheme();
   S.templates = await window.api.templates.list();
 
   $('#req').value = SAMPLE;

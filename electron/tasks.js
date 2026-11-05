@@ -57,6 +57,7 @@ function normalize(t) {
     images: Array.isArray(t.images) ? t.images.map((p) => String(p || '')).filter(Boolean).slice(0, 40) : [],
     exported: String(t.exported || '').slice(0, 500),
     archived: t.archived === true,
+    pinned: t.pinned === true,
     updatedAt: Number(t.updatedAt) || Date.now(),
     createdAt: Number(t.createdAt) || Date.now()
   };

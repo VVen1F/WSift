@@ -261,7 +261,8 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.13', pkg.version === '0.6.13');
+  ok('版本 0.6.14', pkg.version === '0.6.14');
+  ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
   ok('流式正文', llmMod.takeStreamEvent({ type: 'content_block_delta', delta: { text: '甲' } }).text === '甲');
@@ -297,6 +298,9 @@ function ok(name, cond, extra) {
   ]);
   ok('空任务不入库', keptTasks.tasks.length === 2 && !keptTasks.tasks.some((t) => t.id === 'empty'));
   ok('归档能读回', tasksMod.load().tasks.find((t) => t.id === 'box').archived === true);
+  const pinned = tasksMod.saveAll([{ id: 'pin', title: '置顶的', detail: 'z', pinned: true }]);
+  ok('置顶能读回', pinned.tasks[0].pinned === true && tasksMod.load().tasks.find((t) => t.id === 'pin').pinned === true);
+  tasksMod.saveAll([]);
   tasksMod.saveAll([]);
   const ui = ['renderer/index.html', 'renderer/app.js', 'renderer/style.css']
     .map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'))
@@ -308,6 +312,7 @@ function ok(name, cond, extra) {
   ok('打开就是表单', ui.includes('id="reportCol"') && !ui.includes('id="reportEmpty"'));
   ok('浏览器页已去掉', !ui.includes('id="page-browser"') && ui.includes('function stopRun'));
   ok('清空要二次确认', ui.includes('id="confirmAck"') && ui.includes('我已了解'));
+  ok('侧栏新建是图标', ui.includes('aria-label="新建任务"') && ui.includes('id="taskMenu"') && ui.includes('data-theme-choice="system"'));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

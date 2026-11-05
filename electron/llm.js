@@ -99,7 +99,7 @@ async function chatViaProxy(provider, messages, maxTokens = 4096) {
   if (provider.kind === 'anthropic') {
     const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
     const rest = messages.filter((m) => m.role !== 'system');
-    const body = { model: provider.model, max_tokens: maxTokens, messages: rest };
+    const body = { model: provider.model, max_tokens: maxTokens, messages: rest, thinking: { type: 'disabled' } };
     if (system) body.system = system;
     const j = await proxyJSON(provider, joinURL(provider.baseURL, '/v1/messages'), body);
     if (j.error) throw new Error(j.error.message || '请求失败');
@@ -177,7 +177,20 @@ async function readSSE(res, onEvent) {
   }
 }
 
-async function chat({ provider, messages, onDelta, onNote, signal, temperature = 0.4, maxTokens = 4096 }) {
+function anthropicPayload(provider, system, rest, temperature, maxTokens) {
+  return {
+    model: provider.model,
+    system,
+    messages: rest,
+    stream: true,
+    temperature,
+    max_tokens: maxTokens,
+    // 这些模型默认先写很长的思考。思考会计入 max_tokens，超限后正文为空。
+    thinking: { type: 'disabled' }
+  };
+}
+
+async function chat({ provider, messages, onDelta, onNote, signal, temperature = 0.4, maxTokens = 8192 }) {
   if (!provider) throw new Error('未配置模型');
   messages = trimMessages(messages, provider.contextK);
   await throttle(provider);
@@ -240,26 +253,35 @@ async function chatOpenAI(provider, messages, onDelta, onNote, signal, temperatu
   return text;
 }
 
-async function chatAnthropic(provider, messages, onDelta, onNote, signal, temperature, maxTokens) {
-  const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
-  const rest = messages.filter((m) => m.role !== 'system');
-  const res = await fetch(joinURL(provider.baseURL, '/v1/messages'), {
+async function postAnthropic(provider, body, signal) {
+  const send = (payload) => fetch(joinURL(provider.baseURL, '/v1/messages'), {
     method: 'POST',
     headers: headersFor(provider),
-    body: JSON.stringify({
-      model: provider.model,
-      system,
-      messages: rest,
-      stream: true,
-      temperature,
-      max_tokens: maxTokens
-    }),
+    body: JSON.stringify(payload),
     signal
   });
+  let res = await send(body);
+  if (res.status === 400 && body.thinking) {
+    const t = await res.text().catch(() => '');
+    if (/thinking/i.test(t)) {
+      const next = { ...body };
+      delete next.thinking;
+      res = await send(next);
+    } else {
+      throw new Error(`模型返回 400: ${t.slice(0, 300)}`);
+    }
+  }
   if (!res.ok) {
     const t = await res.text().catch(() => '');
     throw new Error(`模型返回 ${res.status}: ${t.slice(0, 300)}`);
   }
+  return res;
+}
+
+async function chatAnthropic(provider, messages, onDelta, onNote, signal, temperature, maxTokens) {
+  const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
+  const rest = messages.filter((m) => m.role !== 'system');
+  const res = await postAnthropic(provider, anthropicPayload(provider, system, rest, temperature, maxTokens), signal);
   const ctype = (res.headers.get('content-type') || '').toLowerCase();
   if (ctype.includes('application/json') && !ctype.includes('event-stream')) {
     const text = textFromJSON('anthropic', await res.json());
@@ -268,7 +290,9 @@ async function chatAnthropic(provider, messages, onDelta, onNote, signal, temper
   }
   const notes = notePump(onNote);
   let text = '';
+  let stop = '';
   await readSSE(res, (ev) => {
+    if (ev && ev.type === 'message_delta' && ev.delta && ev.delta.stop_reason) stop = ev.delta.stop_reason;
     const part = takeStreamEvent(ev);
     if (part.text) {
       text += part.text;
@@ -277,6 +301,9 @@ async function chatAnthropic(provider, messages, onDelta, onNote, signal, temper
     if (part.note) notes.push(part.note);
   });
   notes.flush();
+  if (!text) {
+    throw new Error(stop === 'max_tokens' ? '输出被长度上限截断，没有正文' : '模型没有返回正文');
+  }
   return text;
 }
 
@@ -351,4 +378,4 @@ async function vision({ provider, images, prompt = VISION_PROMPT, maxTokens = 8,
   }
 }
 
-module.exports = { chat, listModels, joinURL, vision, VISION_PROMPT, SESSION_ID, trimMessages, takeStreamEvent };
+module.exports = { chat, listModels, joinURL, vision, VISION_PROMPT, SESSION_ID, trimMessages, takeStreamEvent, anthropicPayload };

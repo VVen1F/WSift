@@ -1863,27 +1863,20 @@ function renderModelPop() {
     return;
   }
   const models = Array.from(new Set([...(prov.models || []), prov.activeModel].filter(Boolean)));
+  const provs = cfg.providers.filter((x) => x.enabled !== false);
+  const q = (pop._q || '').trim().toLowerCase();
+  const shown = q ? models.filter((m) => m.toLowerCase().indexOf(q) >= 0) : models;
+  const check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
 
   pop.innerHTML = `
-    <div class="mp-models">
-      <div class="mp-h">模型</div>
-      ${models.length
-        ? models.map((m) => `<div class="mp-item ${m === prov.activeModel ? 'on' : ''}" data-m="${esc(m)}">
-            <span>${esc(m)}</span>
-            ${m === prov.activeModel ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>' : ''}
-          </div>`).join('')
-        : '<div class="mp-empty">还没勾选模型。到设置里选。</div>'}
+    ${provs.length > 1 ? `<div class="mp-list mp-provs">${provs.map((x) => `<div class="mp-item ${x.id === prov.id ? 'on' : ''}" data-p="${x.id}"><span>${esc(x.name)}</span>${x.id === prov.id ? check : ''}</div>`).join('')}</div>` : ''}
+    <input class="mp-search" id="mpSearch" placeholder="搜索" value="${esc(pop._q || '')}" spellcheck="false" />
+    <div class="mp-list">
+      ${shown.length
+        ? shown.map((m) => `<div class="mp-item ${m === prov.activeModel ? 'on' : ''}" data-m="${esc(m)}"><span>${esc(m)}</span>${m === prov.activeModel ? check : ''}</div>`).join('')
+        : '<div class="mp-empty">没有匹配的模型</div>'}
     </div>
-    <div class="mp-prov">
-      <div class="mp-h">供应商</div>
-      ${cfg.providers
-        .filter((x) => x.enabled !== false)
-        .map((x) => `<div class="mp-item ${x.id === prov.id ? 'on' : ''}" data-p="${x.id}">
-            <span>${esc(x.name)}</span>
-            ${x.id === prov.id ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>' : ''}
-          </div>`).join('')}
-      <div class="mp-foot" id="mpManage">管理模型</div>
-    </div>`;
+    <div class="mp-foot" id="mpManage">管理模型</div>`;
 
   pop.querySelectorAll('[data-m]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -1900,6 +1893,21 @@ function renderModelPop() {
       syncModelPill();
     });
   });
+  const search = $('#mpSearch');
+  if (search) {
+    search.addEventListener('input', () => {
+      pop._q = search.value;
+      const caret = search.selectionStart;
+      renderModelPop();
+      const again = $('#mpSearch');
+      if (again) {
+        again.focus();
+        again.setSelectionRange(caret, caret);
+      }
+    });
+    search.addEventListener('click', (e) => e.stopPropagation());
+    search.addEventListener('keydown', (e) => e.stopPropagation());
+  }
   const manage = $('#mpManage');
   if (manage) {
     manage.addEventListener('click', () => {
@@ -1915,7 +1923,10 @@ function renderModelPop() {
 
 function closeModelPop() {
   const pop = $('#modelPop');
-  if (pop) pop.hidden = true;
+  if (pop) {
+    pop.hidden = true;
+    pop._q = '';
+  }
   const pill = $('#btnModelPick');
   if (pill) pill.classList.remove('on');
 }
@@ -1925,13 +1936,26 @@ function placeModelPop() {
   const pill = $('#btnModelPick');
   if (!pop || !pill) return;
   const r = pill.getBoundingClientRect();
-  const width = Math.min(440, window.innerWidth - 24);
+  const width = 260;
   const left = Math.max(12, Math.min(r.left, window.innerWidth - width - 12));
-  const space = Math.max(160, r.top - 16);
+  const below = window.innerHeight - r.bottom - 12;
+  const above = r.top - 12;
   pop.style.left = left + 'px';
   pop.style.width = width + 'px';
-  pop.style.bottom = (window.innerHeight - r.top + 8) + 'px';
-  pop.style.maxHeight = Math.min(320, space) + 'px';
+  pop.style.right = 'auto';
+  if (below >= 160 || below >= above) {
+    pop.style.top = (r.bottom + 6) + 'px';
+    pop.style.bottom = 'auto';
+    pop.style.maxHeight = Math.min(360, Math.max(160, below)) + 'px';
+    pop.classList.add('down');
+    pop.classList.remove('up');
+  } else {
+    pop.style.top = 'auto';
+    pop.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+    pop.style.maxHeight = Math.min(360, Math.max(160, above)) + 'px';
+    pop.classList.add('up');
+    pop.classList.remove('down');
+  }
 }
 
 function toggleModelPop() {

@@ -63,11 +63,16 @@ function ok(name, cond, extra) {
   const brand = /智谱|智普|zhipu/i;
   ok('内置 GLM 预设', !!(glm && glm.kind === 'anthropic' && glm.activeModel === 'glm-4.6' && glm.baseURL === 'https://open.bigmodel.cn/api/anthropic' && !(glm.accounts || []).some((a) => a.apiKey)));
   ok('预设名称不含厂商品牌', !!(glm && glm.name && !brand.test(glm.name)));
-  const surfaced = ['README.md', 'renderer/index.html', 'renderer/app.js', 'renderer/style.css', 'electron/store.js', 'electron/llm.js']
+  ok('预设数据不含厂商品牌', !brand.test(JSON.stringify(store.DEFAULTS)));
+  const surfaced = ['README.md', 'renderer/index.html', 'renderer/app.js', 'renderer/style.css', 'electron/llm.js']
     .map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'))
     .join('\n');
   ok('界面与说明不含智谱品牌', !brand.test(surfaced));
   ok('新建表单预填 GLM', surfaced.includes(glm.baseURL) && surfaced.includes('例如：OpenAI 生产') && surfaced.includes("model: 'glm-4.6'"));
+  const renamed = store.migrateProvider({ id: 'glm', name: '智谱 GLM', kind: 'anthropic', baseURL: glm.baseURL, apiKey: '', model: 'glm-4.6' });
+  ok('旧默认名会改成 GLM', renamed.name === 'GLM' && renamed.baseURL === glm.baseURL);
+  const kept = store.migrateProvider({ id: 'other', name: '我的线路', kind: 'anthropic', baseURL: 'https://example.test', apiKey: '', model: 'm' });
+  ok('自定义名称保留', kept.name === '我的线路');
   ok('settings 含统计', typeof store.load().stats === 'object');
   ok('模板内置 5 套', templates.list().length === 5);
   ok('模板占位符替换', report.fillTemplate('# {{title}}', { title: 'T' }) === '# T');

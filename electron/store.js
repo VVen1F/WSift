@@ -94,9 +94,13 @@ function migrateProvider(p) {
     ? p.activeAccountId
     : accounts[0].id;
 
+  let name = p.name || '未命名服务';
+  // 只改内置预设当年的默认名。用户后来自己起的名字保留。
+  if (p.id === 'glm' && /^(智谱 GLM|智普 GLM|zhipu glm)$/i.test(String(name).trim())) name = 'GLM';
+
   return {
     id: p.id || newId('prov'),
-    name: p.name || '未命名服务',
+    name,
     kind: p.kind === 'anthropic' ? 'anthropic' : 'openai',
     baseURL: p.baseURL || '',
     modelsURL: p.modelsURL || '',

@@ -520,6 +520,7 @@ function providerDetailHTML(id) {
     </div>
     <div class="krow"><div class="klabel">Base URL</div><input class="inp" style="flex:1;max-width:none" id="pdBase" value="${esc(p.baseURL)}" /></div>
     <div class="krow"><div class="klabel">模型列表地址<small>留空按协议猜</small></div><input class="inp" style="flex:1;max-width:none" id="pdModelsURL" value="${esc(p.modelsURL || '')}" /></div>
+    <div class="krow"><div class="klabel">代理<small>http/socks5，留空直连</small></div><input class="inp" style="flex:1;max-width:none" id="pdProxy" value="${esc(p.proxy || '')}" placeholder="http://127.0.0.1:8080" /></div>
     <div class="krow"><div class="klabel">自定义会话头<small>留空则不发送</small></div><input class="inp" style="flex:1;max-width:none" id="pdSession" value="${esc(p.sessionHeader || '')}" placeholder="如 x-session-id" /></div>
     <div class="krow">
       <div class="klabel">限速与上下文<small>0 = 不限</small></div>
@@ -582,6 +583,7 @@ function bindProviderDetail(id) {
   $('#pdKind').addEventListener('change', (e) => { p.kind = e.target.value; persist(); });
   $('#pdBase').addEventListener('input', (e) => { p.baseURL = e.target.value; persist(); });
   $('#pdModelsURL').addEventListener('input', (e) => { p.modelsURL = e.target.value; persist(); });
+  $('#pdProxy').addEventListener('input', (e) => { p.proxy = e.target.value; persist(); });
   $('#pdSession').addEventListener('input', (e) => { p.sessionHeader = e.target.value; persist(); });
   $('#pdSec').addEventListener('input', (e) => { p.limitSec = Number(e.target.value) || 0; persist(); });
   $('#pdMin').addEventListener('input', (e) => { p.limitMin = Number(e.target.value) || 0; persist(); });
@@ -772,6 +774,7 @@ function openProvModal() {
   $('#pmModel').value = '';
   $('#pmBase').value = 'https://api.openai.com/v1';
   $('#pmKey').value = '';
+  $('#pmProxy').value = '';
   $('#pmSession').value = '';
   $('#pmSec').value = '0';
   $('#pmMin').value = '0';
@@ -796,6 +799,7 @@ function draftProvider() {
     activeAccountId: '',
     models: $('#pmModel').value.trim() ? [$('#pmModel').value.trim()] : [],
     activeModel: $('#pmModel').value.trim(),
+    proxy: $('#pmProxy').value.trim(),
     sessionHeader: $('#pmSession').value.trim(),
     limitSec: Number($('#pmSec').value) || 0,
     limitMin: Number($('#pmMin').value) || 0,

@@ -67,6 +67,17 @@ function ok(name, cond, extra) {
   const chatMsgs = report.buildChatMessages({ material: 'GET / HTTP/1.1', template: '# {{title}}', meta: { product: 'X' }, question: '写报告' });
   ok('对话 prompt 含写作约束', chatMsgs[0].content.includes('固定句式') && chatMsgs[0].content.includes('简洁直接'));
   ok('对话 prompt 带材料', chatMsgs[1].content.includes('GET / HTTP/1.1'));
+  const longMsgs = [
+    { role: 'system', content: 'S'.repeat(100) },
+    { role: 'user', content: 'a'.repeat(4000) },
+    { role: 'assistant', content: 'b'.repeat(4000) },
+    { role: 'user', content: 'last' }
+  ];
+  ok('上下文裁剪保留 system', llm.trimMessages(longMsgs, 1)[0].role === 'system');
+  ok('上下文裁剪会丢掉最早的消息', llm.trimMessages(longMsgs, 1).length < longMsgs.length);
+  ok('不限上下文时原样返回', llm.trimMessages(longMsgs, 0).length === longMsgs.length);
+  ok('会话 id 固定', typeof llm.SESSION_ID === 'string' && llm.SESSION_ID.startsWith('refract-'));
+
   ok('LLM joinURL', llm.joinURL('https://x/v1/', '/chat') === 'https://x/v1/chat');
   ok('版本比较', updater.cmp('0.1.0', '0.1.1') === -1 && updater.cmp('1.0.0', '0.9.9') === 1);
 

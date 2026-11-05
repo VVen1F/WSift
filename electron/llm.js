@@ -1,5 +1,6 @@
 'use strict';
 // 极简 LLM 客户端：OpenAI 兼容 + Anthropic 兼容，支持流式。
+const httpc = require('./http');
 const DEFAULT_TIMEOUT = 120000;
 
 function joinURL(base, suffix) {
@@ -64,6 +65,51 @@ function authHeaders(p) {
   };
 }
 
+/**
+ * 走代理时用项目里的 raw HTTP 通道（fetch 不认代理）。
+ * 代价是不能流式，整段回来再一次性丢给 onDelta。
+ */
+async function proxyJSON(provider, url, bodyObj, method = 'POST') {
+  const u = new URL(url);
+  const body = bodyObj ? JSON.stringify(bodyObj) : '';
+  const h = headersFor(provider);
+  const head =
+    `${method} ${u.pathname}${u.search} HTTP/1.1\r\n` +
+    `Host: ${u.host}\r\n` +
+    Object.entries(h).map(([k, v]) => `${k}: ${v}`).join('\r\n') +
+    (body ? `\r\nContent-Length: ${Buffer.byteLength(body)}` : '') +
+    '\r\n\r\n' + body;
+
+  const r = await httpc.send(head, { scheme: 'https', protocol: 'http1.1', proxy: provider.proxy, timeout: DEFAULT_TIMEOUT });
+  const idx = r.text.indexOf('\r\n\r\n');
+  const payload = idx >= 0 ? r.text.slice(idx + 4) : '';
+  if (r.status >= 400) {
+    let msg = payload.slice(0, 200);
+    try { const j = JSON.parse(payload); msg = (j.error && (j.error.message || j.error)) || msg; } catch (e) { /* ignore */ }
+    throw new Error(`HTTP ${r.status}：${msg}`);
+  }
+  try {
+    return JSON.parse(payload);
+  } catch (e) {
+    throw new Error('返回不是 JSON：' + payload.slice(0, 120));
+  }
+}
+
+async function chatViaProxy(provider, messages, maxTokens = 4096) {
+  if (provider.kind === 'anthropic') {
+    const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+    const rest = messages.filter((m) => m.role !== 'system');
+    const body = { model: provider.model, max_tokens: maxTokens, messages: rest };
+    if (system) body.system = system;
+    const j = await proxyJSON(provider, joinURL(provider.baseURL, '/v1/messages'), body);
+    if (j.error) throw new Error(j.error.message || '请求失败');
+    return (j.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('');
+  }
+  const j = await proxyJSON(provider, joinURL(provider.baseURL, '/chat/completions'), { model: provider.model, messages });
+  if (j.error) throw new Error(j.error.message || '请求失败');
+  return (j.choices && j.choices[0] && j.choices[0].message.content) || '';
+}
+
 async function readSSE(res, onEvent) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -90,6 +136,15 @@ async function readSSE(res, onEvent) {
 
 async function chat({ provider, messages, onDelta, signal, temperature = 0.4, maxTokens = 4096 }) {
   if (!provider) throw new Error('未配置模型');
+  messages = trimMessages(messages, provider.contextK);
+  await throttle(provider);
+
+  if (provider.proxy) {
+    const text = await chatViaProxy(provider, messages, maxTokens);
+    if (onDelta && text) onDelta(text);
+    return text;
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
   if (signal) signal.addEventListener('abort', () => controller.abort());
@@ -163,6 +218,13 @@ async function listModels(provider) {
   const headers = provider.modelsURL
     ? { 'content-type': 'application/json', authorization: `Bearer ${provider.apiKey || ''}` }
     : headersFor(provider);
+  if (provider.proxy) {
+    // 自定义模型列表地址走 OpenAI 风格的 Bearer 鉴权
+    const p2 = provider.modelsURL ? { ...provider, kind: 'openai' } : provider;
+    const j = await proxyJSON(p2, url, null, 'GET');
+    const list = j.data || j.models || [];
+    return list.map((m) => m.id || m.name).filter(Boolean);
+  }
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`获取模型失败 ${res.status}`);
   const json = await res.json();

@@ -778,7 +778,7 @@ function taskRow(t, archivedRow) {
     actions = `<button class="task-del" type="button" data-unarch="${esc(t.id)}">恢复</button>`;
   } else if (!busy) {
     actions = `<button class="task-arch" type="button" data-arch="${esc(t.id)}" aria-label="归档任务">${ARCH_ICON}</button>` +
-      `<button class="task-del" type="button" data-del="${esc(t.id)}">删除</button>`;
+      `<button class="task-del" type="button" data-del="${esc(t.id)}" aria-label="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 12h8l1-12"/></svg></button>`;
   }
   return `<div class="task${on ? ' on' : ''}${archivedRow ? ' archived' : ''}${t.pinned ? ' pinned' : ''}" data-id="${esc(t.id)}" role="button" tabindex="0">` +
     `<span class="task-title">${esc(displayTitle(t))}</span>${actions}</div>`;
@@ -1021,13 +1021,14 @@ function openTaskMenu(id, x, y) {
   const menu = $('#taskMenu');
   if (!t || !menu) return;
   const rows = [];
+  const gap = () => { if (rows.length && !rows[rows.length - 1].sep) rows.push({ sep: true }); };
   if (!t.archived) {
     rows.push({ id: 'pin', label: t.pinned ? '取消置顶' : '置顶' });
     rows.push({ id: 'rename', label: '重命名' });
-    rows.push({ sep: true });
+    gap();
   }
   rows.push({ id: 'archive', label: t.archived ? '恢复' : '归档' });
-  rows.push({ sep: true });
+  gap();
   rows.push({ id: 'del', label: '删除', danger: true });
   menu.innerHTML = rows.map((item) => item.sep
     ? '<div class="sep"></div>'
@@ -1147,7 +1148,13 @@ function bindTasks() {
     const del = e.target.closest('[data-del]');
     if (del) {
       e.stopPropagation();
-      removeTask(del.dataset.del);
+      const id = del.dataset.del;
+      openConfirm({
+        title: '删除报告',
+        text: '这份报告会从列表消失。',
+        ok: '删除',
+        run: () => removeTask(id)
+      });
       return;
     }
     const row = e.target.closest('.task');
@@ -1378,20 +1385,28 @@ if (tplDrop && tplPage) {
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) importTemplateFiles(e.dataTransfer.files);
   });
 }
-$('#btnTplDel').addEventListener('click', async () => {
+$('#btnTplDel').addEventListener('click', () => {
   if (!S.tplId) return;
-  await window.api.templates.remove(S.tplId);
-  S.templates = await window.api.templates.list();
-  S.tplId = S.templates[0] && S.templates[0].id;
-  if (S.tplId) selectTpl(S.tplId);
-  else {
-    $('#tplName').value = '';
-    $('#tplPlatform').value = '';
-    $('#tplBody').value = '';
-  }
-  renderTplList();
-  fillTemplateSelect();
-  toast('已删除');
+  const id = S.tplId;
+  openConfirm({
+    title: '删除模板',
+    text: '这个模板会从列表消失。',
+    ok: '删除',
+    run: async () => {
+      await window.api.templates.remove(id);
+      S.templates = await window.api.templates.list();
+      S.tplId = S.templates[0] && S.templates[0].id;
+      if (S.tplId) selectTpl(S.tplId);
+      else {
+        if ($('#tplName')) $('#tplName').value = '';
+        if ($('#tplPlatform')) $('#tplPlatform').value = '';
+        if ($('#tplBody')) $('#tplBody').value = '';
+      }
+      renderTplList();
+      fillTemplateSelect();
+      toast('已删除');
+    }
+  });
 });
 
 /* ---------------- 设置 ---------------- */

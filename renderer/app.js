@@ -2071,11 +2071,24 @@ async function bindSettingsPage(ri) {
   const ui = S.settings.ui;
   const bk = S.settings.backup;
 
+  // 开关：状态放在 aria-checked 上，样式跟着走
+  const sw = (id, on) => $('#' + id).setAttribute('aria-checked', on ? 'true' : 'false');
+  const swOn = (id) => $('#' + id).getAttribute('aria-checked') === 'true';
+  const bindSwitch = (id, apply) => {
+    const el = $('#' + id);
+    el.addEventListener('click', () => {
+      const next = !swOn(id);
+      sw(id, next);
+      apply(next);
+      persist();
+    });
+  };
+
   $('#setWidth').value = ui.shotWidth || 1600;
-  $('#setAutoShot').value = ui.autoShot ? '1' : '0';
+  sw('setAutoShot', ui.autoShot !== false);
   $('#setProtocol').value = ui.protocol || 'auto';
-  $('#setConfirmQuit').value = ui.confirmQuit ? '1' : '0';
-  $('#setWithKeys').value = bk.withKeys ? '1' : '0';
+  sw('setConfirmQuit', !!ui.confirmQuit);
+  sw('setWithKeys', !!bk.withKeys);
   $('#setBackupAuto').value = bk.auto || 'off';
   $('#setBackupKeep').value = String(bk.keep || 7);
   $('#setPort').value = ui.remotePort || 8765;
@@ -2104,23 +2117,14 @@ async function bindSettingsPage(ri) {
     $('#btnShotShow').addEventListener('click', () => window.api.shots.show());
     paintShotDir();
   }
-  $('#setAutoShot').addEventListener('change', (e) => {
-    S.settings.ui.autoShot = e.target.value === '1';
-    persist();
-  });
+  bindSwitch('setAutoShot', (on) => { S.settings.ui.autoShot = on; });
   $('#setProtocol').addEventListener('change', (e) => {
     S.settings.ui.protocol = e.target.value;
     $('#protocol').value = e.target.value;
     persist();
   });
-  $('#setConfirmQuit').addEventListener('change', (e) => {
-    S.settings.ui.confirmQuit = e.target.value === '1';
-    persist();
-  });
-  $('#setWithKeys').addEventListener('change', (e) => {
-    S.settings.backup.withKeys = e.target.value === '1';
-    persist();
-  });
+  bindSwitch('setConfirmQuit', (on) => { S.settings.ui.confirmQuit = on; });
+  bindSwitch('setWithKeys', (on) => { S.settings.backup.withKeys = on; });
   $('#setBackupAuto').addEventListener('change', (e) => {
     S.settings.backup.auto = e.target.value;
     persist();
@@ -2139,14 +2143,14 @@ async function bindSettingsPage(ri) {
   // 开机自启
   try {
     const auto = await window.api.app.loginItem();
-    $('#setLogin').value = auto ? '1' : '0';
+    sw('setLogin', !!auto);
   } catch (e) {
-    $('#setLogin').value = '0';
+    sw('setLogin', false);
   }
-  $('#setLogin').addEventListener('change', async (e) => {
-    const on = e.target.value === '1';
+  bindSwitch('setLogin', async (on) => {
     const r = await window.api.app.loginItem(on);
     S.settings.ui.launchAtLogin = !!r;
+    sw('setLogin', !!r);
     persist();
     toast(r ? '已设置开机自启' : '已关闭开机自启');
   });

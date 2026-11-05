@@ -195,7 +195,7 @@
               </div>
               <div class="krow">
                 <div class="klabel">发送后自动截图</div>
-                <select class="inp kin" id="setAutoShot"><option value="0">关闭</option><option value="1">开启</option></select>
+                <button class="switch" role="switch" aria-checked="true" aria-label="发送后自动截图" id="setAutoShot"></button>
               </div>
               <div class="krow">
                 <div class="klabel">默认协议</div>
@@ -213,11 +213,11 @@
               </div>
               <div class="krow">
                 <div class="klabel">开机自启</div>
-                <select class="inp kin" id="setLogin"><option value="0">关闭</option><option value="1">开启</option></select>
+                <button class="switch" role="switch" aria-checked="false" aria-label="开机自启" id="setLogin"></button>
               </div>
               <div class="krow">
                 <div class="klabel">退出前询问</div>
-                <select class="inp kin" id="setConfirmQuit"><option value="0">关闭</option><option value="1">开启</option></select>
+                <button class="switch" role="switch" aria-checked="true" aria-label="退出前询问" id="setConfirmQuit"></button>
               </div>
             </div>
           </div>
@@ -256,8 +256,8 @@
               </div>
               <div id="syncPanel" class="sync-panel" hidden></div>
               <div class="krow">
-                <div class="klabel">导出<small>把设置写成一份 JSON</small></div>
-                <select class="inp kin" id="setWithKeys"><option value="0">不带 Key</option><option value="1">带上 Key</option></select>
+                <div class="klabel">导出<small>把设置写成一份 JSON，带上 Key 要小心</small></div>
+                <button class="switch" role="switch" aria-checked="false" aria-label="导出时带上 Key" id="setWithKeys"></button>
                 <button class="btn" id="btnExport">导出…</button>
               </div>
               <div class="krow">

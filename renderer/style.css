@@ -30,8 +30,8 @@
   --hover: rgba(38, 49, 72, 0.06);
   --active: rgba(38, 49, 72, 0.1);
   --nav-on: #ebeef2;
-  --accent: #0f1115;
-  --accent-hover: #43454a;
+  --accent: #4176e6;          /* DSH deepseek-500 */
+  --accent-hover: #5b8bf0;    /* DSH deepseek-400 */
   --on-accent: #ffffff;
   --code-bg: #f9fafb;
   --sel: #ebeef2;
@@ -59,9 +59,9 @@ html[data-ds-dark-theme] {
     --hover: rgba(255, 255, 255, 0.08);
     --active: rgba(255, 255, 255, 0.14);
     --nav-on: #43454a;
-    --accent: #f9fafb;
-    --accent-hover: #ebeef2;
-    --on-accent: #0f1115;
+    --accent: #5686fe;
+    --accent-hover: #7aaaff;
+    --on-accent: #ffffff;
     --code-bg: #1b1b1c;
     --sel: #43454a;
     --focus: #7aaaff;

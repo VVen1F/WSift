@@ -359,11 +359,11 @@ async function saveReport() {
   const title = mdTitle(S.reportMd);
   const md = S.reportMd.replace(/\s+$/, '') + imagesSection();
   const r = await window.api.saveReport({ markdown: md, images: S.images, title });
-  S.reportDir = r.dir;
+  S.reportDir = (r && (r.zip || r.dir)) || '';
   S.settings.stats.reports = (S.settings.stats.reports || 0) + 1;
   persist();
   renderStats();
-  toast('已保存到 ' + r.dir);
+  toast('已导出 ' + (r.zip || r.dir));
   $('#btnReveal').disabled = false;
   return r;
 }
@@ -380,8 +380,8 @@ $('#btnCopy').addEventListener('click', async () => {
   toast('已复制');
 });
 $('#btnReveal').addEventListener('click', () => {
-  if (!S.reportDir) return toast('先保存一次', true);
-  window.api.showItem(S.reportDir + '/report.md');
+  if (!S.reportDir) return toast('先导出一次', true);
+  window.api.showItem(S.reportDir);
 });
 
 /* ---------------- 模板 ---------------- */
@@ -405,7 +405,24 @@ function selectTpl(id) {
   $('#tplPlatform').value = t.platform;
   $('#tplBody').value = t.body;
   renderTplList();
+  refreshTplCheck();
 }
+
+async function tplIssues(body) {
+  if (!window.api.templates.check) return null;
+  return window.api.templates.check(body);
+}
+
+function showTplIssues(r) {
+  const el = $('#tplCheck');
+  if (!el) return;
+  if (!r || r.ok) { el.textContent = ''; return; }
+  el.textContent = r.unclosed ? '占位符没有闭合' : '未知占位符：' + (r.unknown || []).join('、');
+}
+
+const refreshTplCheck = debounce(async () => {
+  showTplIssues(await tplIssues($('#tplBody').value));
+}, 180);
 
 async function saveTpl() {
   const t = {
@@ -414,15 +431,18 @@ async function saveTpl() {
     platform: $('#tplPlatform').value.trim() || '自定义',
     body: $('#tplBody').value
   };
+  const issues = await tplIssues(t.body);
+  showTplIssues(issues);
   await window.api.templates.upsert(t);
   S.templates = await window.api.templates.list();
   if (!S.tplId) S.tplId = S.templates[S.templates.length - 1].id;
   renderTplList();
   fillTemplateSelect();
-  toast('模板已保存');
+  toast(issues && !issues.ok ? '已保存，占位符需要再看一眼' : '模板已保存');
 }
 
 $('#btnTplSave').addEventListener('click', saveTpl);
+$('#tplBody').addEventListener('input', refreshTplCheck);
 $('#btnTplNew').addEventListener('click', () => {
   S.tplId = null;
   $('#tplName').value = '';
@@ -475,19 +495,14 @@ function providerListHTML() {
       const on = p.id === activeId;
       const key = providerKey(p);
       return `<div class="llm-card ${on ? 'on' : ''}" data-id="${p.id}">
-        <div class="lc-top">
-          <button class="star ${on ? 'on' : ''}" data-act="star" title="${on ? '当前激活' : '设为激活'}">${on ? '★' : '☆'}</button>
+        <button class="star ${on ? 'on' : ''}" data-act="star" title="${on ? '当前激活' : '设为激活'}">${on ? '★' : '☆'}</button>
+        <div class="pmeta">
           <b>${esc(p.name)}</b>
-          <span class="badge">${p.kind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</span>
-          <span class="spacer"></span>
-          <span class="lc-state ${p.enabled === false ? 'off' : ''}">${p.enabled === false ? '已关闭' : '正常'}</span>
+          <small>${esc(p.activeModel || '未选模型')} · ${key ? '…' + esc(key.slice(-4)) : '未填 Key'}</small>
         </div>
-        <div class="lc-model">${esc(p.activeModel || '—')}</div>
-        <div class="lc-meta">${key ? '…' + esc(key.slice(-4)) : '未填 Key'} · ${(p.models || []).length} 个模型</div>
-        <div class="lc-actions">
-          <button class="btn ${on ? '' : 'primary'}" data-act="activate">${on ? '已激活' : '设为激活'}</button>
-          <button class="btn ghost danger" data-act="del" title="删除">🗑</button>
-        </div>
+        <span class="badge">${p.kind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</span>
+        <span class="lc-state ${p.enabled === false ? 'off' : ''}">${p.enabled === false ? '已关闭' : '正常'}</span>
+        <button class="btn ghost" data-act="del">删除</button>
       </div>`;
     })
     .join('')}</div>`;
@@ -518,16 +533,13 @@ function providerDetailHTML(id) {
         <option value="anthropic"${p.kind === 'anthropic' ? ' selected' : ''}>Anthropic 兼容</option>
       </select>
     </div>
-    <div class="krow"><div class="klabel">Base URL</div><input class="inp" style="flex:1;max-width:none" id="pdBase" value="${esc(p.baseURL)}" /></div>
-    <div class="krow"><div class="klabel">模型列表地址<small>留空按协议猜</small></div><input class="inp" style="flex:1;max-width:none" id="pdModelsURL" value="${esc(p.modelsURL || '')}" /></div>
-    <div class="krow"><div class="klabel">代理<small>http/socks5，留空直连</small></div><input class="inp" style="flex:1;max-width:none" id="pdProxy" value="${esc(p.proxy || '')}" placeholder="http://127.0.0.1:8080" /></div>
-    <div class="krow"><div class="klabel">自定义会话头<small>留空则不发送</small></div><input class="inp" style="flex:1;max-width:none" id="pdSession" value="${esc(p.sessionHeader || '')}" placeholder="如 x-session-id" /></div>
-    <div class="krow">
-      <div class="klabel">限速与上下文<small>0 = 不限</small></div>
-      <input class="inp kin" id="pdSec" type="number" min="0" placeholder="每秒" value="${Number(p.limitSec) || 0}" />
-      <input class="inp kin" id="pdMin" type="number" min="0" placeholder="每分钟" value="${Number(p.limitMin) || 0}" />
-      <input class="inp kin" id="pdCtx" type="number" min="0" placeholder="上下文 K" value="${Number(p.contextK) || 0}" />
-    </div>
+    <div class="krow"><div class="klabel">Base URL</div><input class="inp kin" id="pdBase" value="${esc(p.baseURL)}" /></div>
+    <div class="krow"><div class="klabel">模型列表地址<small>留空按协议猜</small></div><input class="inp kin" id="pdModelsURL" value="${esc(p.modelsURL || '')}" /></div>
+    <div class="krow"><div class="klabel">代理<small>http 或 socks5，留空直连</small></div><input class="inp kin" id="pdProxy" value="${esc(p.proxy || '')}" placeholder="http://127.0.0.1:8080" /></div>
+    <div class="krow"><div class="klabel">自定义会话头<small>留空则不发送</small></div><input class="inp kin" id="pdSession" value="${esc(p.sessionHeader || '')}" placeholder="如 x-session-id" /></div>
+    <div class="krow"><div class="klabel">每秒<small>0 表示不限</small></div><input class="inp kin" id="pdSec" type="number" min="0" value="${Number(p.limitSec) || 0}" /></div>
+    <div class="krow"><div class="klabel">每分钟<small>0 表示不限</small></div><input class="inp kin" id="pdMin" type="number" min="0" value="${Number(p.limitMin) || 0}" /></div>
+    <div class="krow"><div class="klabel">上下文 K<small>0 表示不限</small></div><input class="inp kin" id="pdCtx" type="number" min="0" value="${Number(p.contextK) || 0}" /></div>
   </div>
 
   <div class="pd-sec">
@@ -535,10 +547,12 @@ function providerDetailHTML(id) {
     <div id="pdAccounts">
       ${accs.map((a) => `
         <div class="acc-item" data-aid="${a.id}">
-          <input class="inp aname" data-a="name" value="${esc(a.name)}" placeholder="名称" />
-          <input class="inp" data-a="apiKey" type="password" value="${esc(a.apiKey)}" placeholder="API Key" />
-          <button class="btn ghost" data-act="use">${a.id === p.activeAccountId ? '首选' : '设为首选'}</button>
-          <button class="btn ghost" data-act="del">删除</button>
+          <label class="f">名称<input class="inp aname" data-a="name" value="${esc(a.name)}" placeholder="名称" /></label>
+          <label class="f">API Key<input class="inp" data-a="apiKey" type="password" value="${esc(a.apiKey)}" placeholder="API Key" /></label>
+          <div class="row actions">
+            <button class="btn ghost" data-act="use">${a.id === p.activeAccountId ? '首选' : '设为首选'}</button>
+            <button class="btn ghost" data-act="del">删除</button>
+          </div>
         </div>`).join('')}
     </div>
     <button class="btn ghost" id="pdAddAcc">+ 添加账号</button>
@@ -549,20 +563,20 @@ function providerDetailHTML(id) {
     <div class="chips" id="pdChips">
       ${all.map((m) => `<span class="mchip ${mine.includes(m) ? 'on' : ''} ${m === p.activeModel ? 'cur' : ''}" data-m="${esc(m)}">${esc(m)}</span>`).join('')}
     </div>
-    <div class="row actions" style="margin-top:10px">
-      <input class="inp" id="pdModelInput" placeholder="添加模型 ID" style="max-width:190px" />
-      <button class="btn" id="pdAddModel">添加模型</button>
-      <button class="btn" id="pdFetch">重新获取模型</button>
-      <button class="btn" id="pdTest">测试模型</button>
-      <span class="spacer"></span>
+    <label class="f">添加模型 ID
+      <input class="inp" id="pdModelInput" placeholder="模型 ID" />
+    </label>
+    <div class="row actions">
+      <button class="btn" id="pdAddModel">添加</button>
+      <button class="btn" id="pdFetch">重新获取</button>
+      <button class="btn" id="pdTest">测试</button>
       <span class="muted" id="pdModelCount">${mine.length} 个已选</span>
     </div>
-    <div class="row actions" style="margin-top:10px">
-      <select class="inp kin" id="pdActiveModel" style="max-width:220px">
+    <label class="f">当前使用
+      <select class="inp" id="pdActiveModel">
         ${mine.map((m) => `<option${m === p.activeModel ? ' selected' : ''}>${esc(m)}</option>`).join('')}
       </select>
-      <span class="muted">当前使用</span>
-    </div>
+    </label>
   </div>
 
   <div class="row actions" style="margin-top:18px">
@@ -942,15 +956,15 @@ function renderSync() {
         </select>
       </div>
       ${sy.kind === 'webdav' ? `
-      <div class="krow"><div class="klabel">地址</div><input class="inp" style="flex:1;max-width:none" id="wdUrl" value="${esc(w.url)}" placeholder="https://dav.example.com/dav/files/me" /></div>
+      <div class="krow"><div class="klabel">地址</div><input class="inp kin" id="wdUrl" value="${esc(w.url)}" placeholder="https://dav.example.com/dav/files/me" /></div>
       <div class="krow"><div class="klabel">用户名</div><input class="inp kin" id="wdUser" value="${esc(w.user)}" /></div>
       <div class="krow"><div class="klabel">密码</div><input class="inp kin" type="password" id="wdPass" value="${esc(w.pass)}" /></div>
       <div class="krow"><div class="klabel">远端文件名</div><input class="inp kin" id="wdPath" value="${esc(w.path)}" /></div>` : ''}
       ${sy.kind === 'github' ? `
       <div class="krow"><div class="klabel">仓库<small>owner/repo</small></div><input class="inp kin" id="ghRepo" value="${esc(g.repo)}" placeholder="me/dotfiles" /></div>
       <div class="krow"><div class="klabel">分支</div><input class="inp kin" id="ghBranch" value="${esc(g.branch)}" /></div>
-      <div class="krow"><div class="klabel">路径</div><input class="inp" style="flex:1;max-width:none" id="ghPath" value="${esc(g.path)}" /></div>
-      <div class="krow"><div class="klabel">Token<small>只存本机</small></div><input class="inp" style="flex:1;max-width:none" type="password" id="ghToken" value="${esc(g.token)}" /></div>` : ''}
+      <div class="krow"><div class="klabel">路径</div><input class="inp kin" id="ghPath" value="${esc(g.path)}" /></div>
+      <div class="krow"><div class="klabel">Token<small>只存本机</small></div><input class="inp kin" type="password" id="ghToken" value="${esc(g.token)}" /></div>` : ''}
     </div>
     ${sy.kind === 'off' ? '' : `
     <div class="row actions" style="margin-top:12px">
@@ -1192,32 +1206,96 @@ const PERM_TEXT = {
 async function refreshPerm() {
   const el = $('#permText');
   if (!el || !window.api.perm) return;
-  const r = await window.api.perm.screen();
+  applyPermStatus(await window.api.perm.screen());
+}
+
+function openPermModal(info) {
+  const modal = $('#permModal');
+  if (!modal) return;
+  const black = info && info.black;
+  $('#permTitle').textContent = black ? '截图是黑的' : '需要屏幕录制权限';
+  $('#permBody').textContent = (info && info.message) || (black
+    ? '画面是黑的。退出 Refract 再打开，授权才会生效。'
+    : '整屏截图和弹窗取证要读取屏幕。到系统设置勾上 Refract，回到窗口后会自动再拍一次。');
+  $('#permGo').hidden = !!black;
+  $('#permModalStatus').textContent = black ? '' : '尚未授权';
+  modal.hidden = false;
+}
+
+function closePermModal() {
+  const modal = $('#permModal');
+  if (modal) modal.hidden = true;
+}
+
+function applyPermStatus(r) {
+  const el = $('#permText');
+  if (!el || !r) return;
   el.classList.remove('ok', 'bad');
-  if (r.platform !== 'darwin') {
+  if (r.platform && r.platform !== 'darwin') {
     el.textContent = '当前平台不需要单独授权';
-    $('#btnPermAsk').disabled = true;
+    const ask = $('#btnPermAsk');
+    if (ask) ask.disabled = true;
     return;
   }
-  el.textContent = PERM_TEXT[r.status] || r.status;
+  el.textContent = PERM_TEXT[r.status] || r.status || '';
   el.classList.add(r.status === 'granted' ? 'ok' : 'bad');
+  const note = $('#permModalStatus');
+  const modal = $('#permModal');
+  if (note && modal && !modal.hidden && r.status) {
+    note.textContent = r.status === 'granted' ? '已授权，正在重新截图' : (PERM_TEXT[r.status] || r.status);
+  }
 }
 
 function bindPerm() {
   if (!window.api.perm) return;
   $('#btnPermAsk').addEventListener('click', async () => {
-    const r = await window.api.perm.request();
+    const r = await window.api.perm.screen();
     if (r.status === 'granted') {
       await refreshPerm();
       return toast('已经有权限了');
     }
-    await window.api.perm.open();
-    toast('已打开系统设置，勾上 Refract 后回来点重新检测');
+    openPermModal(r);
   });
   $('#btnPermCheck').addEventListener('click', async () => {
     await refreshPerm();
     toast('权限：' + $('#permText').textContent);
   });
+  const go = $('#permGo');
+  if (go) {
+    go.addEventListener('click', async () => {
+      await window.api.perm.open();
+      await window.api.perm.request();
+      $('#permModalStatus').textContent = '到系统设置勾上 Refract，回到这里会自动再拍';
+    });
+  }
+  const later = $('#permLater');
+  if (later) later.addEventListener('click', closePermModal);
+  const x = $('#permClose');
+  if (x) x.addEventListener('click', closePermModal);
+  if (window.api.perm.onNeed) window.api.perm.onNeed((p) => openPermModal(p));
+  if (window.api.perm.onStatus) window.api.perm.onStatus((p) => applyPermStatus(p));
+  if (window.api.perm.onRetry) {
+    window.api.perm.onRetry((r) => {
+      if (r && r.ok && r.path) {
+        showBrowserShot(r.path, '整屏截图');
+        $('#bwLog').textContent = '已保存 ' + r.path;
+        rememberShot(r.path);
+        closePermModal();
+        toast('已重新截图');
+        return;
+      }
+      if (r && r.code === 'BLACK_FRAME') {
+        $('#bwLog').textContent = r.error || '';
+        openPermModal({ black: true, message: r.error });
+        return;
+      }
+      if (r && r.ok) closePermModal();
+      else if (r && r.error) {
+        const note = $('#permModalStatus');
+        if (note) note.textContent = r.error;
+      }
+    });
+  }
 }
 
 /* ---------------- 设置菜单 ---------------- */
@@ -1243,7 +1321,7 @@ function bindSettingsMenu() {
       close();
       const sec = document.getElementById('sect-' + key);
       if (!sec) return;
-      sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      sec.scrollIntoView({ block: 'start', behavior: motionOff() ? 'auto' : 'smooth' });
       sec.classList.add('flash');
       setTimeout(() => sec.classList.remove('flash'), 900);
     });
@@ -1276,13 +1354,19 @@ function renderGateway(ri) {
 function greeting() {
   const h = new Date().getHours();
   if (h < 5) return '夜深了';
-  if (h < 12) return '上午好呀';
-  if (h < 18) return '下午好呀';
-  return '晚上好呀';
+  if (h < 12) return '早上好';
+  if (h < 18) return '下午好';
+  return '晚上好';
+}
+
+function motionOff() {
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 function setChatting(on) {
   const home = $('#home');
+  const ta = $('#chatInput');
+  if (ta) ta.placeholder = on ? '提出修改' : '描述要做的事';
   if (!home || home.classList.contains('chatting') === on) return;
   const wrap = $('#composerWrap');
   const before = wrap.getBoundingClientRect();
@@ -1290,16 +1374,16 @@ function setChatting(on) {
   const after = wrap.getBoundingClientRect();
   const dy = before.top - after.top;
   const dx = before.left - after.left;
-  if (Math.abs(dy) > 1 || Math.abs(dx) > 1) {
+  if (!motionOff() && (Math.abs(dy) > 1 || Math.abs(dx) > 1)) {
     wrap.style.transition = 'none';
     wrap.style.transform = `translate(${dx}px, ${dy}px)`;
     void wrap.offsetHeight;
-    wrap.style.transition = 'transform .5s cubic-bezier(.2, .8, .2, 1)';
+    wrap.style.transition = 'transform .22s cubic-bezier(.2, .8, .2, 1)';
     wrap.style.transform = 'translate(0, 0)';
     setTimeout(() => {
       wrap.style.transition = '';
       wrap.style.transform = '';
-    }, 540);
+    }, 240);
   }
 }
 
@@ -1440,16 +1524,29 @@ async function bwPageShot() {
   }
 }
 
+function rememberShot(p) {
+  if (p && S.images.indexOf(p) < 0) S.images.push(p);
+}
+
 async function bwScreenShot() {
   $('#bwLog').textContent = '整屏截图中…';
   const r = await window.api.browser.screen();
   if (r.ok) {
     showBrowserShot(r.path, '整屏截图');
     $('#bwLog').textContent = '已保存 ' + r.path;
-    S.images.push(r.path);
-  } else {
-    $('#bwLog').textContent = '截图失败：' + r.error;
+    rememberShot(r.path);
+    return;
   }
+  if (r.code === 'NO_PERM' || r.waiting) {
+    $('#bwLog').textContent = '等待屏幕录制权限';
+    return;
+  }
+  if (r.code === 'BLACK_FRAME') {
+    $('#bwLog').textContent = r.error;
+    openPermModal({ black: true, message: r.error });
+    return;
+  }
+  $('#bwLog').textContent = '截图失败：' + (r.error || '');
 }
 
 function bindBrowser() {
@@ -1485,9 +1582,12 @@ function bindBrowser() {
       const how = d.method === 'ai' ? 'AI 挑图' : d.frames > 1 ? `按画面挑（${d.frames} 张）` : '';
       $('#bwLog').textContent = `捕获弹窗（${d.type || 'alert'}）：${d.message}` + (how ? ' · ' + how : '');
       if (d.shot) showBrowserShot(d.shot, '弹窗截图');
+      if (d.shot) rememberShot(d.shot);
       if (d.error) {
         $('#bwLog').textContent += ' · ' + d.error;
-        if (/权限|空白/.test(d.error)) toast('屏幕录制权限没开：设置 → 常规 → 去授权', true);
+        if (d.code === 'BLACK_FRAME' || /黑/.test(d.error)) openPermModal({ black: true, message: d.error });
+      } else if (d.shot) {
+        closePermModal();
       }
     });
   }
@@ -1648,11 +1748,11 @@ function bindHome() {
         images: S.images,
         title: mdTitle(m.text)
       });
-      S.reportDir = r.dir;
+      S.reportDir = (r && (r.zip || r.dir)) || '';
       S.settings.stats.reports = (S.settings.stats.reports || 0) + 1;
       persist();
       renderStats();
-      toast('已保存到 ' + r.dir);
+      toast('已导出 ' + (r.zip || r.dir));
     }
   });
 }

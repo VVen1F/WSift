@@ -18,6 +18,18 @@ function cmp(a, b) {
   return 0;
 }
 
+function pickAsset(assets, platform, arch) {
+  const list = assets || [];
+  const plat = platform || process.platform;
+  const cpu = arch || process.arch;
+  if (plat === 'darwin') {
+    const dmgs = list.filter((a) => /\.dmg$/i.test(a.name));
+    return dmgs.find((a) => (cpu === 'arm64' ? /arm64/i.test(a.name) : !/arm64/i.test(a.name))) || dmgs[0] || null;
+  }
+  if (plat === 'win32') return list.find((a) => /\.exe$/i.test(a.name)) || null;
+  return list.find((a) => /AppImage$/i.test(a.name)) || list.find((a) => /\.(zip|exe)$/i.test(a.name)) || null;
+}
+
 async function check(current) {
   const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, {
     headers: { accept: 'application/vnd.github+json', 'user-agent': 'refract' }
@@ -26,9 +38,7 @@ async function check(current) {
   const rel = await res.json();
   const latest = String(rel.tag_name || '').replace(/^v/, '');
   const assets = rel.assets || [];
-  const dmgs = assets.filter((a) => /\.dmg$/i.test(a.name));
-  const pickDmg = dmgs.find((a) => (process.arch === 'arm64' ? /arm64/i.test(a.name) : !/arm64/i.test(a.name))) || dmgs[0];
-  const asset = pickDmg || assets.find((a) => /\.(zip|exe|AppImage)$/i.test(a.name));
+  const asset = pickAsset(assets);
   return {
     hasUpdate: cmp(latest, current) > 0,
     latest,
@@ -98,4 +108,4 @@ function app_is_writable() {
   }
 }
 
-module.exports = { check, download, install, cmp, OWNER, REPO };
+module.exports = { check, download, install, cmp, pickAsset, OWNER, REPO };

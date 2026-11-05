@@ -33,7 +33,8 @@ const BRIDGE = `(function(){
       list: () => j('/api/templates'),
       upsert: (t) => j('/api/templates', {method:'POST', body: JSON.stringify(t)}),
       remove: (id) => j('/api/templates/' + encodeURIComponent(id), {method:'DELETE'}),
-      reset: () => j('/api/templates/reset', {method:'POST', body:'{}'})
+      reset: () => j('/api/templates/reset', {method:'POST', body:'{}'}),
+      check: (body) => j('/api/templates/check', {method:'POST', body: JSON.stringify({ body })})
     },
     models: (p) => j('/api/models', {method:'POST', body: JSON.stringify(p)}),
     chatMessages: (p) => j('/api/report/chat', {method:'POST', body: JSON.stringify(p)}),
@@ -153,6 +154,10 @@ function start(opts) {
         return send(res, 200, JSON.stringify(store.save(b)));
       }
 
+      if (req.method === 'POST' && p === '/api/templates/check') {
+        const b = await readBody(req);
+        return send(res, 200, JSON.stringify(templates.checkVars(b.body)));
+      }
       if (req.method === 'GET' && p === '/api/templates') return send(res, 200, JSON.stringify(templates.list()));
       if (req.method === 'POST' && p === '/api/templates') {
         return send(res, 200, JSON.stringify(templates.upsert(await readBody(req))));

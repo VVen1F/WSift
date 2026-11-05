@@ -1,7 +1,7 @@
 {
   "name": "refract",
   "productName": "Refract",
-  "version": "0.5.2",
+  "version": "0.6.1",
   "description": "SRC 复测与报告工作台：发包、截图、LLM、模板、统一风格报告",
   "main": "electron/main.js",
   "author": "WenYifan",
@@ -12,6 +12,7 @@
     "dev": "electron . --dev",
     "test": "node test/run.js",
     "dist:mac": "electron-builder --mac dmg",
+    "dist:win": "electron-builder --win nsis",
     "dist:linux": "electron-builder --linux AppImage"
   },
   "devDependencies": {
@@ -55,6 +56,24 @@
       ],
       "icon": "build/icon.png",
       "category": "Development"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Refract"
     }
   }
 }

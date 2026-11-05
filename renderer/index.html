@@ -58,15 +58,13 @@
     <section class="page on" id="page-home">
       <div class="home" id="home">
         <div class="hero" id="hero">
-          <h1 id="heroTitle">上午好呀</h1>
-          <p class="sub">有什么想让我帮忙的吗</p>
+          <h1 id="heroTitle">早上好</h1>
+          <p class="sub">拖入请求，或直接描述要做的事</p>
         </div>
 
         <div class="chat" id="chatLog">
           <div class="chat-empty" id="chatEmpty">
-            <div class="hint">
-              把请求拖进下面的输入框，或者直接说你要什么
-            </div>
+            <div class="hint">把请求拖进输入框，或直接说要做什么</div>
           </div>
         </div>
 
@@ -75,7 +73,7 @@
 
           <div class="composer" id="composer">
             <div class="c-top">
-              <textarea id="chatInput" rows="1" placeholder="提出后续修改要求"></textarea>
+              <textarea id="chatInput" rows="1" placeholder="描述要做的事"></textarea>
             </div>
             <div class="c-bottom">
               <button class="c-btn" id="btnAttach" title="添加文件">
@@ -121,14 +119,14 @@
         <button class="btn ghost" id="btnToReport">作为报告材料 →</button>
       </div>
 
-      <div class="card" style="flex:1">
+      <div class="sheet">
         <div class="split">
-          <div class="col" style="display:flex;flex-direction:column;min-width:0">
+          <div class="col">
             <div class="pane-h">Request</div>
             <textarea class="editor" id="req" spellcheck="false"></textarea>
           </div>
-          <div class="col" style="display:flex;flex-direction:column;min-width:0">
-            <div class="pane-h">Response <span id="resMeta" style="margin-left:auto"></span></div>
+          <div class="col">
+            <div class="pane-h">Response <span id="resMeta" class="pane-meta"></span></div>
             <pre class="code" id="res"></pre>
           </div>
         </div>
@@ -150,8 +148,8 @@
         <span class="spacer"></span>
         <button class="btn ghost" id="bwClose">关闭浏览器</button>
       </div>
-      <div class="card" style="flex:1">
-        <div class="pane-h">预览 <span id="bwInfo" style="margin-left:auto"></span></div>
+      <div class="sheet">
+        <div class="pane-h">预览 <span id="bwInfo" class="pane-meta"></span></div>
         <div class="bw-body" id="bwBody">
           <div class="empty" id="bwEmpty">打开一个地址，截图会出现在这里</div>
           <img id="bwImg" alt="" hidden />
@@ -163,28 +161,28 @@
     <!-- 报告 -->
     <section class="page" id="page-report">
       <div class="report-grid">
-        <div class="card left">
-          <div class="card-h">报告材料</div>
+        <div class="sheet left">
+          <div class="pane-h">报告材料</div>
           <div class="form">
             <label class="f">模板<select class="inp" id="rTemplate"></select></label>
             <label class="f">账号密码
-              <textarea class="inp" id="rCred" style="min-height:62px" placeholder="测试账号、口令，没有就留空"></textarea>
+              <textarea class="inp" id="rCred" placeholder="测试账号、口令，没有就留空"></textarea>
             </label>
-            <label class="f" style="flex:1;min-height:220px">漏洞详情
-              <textarea class="inp" id="rDetail" style="flex:1;min-height:200px" placeholder="粘请求和响应，写清现象、复现条件，越具体越好"></textarea>
+            <label class="f grow">漏洞详情
+              <textarea class="inp" id="rDetail" placeholder="粘请求和响应，写清现象和复现条件"></textarea>
             </label>
             <label class="f">其他要求
-              <textarea class="inp" id="rExtra" style="min-height:62px" placeholder="可选，例如：强调未授权访问"></textarea>
+              <textarea class="inp" id="rExtra" placeholder="可选。例如：强调未授权访问"></textarea>
             </label>
-            <div class="row">
+            <div class="row actions">
               <button class="btn primary" id="btnGen">生成报告</button>
-              <button class="btn" id="btnSave">保存</button>
+              <button class="btn" id="btnSave">导出</button>
             </div>
           </div>
         </div>
 
-        <div class="card right">
-          <div class="card-h">预览
+        <div class="sheet right">
+          <div class="pane-h">预览
             <span class="spacer"></span>
             <button class="btn ghost" id="btnCopy">复制</button>
             <button class="btn ghost" id="btnReveal">打开文件夹</button>
@@ -198,28 +196,27 @@
     <!-- 模板 -->
     <section class="page" id="page-templates">
       <div class="report-grid">
-        <div class="card left" style="width:260px;flex:0 0 260px">
-          <div class="card-h">模板
+        <div class="sheet side">
+          <div class="pane-h">模板
             <span class="spacer"></span>
             <button class="btn ghost" id="btnTplNew">新建</button>
           </div>
           <div class="list" id="tplList"></div>
         </div>
-        <div class="card right">
-          <div class="card-h">编辑
+        <div class="sheet right">
+          <div class="pane-h">编辑
             <span class="spacer"></span>
             <button class="btn ghost" id="btnTplReset">恢复内置</button>
             <button class="btn primary" id="btnTplSave">保存</button>
             <button class="btn ghost" id="btnTplDel">删除</button>
           </div>
-          <div class="form" style="flex:1;min-height:0">
-            <div class="row">
-              <label class="f">名称<input class="inp" id="tplName" /></label>
-              <label class="f">平台<input class="inp" id="tplPlatform" /></label>
-            </div>
-            <label class="f" style="flex:1;min-height:0">正文（Markdown，支持 {{title}} 这类占位符）
-              <textarea class="inp" id="tplBody" style="flex:1;min-height:280px"></textarea>
+          <div class="form">
+            <label class="f">名称<input class="inp" id="tplName" /></label>
+            <label class="f">平台<input class="inp" id="tplPlatform" /></label>
+            <label class="f grow">正文
+              <textarea class="inp" id="tplBody" placeholder="Markdown。可用 {{title}} {{url}} 这类占位符"></textarea>
             </label>
+            <div class="form-note" id="tplCheck"></div>
           </div>
         </div>
       </div>
@@ -227,9 +224,8 @@
 
     <!-- 设置 -->
     <section class="page" id="page-settings">
-      <div class="card" style="flex:1">
-        <div class="card-h">设置</div>
-        <div class="settings" id="settingsScroll">
+      <div class="narrow" id="settingsScroll">
+        <div class="settings">
 
           <div class="sect" id="sect-general">
             <h3>常规</h3>
@@ -285,7 +281,7 @@
           <div class="sect" id="sect-llm">
             <div class="llm-head">
               <h3>LLM</h3>
-              <span class="muted">点卡片编辑，星标是当前激活的配置</span>
+              <span class="muted">星标为当前配置</span>
               <span class="spacer"></span>
               <button class="btn primary" id="btnProvNew">+ 新建</button>
             </div>
@@ -303,7 +299,7 @@
               <div id="syncPanel" class="sync-panel" hidden></div>
               <div class="krow">
                 <div class="klabel">导出<small>把设置写成一份 JSON</small></div>
-                <select class="inp kin" id="setWithKeys" style="max-width:120px"><option value="0">不带 Key</option><option value="1">带上 Key</option></select>
+                <select class="inp kin" id="setWithKeys"><option value="0">不带 Key</option><option value="1">带上 Key</option></select>
                 <button class="btn" id="btnExport">导出…</button>
               </div>
               <div class="krow">
@@ -380,38 +376,51 @@
   <div class="modal-card">
     <div class="modal-head">
       <b>新建模型配置</b>
-      <button class="modal-x" id="pmClose">×</button>
+      <button class="modal-x" id="pmClose" aria-label="关闭">×</button>
     </div>
-    <p class="modal-sub">新建后不会自动激活，请在卡片上「设为激活」。</p>
-    <div class="klist">
-      <div class="krow"><div class="klabel">名称</div><input class="inp" style="flex:1;max-width:none" id="pmName" placeholder="例如：OpenAI 生产" /></div>
-      <div class="krow"><div class="klabel">格式</div>
-        <select class="inp kin" id="pmKind">
+    <p class="modal-sub">新建后不会自动激活。</p>
+    <div class="form">
+      <label class="f">名称<input class="inp" id="pmName" placeholder="例如 OpenAI 生产" /></label>
+      <label class="f">格式
+        <select class="inp" id="pmKind">
           <option value="openai">OpenAI 兼容</option>
           <option value="anthropic">Anthropic</option>
         </select>
-      </div>
-      <div class="krow"><div class="klabel">模型</div>
-        <input class="inp" style="flex:1;max-width:none" id="pmModel" placeholder="claude-opus-4-8" />
-        <button class="btn" id="pmModelFetch" title="拉取模型">⟳</button>
-      </div>
-      <div class="krow"><div class="klabel">Base URL</div><input class="inp" style="flex:1;max-width:none" id="pmBase" placeholder="https://api.openai.com/v1" /></div>
-      <div class="krow"><div class="klabel">API Key</div><input class="inp" style="flex:1;max-width:none" id="pmKey" type="password" placeholder="sk-…" /></div>
-      <div class="krow"><div class="klabel">代理<small>http/socks5，留空直连</small></div><input class="inp" style="flex:1;max-width:none" id="pmProxy" placeholder="http://127.0.0.1:8080" /></div>
-      <div class="krow"><div class="klabel">自定义会话头<small>留空则不发送</small></div><input class="inp" style="flex:1;max-width:none" id="pmSession" placeholder="如 x-session-id" /></div>
-      <div class="krow">
-        <div class="klabel">限速与上下文<small>0 = 不限</small></div>
-        <input class="inp kin" id="pmSec" type="number" min="0" placeholder="每秒" />
-        <input class="inp kin" id="pmMin" type="number" min="0" placeholder="每分钟" />
-        <input class="inp kin" id="pmCtx" type="number" min="0" placeholder="上下文 K" />
-      </div>
+      </label>
+      <label class="f">模型
+        <input class="inp" id="pmModel" placeholder="claude-opus-4-8" />
+      </label>
+      <div class="row actions"><button class="btn ghost" id="pmModelFetch">拉取模型</button></div>
+      <label class="f">Base URL<input class="inp" id="pmBase" placeholder="https://api.openai.com/v1" /></label>
+      <label class="f">API Key<input class="inp" id="pmKey" type="password" placeholder="sk-…" /></label>
+      <label class="f">代理<small>http 或 socks5，留空直连</small><input class="inp" id="pmProxy" placeholder="http://127.0.0.1:8080" /></label>
+      <label class="f">自定义会话头<small>留空则不发送</small><input class="inp" id="pmSession" placeholder="如 x-session-id" /></label>
+      <label class="f">每秒<input class="inp" id="pmSec" type="number" min="0" placeholder="0" /></label>
+      <label class="f">每分钟<input class="inp" id="pmMin" type="number" min="0" placeholder="0" /></label>
+      <label class="f">上下文 K<input class="inp" id="pmCtx" type="number" min="0" placeholder="0" /></label>
     </div>
-    <div class="row actions" style="margin-top:16px">
+    <div class="row actions">
       <button class="btn" id="pmTest">测试连接</button>
       <span class="spacer"></span>
-      <button class="btn primary" id="pmCreate">+ 新建</button>
+      <button class="btn primary" id="pmCreate">新建</button>
     </div>
-    <div class="muted" id="pmStatus" style="margin-top:8px"></div>
+    <div class="form-note" id="pmStatus"></div>
+  </div>
+</div>
+
+<div class="modal" id="permModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <b id="permTitle">需要屏幕录制权限</b>
+      <button class="modal-x" id="permClose" aria-label="关闭">×</button>
+    </div>
+    <p class="modal-sub" id="permBody">整屏截图和弹窗取证要读取屏幕。到系统设置勾上 Refract，回到窗口后会自动再拍一次。</p>
+    <div class="row actions">
+      <button class="btn" id="permLater">稍后</button>
+      <span class="spacer"></span>
+      <button class="btn primary" id="permGo">打开系统设置</button>
+    </div>
+    <div class="form-note" id="permModalStatus"></div>
   </div>
 </div>
 

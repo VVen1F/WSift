@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  mac:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -30,15 +30,49 @@ jobs:
       - name: Build dmg
         run: npx electron-builder --mac dmg --arm64 --x64 --publish never
 
-      - name: Upload artifacts
+      - name: Upload dmg
         uses: actions/upload-artifact@v4
         with:
-          name: dmg
+          name: mac-dmg
           path: dist/*.dmg
 
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Test
+        run: npm test
+
+      - name: Build nsis
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-exe
+          path: dist/*.exe
+
+  release:
+    needs: [mac, windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.dmg
+          files: artifacts/*
           generate_release_notes: true

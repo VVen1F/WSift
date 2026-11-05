@@ -69,36 +69,115 @@ function screenAccess() {
   }
 }
 
+function fail(message, code, extra) {
+  const err = new Error(message);
+  err.code = code;
+  if (extra) Object.assign(err, extra);
+  return err;
+}
+
+/** 缩略图用物理像素。Windows 高 DPI 下 DIP 尺寸会糊，过大则钳到 4096。 */
+function thumbnailSizeFor(display) {
+  const size = (display && display.size) || { width: 1920, height: 1080 };
+  const scale = Number(display && display.scaleFactor) || 1;
+  let w = Math.max(1, Math.round(Number(size.width) * scale));
+  let h = Math.max(1, Math.round(Number(size.height) * scale));
+  const maxEdge = 4096;
+  const edge = Math.max(w, h);
+  if (edge > maxEdge) {
+    const k = maxEdge / edge;
+    w = Math.max(1, Math.round(w * k));
+    h = Math.max(1, Math.round(h * k));
+  }
+  return { width: w, height: h };
+}
+
+/** nativeImage 或带同样方法的对象。几乎全黑返回 true。 */
+function looksBlack(image) {
+  if (!image || (image.isEmpty && image.isEmpty())) return true;
+  const small = image.resize ? image.resize({ width: 24, height: 24 }) : image;
+  const size = small.getSize ? small.getSize() : { width: 0, height: 0 };
+  if (!size.width || !size.height) return true;
+  const bmp = small.toBitmap ? small.toBitmap() : null;
+  if (!bmp || bmp.length < 4) return true;
+  let dark = 0;
+  const n = Math.floor(bmp.length / 4);
+  for (let i = 0; i < bmp.length; i += 4) {
+    if (bmp[i] < 8 && bmp[i + 1] < 8 && bmp[i + 2] < 8) dark++;
+  }
+  return dark / n > 0.97;
+}
+
+function assertNotBlack(image, status) {
+  if (!looksBlack(image)) return;
+  if (status && status !== 'granted') {
+    throw fail('需要屏幕录制权限', 'NO_PERM', { status });
+  }
+  throw fail('画面是黑的。退出 Refract 再打开，授权才会生效。', 'BLACK_FRAME', { status: status || 'granted' });
+}
+
 async function captureScreen(out) {
   const { execFile } = require('child_process');
   const target = out || path.join(app.getPath('temp'), `refract-screen-${Date.now()}.png`);
+  const status = screenAccess();
+  if (process.platform === 'darwin' && status !== 'granted') {
+    throw fail('需要屏幕录制权限', 'NO_PERM', { status });
+  }
   if (process.platform === 'darwin') {
     try {
-      // 用异步的，别把主进程卡住
       await new Promise((resolve, reject) => {
-        execFile('screencapture', ['-x', '-o', target], { timeout: 5000 }, (err) =>
+        execFile('screencapture', ['-x', '-o', target], { timeout: 8000 }, (err) =>
           err ? reject(err) : resolve()
         );
       });
     } catch (e) {
-      throw Object.assign(new Error('screencapture 失败：' + e.message), { code: 'NO_PERM' });
+      const now = screenAccess();
+      if (now !== 'granted') throw fail('需要屏幕录制权限', 'NO_PERM', { status: now });
+      throw fail('画面是黑的。退出 Refract 再打开，授权才会生效。', 'BLACK_FRAME', { status: now });
     }
     let size = 0;
     try { size = fs.statSync(target).size; } catch (e) { size = 0; }
     if (size < 20 * 1024) {
-      // 没权限时拍出来基本是全黑/全白，压缩后很小
-      throw Object.assign(new Error('屏幕录制权限没开，截出来是空白'), { code: 'NO_PERM' });
+      const now = screenAccess();
+      if (now !== 'granted') throw fail('需要屏幕录制权限', 'NO_PERM', { status: now });
+      throw fail('画面是黑的。退出 Refract 再打开，授权才会生效。', 'BLACK_FRAME', { status: now });
+    }
+    try {
+      const { nativeImage } = require('electron');
+      assertNotBlack(nativeImage.createFromPath(target), screenAccess());
+    } catch (e) {
+      if (e.code === 'NO_PERM' || e.code === 'BLACK_FRAME') throw e;
     }
     return { path: target, size };
   }
-  const { desktopCapturer, screen } = require('electron');
-  const sources = await desktopCapturer.getSources({
-    types: ['screen'],
-    thumbnailSize: screen.getPrimaryDisplay().size
-  });
-  if (!sources.length) throw new Error('没有可截的屏幕');
-  fs.writeFileSync(target, sources[0].thumbnail.toPNG());
-  return { path: target };
+
+  const { desktopCapturer, screen, nativeImage } = require('electron');
+  const display = screen.getPrimaryDisplay();
+  const physical = thumbnailSizeFor(display);
+  const dip = {
+    width: Math.max(1, Math.round(display.size.width)),
+    height: Math.max(1, Math.round(display.size.height))
+  };
+  let sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: physical });
+  let source = pickSource(sources, display);
+  let image = source && source.thumbnail;
+  if (!image || image.isEmpty()) {
+    sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: dip });
+    source = pickSource(sources, display);
+    image = source && source.thumbnail;
+  }
+  if (!image || image.isEmpty()) throw new Error('没有可截的屏幕');
+  if (nativeImage && looksBlack(image)) {
+    throw fail('画面是黑的。退出 Refract 再打开，授权才会生效。', 'BLACK_FRAME');
+  }
+  fs.writeFileSync(target, image.toPNG());
+  return { path: target, size: fs.statSync(target).size, scale: display.scaleFactor || 1 };
 }
 
-module.exports = { capture, captureScreen, screenAccess };
+function pickSource(sources, display) {
+  if (!sources || !sources.length) return null;
+  const id = display && display.id != null ? String(display.id) : '';
+  return sources.find((s) => id && String(s.display_id) === id) || sources[0];
+}
+
+module.exports = { capture, captureScreen, screenAccess, thumbnailSizeFor, looksBlack };

@@ -21,7 +21,8 @@ contextBridge.exposeInMainWorld('api', {
     list: () => ipcRenderer.invoke('templates:list'),
     upsert: (t) => ipcRenderer.invoke('templates:upsert', t),
     remove: (id) => ipcRenderer.invoke('templates:remove', id),
-    reset: () => ipcRenderer.invoke('templates:reset')
+    reset: () => ipcRenderer.invoke('templates:reset'),
+    check: (body) => ipcRenderer.invoke('templates:check', body)
   },
 
   models: (provider) => ipcRenderer.invoke('llm:models', provider),
@@ -88,7 +89,22 @@ contextBridge.exposeInMainWorld('api', {
   perm: {
     screen: () => ipcRenderer.invoke('perm:screen'),
     request: () => ipcRenderer.invoke('perm:request'),
-    open: () => ipcRenderer.invoke('perm:open')
+    open: () => ipcRenderer.invoke('perm:open'),
+    onNeed(cb) {
+      const h = (_e, p) => cb(p);
+      ipcRenderer.on('perm:need', h);
+      return () => ipcRenderer.off('perm:need', h);
+    },
+    onStatus(cb) {
+      const h = (_e, p) => cb(p);
+      ipcRenderer.on('perm:status', h);
+      return () => ipcRenderer.off('perm:status', h);
+    },
+    onRetry(cb) {
+      const h = (_e, p) => cb(p);
+      ipcRenderer.on('perm:retry', h);
+      return () => ipcRenderer.off('perm:retry', h);
+    }
   },
 
   browser: {

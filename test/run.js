@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.10', pkg.version === '0.6.10');
+  ok('版本 0.6.11', pkg.version === '0.6.11');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
   ok('流式正文', llmMod.takeStreamEvent({ type: 'content_block_delta', delta: { text: '甲' } }).text === '甲');
@@ -293,6 +293,7 @@ function ok(name, cond, extra) {
     .map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'))
     .join('\n');
   ok('侧栏有报告列表', ui.includes('id="taskList"') && ui.includes('>清空<') && ui.includes('确认清空'));
+  ok('侧栏是新建任务', ui.includes('新建任务') && !ui.includes('data-page="browser"') && !ui.includes('id="page-home"'));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

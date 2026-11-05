@@ -182,6 +182,8 @@ function mdToHtml(md) {
 
 function go(page) {
   $$('.nav').forEach((b) => b.classList.toggle('on', b.dataset.page === page));
+  const neu = $('#btnNewTask');
+  if (neu) neu.classList.toggle('on', page === 'report');
   $$('.page').forEach((p) => p.classList.toggle('on', p.id === 'page-' + page));
   if (page === 'report') syncReportVisibility();
   renderTaskList();
@@ -792,6 +794,8 @@ function bindTasks() {
 
   const neu = $('#btnTaskNew');
   if (neu) neu.addEventListener('click', () => createTask({}));
+  const neuTask = $('#btnNewTask');
+  if (neuTask) neuTask.addEventListener('click', () => createTask({}));
   const neu2 = $('#btnReportNew');
   if (neu2) neu2.addEventListener('click', () => createTask({}));
   const label = $('#btnReports');
@@ -842,7 +846,9 @@ async function loadTasks() {
     TASKS.list = [];
   }
   renderTaskList();
-  showReportEmpty();
+  const first = sortedTasks()[0];
+  if (first) selectTask(first.id);
+  else showReportEmpty();
 }
 
 /* ---------------- 模板 ---------------- */
@@ -2050,6 +2056,7 @@ function toggleModelPop() {
 }
 
 function bindComposer() {
+  if (!$('#btnModelPick')) return;
   $('#btnModelPick').addEventListener('click', (e) => {
     e.stopPropagation();
     toggleModelPop();
@@ -2281,6 +2288,7 @@ function autoGrow() {
 }
 
 function bindHome() {
+  if (!$('#chatInput')) return;
   emptyNode = $('#chatEmpty');
   const page = $('#page-home');
   const comp = $('.composer');

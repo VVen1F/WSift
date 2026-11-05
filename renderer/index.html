@@ -12,17 +12,13 @@
   <aside class="sidebar">
     <div class="brand"><span class="dot"><span></span></span>Refract</div>
 
-    <button class="nav on" data-page="home">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6.5 10.5V20h11v-9.5"/></svg>
-      首页
+    <button class="nav on" id="btnNewTask" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      新建任务
     </button>
     <button class="nav" data-page="repeater">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l3 3-3 3"/></svg>
       测试
-    </button>
-    <button class="nav" data-page="browser">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5S14.4 18.2 12 20.5c-2.4-2.3-3.6-5.2-3.6-8.5S9.6 5.8 12 3.5z"/></svg>
-      浏览器
     </button>
     <button class="nav" data-page="templates">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="15" width="7" height="5" rx="1.5"/></svg>
@@ -59,49 +55,6 @@
   </aside>
 
   <main>
-    <!-- 首页 -->
-    <section class="page on" id="page-home">
-      <div class="home" id="home">
-        <div class="chat" id="chatLog">
-          <div class="chat-empty" id="chatEmpty">
-            <div class="hint">还没有消息</div>
-          </div>
-        </div>
-
-        <div class="composer-wrap" id="composerWrap">
-          <div class="chips" id="chips"></div>
-
-          <div class="composer" id="composer">
-            <div class="c-top">
-              <textarea id="chatInput" rows="1" placeholder="粘贴请求，或说明要写的报告"></textarea>
-            </div>
-            <div class="c-bottom">
-              <button class="c-btn" id="btnAttach" title="添加文件">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              </button>
-              <button class="model-pill" id="btnModelPick">
-                <span id="modelPillText">选择模型</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10l4 4 4-4"/></svg>
-              </button>
-              <span class="spacer"></span>
-              <button class="send" id="btnChatSend" title="发送" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="quick">
-            <button class="q-chip" data-q="report">写报告</button>
-            <button class="q-chip" data-q="risk">查风险</button>
-            <button class="q-chip" data-q="test">去测试</button>
-          </div>
-
-          <div class="model-pop" id="modelPop" hidden></div>
-        </div>
-      </div>
-      <input type="file" id="filePick" multiple accept=".txt,.http,.md,.har,.json" hidden />
-    </section>
-
     <!-- 测试 -->
     <section class="page" id="page-repeater">
       <div class="toolbar">
@@ -157,7 +110,7 @@
     </section>
 
     <!-- 报告 -->
-    <section class="page" id="page-report">
+    <section class="page on" id="page-report">
       <div class="report-empty" id="reportEmpty">
         <p id="reportEmptyText">还没有报告</p>
         <button class="btn primary" id="btnReportNew" type="button">新建</button>

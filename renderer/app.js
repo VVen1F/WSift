@@ -365,6 +365,30 @@ function safeDom(fn) {
   try { fn(); } catch (e) { console.error(e); }
 }
 
+
+/** 模型偶尔把思考过程写进正文，开头一段英文要切掉。 */
+function cleanModelText(md) {
+  const text = String(md || '');
+  if (!/[\u4e00-\u9fa5]/.test(text)) return text;
+  const head = text.slice(0, 160);
+  const latin = (head.match(/[A-Za-z]/g) || []).length;
+  if (latin > 40 && !/HTTP\//.test(head)) {
+    const i = text.search(/[\u4e00-\u9fa5]/);
+    if (i > 0) return text.slice(i).trim();
+  }
+  return text;
+}
+
+/** 有请求行才算写了报告。 */
+function hasRequestLine(md) {
+  return /^\s*(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+\S+\s+HTTP\/\d/m.test(String(md || ''));
+}
+
+function looksLikeRefusal(md) {
+  const head = String(md || '').slice(0, 240);
+  return !hasRequestLine(md) && /无法|抱歉|不能|请补充|请提供|cannot|unable/i.test(head);
+}
+
 async function generateReport() {
   const prov = activeProvider();
   if (!prov || !prov.apiKey) return toast('先在设置里配置模型和 API Key', true);
@@ -383,6 +407,12 @@ async function generateReport() {
   if (!detail) {
     TASKS.starting = false;
     return toast('先把漏洞详情填上', true);
+  }
+
+  // 材料里没有请求包就别调模型了，省得它写一篇「我写不了」
+  if (!/^\s*(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+\S+\s+HTTP\/\d/m.test(detail) && detail.length < 40) {
+    TASKS.starting = false;
+    return toast('材料里没有请求包，先发一次包或贴一段请求', true);
   }
 
   const material = (cred ? '账号密码：\n' + cred + '\n\n' : '') + detail;
@@ -489,9 +519,24 @@ async function generateReport() {
         if (!raf) raf = setTimeout(paint, 80);
       }
     },
-    onDone: (text) => {
+    onDone: (raw) => {
       const live = TASKS.list.find((x) => x.id === taskId);
-      const md = text || buf;
+      const md = cleanModelText(raw || buf);
+
+      if (looksLikeRefusal(md)) {
+        if (live) live.markdown = '';
+        if (viewing()) {
+          safeDom(() => {
+            const preview = $('#mdPreview');
+            const status = $('#genStatus');
+            if (preview) preview.innerHTML = '<div class="empty">材料不够，模型没写出报告</div>';
+            if (status) status.textContent = '没有正文';
+          });
+        }
+        finish();
+        saveTasksNow();
+        return toast('材料不够，模型没写出报告', true);
+      }
       if (live) {
         live.markdown = md;
         if (!String(live.title || '').trim()) {

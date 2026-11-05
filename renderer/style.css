@@ -355,6 +355,8 @@ textarea.inp {
 }
 .settings { padding: 8px 4px 40px; display: flex; flex-direction: column; gap: 0; }
 .sect { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 40px 0 0; border: 0; }
+.sect[hidden] { display: none !important; }
+#page-settings .sect { padding-top: 0; }
 .sect:first-child { padding-top: 0; }
 .sect h3 { margin: 0 0 4px; font-size: 12px; color: var(--muted); font-weight: 560; letter-spacing: .04em; }
 .sect.flash { background: var(--hover); }
@@ -445,6 +447,11 @@ textarea.inp {
   max-width: 60vw;
 }
 .toast.on { opacity: 1; }
+.toast.act { pointer-events: auto; display: flex; align-items: center; gap: 12px; }
+.toast-act {
+  border: 0; background: none; color: inherit; font: inherit; font-size: 12px;
+  padding: 0; text-decoration: underline; cursor: default;
+}
 .toast.err { background: var(--accent); color: var(--on-accent); }
 
 .no-drag, button, input, textarea, select { -webkit-app-region: no-drag; }
@@ -687,10 +694,11 @@ textarea.inp {
 .side-foot .nav.open { background: var(--hover); }
 
 .pop {
-  position: absolute; left: 0; right: 0; bottom: 100%; margin-bottom: 6px;
+  position: absolute; left: -8px; right: -8px; bottom: 100%; margin-bottom: 6px;
   background: var(--bg); border: 1px solid var(--line-strong); border-radius: 12px;
-  padding: 4px; z-index: 60;
+  padding: 6px; z-index: 60;
   box-shadow: none;
+  display: flex; flex-direction: column; gap: 4px;
   transform-origin: bottom left;
   animation: popIn var(--dur) var(--ease);
 }
@@ -700,11 +708,12 @@ textarea.inp {
 }
 .pop button {
   display: block; width: 100%; text-align: left; border: 0; background: none;
-  padding: 8px 10px; border-radius: 10px; font: inherit; font-size: 12.5px;
+  padding: 10px 14px; border-radius: 10px; font: inherit; font-size: 12.5px;
   color: var(--text);
   transition: background var(--dur) var(--ease);
 }
 .pop button:hover { background: var(--hover); }
+.pop button.on { background: var(--sel); }
 
 .gateway {
   display: flex; align-items: center; gap: 7px;
@@ -858,7 +867,55 @@ textarea.inp {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-right: 44px;
+  padding-right: 78px;
+}
+.task.archived { opacity: .55; }
+.task-arch-head {
+  display: block;
+  width: calc(100% - 4px);
+  margin: 8px 2px 2px;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--muted);
+  font-size: 12px;
+  border-radius: 8px;
+}
+.task-arch-head:hover { background: var(--hover); color: var(--text); }
+.task-arch {
+  position: absolute;
+  right: 40px;
+  top: 5px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity .15s var(--ease), background .15s var(--ease), color .15s var(--ease);
+}
+.task-arch svg { width: 14px; height: 14px; }
+.task:hover .task-arch,
+.task.on .task-arch,
+.task:focus-within .task-arch { opacity: 1; }
+.task-arch:hover { color: var(--text); background: var(--hover); }
+.arch-tip {
+  position: fixed;
+  z-index: 90;
+  transform: translate(-50%, -100%);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #3a3a3c;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .task-meta, .task-del {
   position: absolute;

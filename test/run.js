@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.11', pkg.version === '0.6.11');
+  ok('版本 0.6.12', pkg.version === '0.6.12');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
   ok('流式正文', llmMod.takeStreamEvent({ type: 'content_block_delta', delta: { text: '甲' } }).text === '甲');
@@ -289,11 +289,23 @@ function ok(name, cond, extra) {
   ok('空草稿叫未命名', tasksMod.displayTitle({ title: '  ', markdown: '# 报告', detail: '请求：' }) === '未命名');
   ok('能读回草稿', tasksMod.load().tasks.length === 3);
   ok('清空草稿', tasksMod.saveAll([]).tasks.length === 0 && tasksMod.load().tasks.length === 0);
+  ok('没填的不算一份任务', tasksMod.hasContent({ title: '', templateId: '雷神众测' }) === false && tasksMod.hasContent({ detail: 'GET /' }) === true);
+  const keptTasks = tasksMod.saveAll([
+    { id: 'full', title: '有内容', detail: 'x' },
+    { id: 'empty', title: '', templateId: 'only' },
+    { id: 'box', title: '收起来', detail: 'y', archived: true }
+  ]);
+  ok('空任务不入库', keptTasks.tasks.length === 2 && !keptTasks.tasks.some((t) => t.id === 'empty'));
+  ok('归档能读回', tasksMod.load().tasks.find((t) => t.id === 'box').archived === true);
+  tasksMod.saveAll([]);
   const ui = ['renderer/index.html', 'renderer/app.js', 'renderer/style.css']
     .map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'))
     .join('\n');
   ok('侧栏有报告列表', ui.includes('id="taskList"') && ui.includes('>清空<') && ui.includes('确认清空'));
   ok('侧栏是新建任务', ui.includes('新建任务') && !ui.includes('data-page="browser"') && !ui.includes('id="page-home"'));
+  ok('设置按项分开', ui.includes('function showSettingsSection') && ui.includes('id="sect-network" hidden'));
+  ok('悬停归档', ui.includes('归档任务') && ui.includes('data-arch'));
+  ok('打开就是表单', ui.includes('id="reportCol"') && !ui.includes('id="reportEmpty"'));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

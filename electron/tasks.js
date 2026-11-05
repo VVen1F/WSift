@@ -31,6 +31,17 @@ function displayTitle(t) {
   return '未命名';
 }
 
+function hasContent(t) {
+  if (!t) return false;
+  if (String(t.title || '').trim()) return true;
+  if (String(t.cred || '').trim()) return true;
+  if (String(t.detail || '').trim()) return true;
+  if (String(t.extra || '').trim()) return true;
+  if (String(t.markdown || '').trim()) return true;
+  if (Array.isArray(t.images) && t.images.some((p) => String(p || '').trim())) return true;
+  return false;
+}
+
 function normalize(t) {
   if (!t || typeof t !== 'object') return null;
   const id = String(t.id || '').trim();
@@ -45,6 +56,7 @@ function normalize(t) {
     markdown: String(t.markdown || '').slice(0, 400000),
     images: Array.isArray(t.images) ? t.images.map((p) => String(p || '')).filter(Boolean).slice(0, 40) : [],
     exported: String(t.exported || '').slice(0, 500),
+    archived: t.archived === true,
     updatedAt: Number(t.updatedAt) || Date.now(),
     createdAt: Number(t.createdAt) || Date.now()
   };
@@ -56,12 +68,15 @@ function load() {
     const list = Array.isArray(raw) ? raw : (raw && raw.tasks);
     const tasks = [];
     const seen = new Set();
+    let dropped = false;
     for (const item of (Array.isArray(list) ? list : []).map(normalize).filter(Boolean)) {
+      if (!hasContent(item)) { dropped = true; continue; }
       if (seen.has(item.id)) continue;
       seen.add(item.id);
       tasks.push(item);
       if (tasks.length >= MAX) break;
     }
+    if (dropped) saveAll(tasks);
     return { tasks };
   } catch (e) {
     return { tasks: [] };
@@ -72,6 +87,7 @@ function saveAll(list) {
   const tasks = [];
   const seen = new Set();
   for (const item of (Array.isArray(list) ? list : []).map(normalize).filter(Boolean)) {
+    if (!hasContent(item)) continue;
     if (seen.has(item.id)) {
       tasks[tasks.findIndex((t) => t.id === item.id)] = item;
       continue;
@@ -88,4 +104,4 @@ function saveAll(list) {
   return { tasks };
 }
 
-module.exports = { load, saveAll, displayTitle, normalize, file };
+module.exports = { load, saveAll, displayTitle, normalize, hasContent, file };

@@ -17,19 +17,33 @@ const S = {
   info: null
 };
 
-const TASKS = { list: [], id: null, busyId: null };
+const TASKS = { list: [], id: null, busyId: null, showArchived: false };
 let clearArmed = false;
 let clearTimer = 0;
 let saveChain = Promise.resolve();
 
 /* ---------------- 基础 ---------------- */
 
-function toast(msg, isErr) {
+function toast(msg, isErr, action) {
   const t = $('#toast');
-  t.textContent = msg;
-  t.className = 'toast on' + (isErr ? ' err' : '');
+  t.replaceChildren();
+  t.append(document.createTextNode(msg));
+  if (action && action.label) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'toast-act';
+    b.textContent = action.label;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearTimeout(t._h);
+      t.className = 'toast';
+      action.run();
+    });
+    t.append(b);
+  }
+  t.className = 'toast on' + (isErr ? ' err' : '') + (action ? ' act' : '');
   clearTimeout(t._h);
-  t._h = setTimeout(() => (t.className = 'toast'), 2600);
+  t._h = setTimeout(() => { t.className = 'toast'; }, action ? 5000 : 2600);
 }
 
 function esc(s) {
@@ -325,8 +339,9 @@ function mdTitle(md) {
 async function generateReport() {
   const prov = activeProvider();
   if (!prov || !prov.apiKey) return toast('先在设置里配置模型和 API Key', true);
-  const task = currentTask();
-  if (!task) return toast('先新建一份报告', true);
+  let task = currentTask();
+  if (!task && formHasContent()) task = onTaskEdit();
+  if (!task) return toast('先把漏洞详情填上', true);
   if (TASKS.busyId) return toast('等当前报告生成完', true);
 
   readFormInto(task, false);
@@ -595,23 +610,68 @@ function applyTask(t) {
   syncGenButton();
 }
 
-function showReportEmpty() {
-  const empty = $('#reportEmpty');
+function hasContent(t) {
+  if (!t) return false;
+  if (String(t.title || '').trim()) return true;
+  if (String(t.cred || '').trim()) return true;
+  if (String(t.detail || '').trim()) return true;
+  if (String(t.extra || '').trim()) return true;
+  if (String(t.markdown || '').trim()) return true;
+  if (Array.isArray(t.images) && t.images.some((p) => String(p || '').trim())) return true;
+  return false;
+}
+
+function formHasContent() {
+  if (['rTitle', 'rCred', 'rDetail', 'rExtra'].some((id) => {
+    const el = document.getElementById(id);
+    return !!(el && el.value.trim());
+  })) return true;
+  if (String(S.reportMd || '').trim()) return true;
+  if (S.images && S.images.length) return true;
+  return false;
+}
+
+function activeTasks() {
+  return sortedTasks().filter((t) => !t.archived && hasContent(t));
+}
+
+function archivedTasks() {
+  return sortedTasks().filter((t) => t.archived && hasContent(t));
+}
+
+function showReportForm() {
   const col = $('#reportCol');
-  if (empty) empty.hidden = false;
-  if (col) col.hidden = true;
-  const text = $('#reportEmptyText');
-  if (text) text.textContent = TASKS.list.length ? '选择一份报告' : '还没有报告';
+  if (col) col.hidden = false;
 }
 
 function syncReportVisibility() {
-  if (currentTask()) {
-    const empty = $('#reportEmpty');
-    const col = $('#reportCol');
-    if (empty) empty.hidden = true;
-    if (col) col.hidden = false;
-  } else {
-    showReportEmpty();
+  showReportForm();
+}
+
+function blankForm(opts) {
+  opts = opts || {};
+  TASKS.id = null;
+  S.reportMd = '';
+  S.reportDir = '';
+  S.images = [];
+  if ($('#rTitle')) $('#rTitle').value = '';
+  if ($('#rCred')) $('#rCred').value = '';
+  if ($('#rDetail')) $('#rDetail').value = '';
+  if ($('#rExtra')) $('#rExtra').value = '';
+  const preview = $('#mdPreview');
+  if (preview) {
+    preview.classList.remove('live');
+    preview.innerHTML = '<div class="empty">生成后显示在这里</div>';
+  }
+  const st = $('#genStatus');
+  if (st) st.textContent = '未生成';
+  const reveal = $('#btnReveal');
+  if (reveal) reveal.disabled = true;
+  showReportForm();
+  go('report');
+  if (opts.focus) {
+    const field = $('#rDetail');
+    if (field) field.focus();
   }
 }
 
@@ -623,6 +683,23 @@ function kickSwap() {
   col.classList.add('swap');
 }
 
+const ARCH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8z"/><path d="M3 8l2.2-3h13.6L21 8"/><path d="M10 12h4"/></svg>';
+
+function taskRow(t, archivedRow) {
+  const onPage = document.getElementById('page-report').classList.contains('on');
+  const on = onPage && t.id === TASKS.id;
+  const busy = TASKS.busyId === t.id;
+  let actions = '<span class="task-meta">生成中</span>';
+  if (!busy && archivedRow) {
+    actions = `<button class="task-del" type="button" data-unarch="${esc(t.id)}">恢复</button>`;
+  } else if (!busy) {
+    actions = `<button class="task-arch" type="button" data-arch="${esc(t.id)}" aria-label="归档任务">${ARCH_ICON}</button>` +
+      `<button class="task-del" type="button" data-del="${esc(t.id)}">删除</button>`;
+  }
+  return `<div class="task${on ? ' on' : ''}${archivedRow ? ' archived' : ''}" data-id="${esc(t.id)}" role="button" tabindex="0">` +
+    `<span class="task-title">${esc(displayTitle(t))}</span>${actions}</div>`;
+}
+
 function renderTaskList() {
   const box = $('#taskList');
   if (!box) return;
@@ -630,15 +707,15 @@ function renderTaskList() {
     ? document.activeElement.closest('#taskList .task')
     : null;
   const focusId = focused ? focused.dataset.id : '';
-  const tasks = sortedTasks();
+  const tasks = activeTasks();
+  const archived = archivedTasks();
   const clearBtn = $('#btnTasksClear');
   if (clearBtn) clearBtn.hidden = tasks.length === 0;
-  if (!tasks.length) {
+  if (!tasks.length && !archived.length) {
     box.innerHTML = '<div class="task-empty">还没有报告</div>';
     setClearArm(false);
     return;
   }
-  const onPage = document.getElementById('page-report').classList.contains('on');
   let html = '';
   let last = '';
   for (const t of tasks) {
@@ -647,14 +724,11 @@ function renderTaskList() {
       html += `<div class="task-group">${esc(g)}</div>`;
       last = g;
     }
-    const on = onPage && t.id === TASKS.id;
-    const busy = TASKS.busyId === t.id;
-    html += `<div class="task${on ? ' on' : ''}" data-id="${esc(t.id)}" role="button" tabindex="0">` +
-      `<span class="task-title">${esc(displayTitle(t))}</span>` +
-      (busy
-        ? '<span class="task-meta">生成中</span>'
-        : `<button class="task-del" type="button" data-del="${esc(t.id)}">删除</button>`) +
-      '</div>';
+    html += taskRow(t, false);
+  }
+  if (archived.length) {
+    html += `<button class="task-arch-head" type="button" data-arch-toggle>归档 ${archived.length}</button>`;
+    if (TASKS.showArchived) archived.forEach((t) => { html += taskRow(t, true); });
   }
   box.innerHTML = html;
   if (focusId) {
@@ -664,12 +738,62 @@ function renderTaskList() {
 }
 
 function onTaskEdit() {
-  const t = currentTask();
-  if (!t) return;
+  if (!formHasContent()) {
+    const cur = currentTask();
+    if (cur && TASKS.busyId !== cur.id) {
+      TASKS.list = TASKS.list.filter((t) => t.id !== cur.id);
+      TASKS.id = null;
+      renderTaskList();
+      saveTasksNow();
+    }
+    return null;
+  }
+  let t = currentTask();
+  const fresh = !t;
+  if (!t) {
+    const now = Date.now();
+    t = {
+      id: 't' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+      title: '',
+      templateId: '',
+      cred: '',
+      detail: '',
+      extra: '',
+      markdown: '',
+      images: [],
+      exported: '',
+      archived: false,
+      updatedAt: now,
+      createdAt: now
+    };
+    TASKS.list.unshift(t);
+    TASKS.id = t.id;
+  }
   readFormInto(t);
-  const title = document.querySelector('#taskList .task.on .task-title');
-  if (title) title.textContent = displayTitle(t);
+  t.updatedAt = Date.now();
+  if (fresh) renderTaskList();
+  else {
+    const title = document.querySelector('#taskList .task.on .task-title');
+    if (title) title.textContent = displayTitle(t);
+  }
   saveTasksSoon();
+  return t;
+}
+
+function flushDraft() {
+  const cur = currentTask();
+  if (cur) {
+    readFormInto(cur);
+    cur.updatedAt = Date.now();
+    if (!hasContent(cur) && TASKS.busyId !== cur.id) {
+      TASKS.list = TASKS.list.filter((t) => t.id !== cur.id);
+      if (TASKS.id === cur.id) TASKS.id = null;
+      saveTasksNow();
+    }
+    return cur;
+  }
+  if (formHasContent()) return onTaskEdit();
+  return null;
 }
 
 function selectTask(id) {
@@ -677,7 +801,8 @@ function selectTask(id) {
   const page = document.getElementById('page-report');
   const wasReport = page && page.classList.contains('on');
   if (TASKS.id === id && wasReport) return;
-  if (TASKS.id && TASKS.id !== id) readFormInto(currentTask());
+  if (!currentTask() && formHasContent()) onTaskEdit();
+  else if (TASKS.id && TASKS.id !== id) readFormInto(currentTask());
   const t = TASKS.list.find((x) => x.id === id);
   if (!t) return;
   const same = TASKS.id === id && wasReport;
@@ -687,21 +812,38 @@ function selectTask(id) {
   if (wasReport && !same) kickSwap();
 }
 
+function requestNewTask() {
+  flushDraft();
+  const page = document.getElementById('page-report');
+  const wasReport = page && page.classList.contains('on');
+  blankForm({ focus: true });
+  if (wasReport) kickSwap();
+}
+
 function createTask(partial) {
   partial = partial || {};
-  const cur = currentTask();
-  if (cur) readFormInto(cur);
-  const now = Date.now();
-  const t = {
-    id: 't' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+  const incoming = {
     title: partial.title || '',
-    templateId: partial.templateId || (($('#rTemplate') && $('#rTemplate').value) || ''),
     cred: partial.cred || '',
     detail: partial.detail || '',
     extra: partial.extra || '',
     markdown: partial.markdown || '',
-    images: Array.isArray(partial.images) ? partial.images.slice() : [],
+    images: Array.isArray(partial.images) ? partial.images.slice() : []
+  };
+  if (!hasContent(incoming)) return requestNewTask();
+  flushDraft();
+  const now = Date.now();
+  const t = {
+    id: 't' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+    title: incoming.title,
+    templateId: partial.templateId || (($('#rTemplate') && $('#rTemplate').value) || ''),
+    cred: incoming.cred,
+    detail: incoming.detail,
+    extra: incoming.extra,
+    markdown: incoming.markdown,
+    images: incoming.images,
     exported: partial.exported || '',
+    archived: false,
     updatedAt: now,
     createdAt: now
   };
@@ -713,11 +855,38 @@ function createTask(partial) {
   go('report');
   if (wasReport) kickSwap();
   saveTasksNow();
-  if (!partial.detail && !partial.markdown) {
-    const field = $('#rDetail');
-    if (field) field.focus();
-  }
   return t;
+}
+
+function archiveTask(id) {
+  const t = TASKS.list.find((x) => x.id === id);
+  if (!t || t.archived || TASKS.busyId === id) return;
+  if (TASKS.id === id) readFormInto(t);
+  if (!hasContent(t)) return;
+  t.archived = true;
+  t.updatedAt = Date.now();
+  if (TASKS.id === id) {
+    const next = activeTasks()[0] || null;
+    if (next) {
+      TASKS.id = next.id;
+      applyTask(next);
+    } else blankForm();
+  }
+  renderTaskList();
+  saveTasksNow();
+  toast('已归档', false, { label: '撤销', run: () => unarchiveTask(id) });
+}
+
+function unarchiveTask(id) {
+  const t = TASKS.list.find((x) => x.id === id);
+  if (!t) return;
+  t.archived = false;
+  t.updatedAt = Date.now();
+  TASKS.showArchived = false;
+  saveTasksNow();
+  renderTaskList();
+  selectTask(id);
+  toast('已恢复');
 }
 
 function removeTask(id) {
@@ -727,11 +896,12 @@ function removeTask(id) {
   TASKS.list.splice(idx, 1);
   if (TASKS.busyId === id) TASKS.busyId = null;
   if (TASKS.id === id) {
-    const next = TASKS.list[idx] || TASKS.list[idx - 1] || null;
-    TASKS.id = next ? next.id : null;
-    if (next) applyTask(next);
-    else showReportEmpty();
-    if (document.getElementById('page-report').classList.contains('on')) kickSwap();
+    const next = activeTasks()[0] || null;
+    if (next) {
+      TASKS.id = next.id;
+      applyTask(next);
+      if (document.getElementById('page-report').classList.contains('on')) kickSwap();
+    } else blankForm();
   }
   renderTaskList();
   saveTasksNow();
@@ -739,15 +909,12 @@ function removeTask(id) {
 }
 
 function clearTasks() {
-  TASKS.list = [];
-  TASKS.id = null;
+  const viewing = currentTask();
+  TASKS.list = TASKS.list.filter((t) => t.archived && hasContent(t));
   TASKS.busyId = null;
-  S.reportMd = '';
-  S.reportDir = '';
-  S.images = [];
-  showReportEmpty();
   setClearArm(false);
-  renderTaskList();
+  if (!viewing || !viewing.archived) blankForm();
+  else renderTaskList();
   saveTasksNow();
   toast('已清空');
 }
@@ -765,6 +932,23 @@ function bindTasks() {
   if (!box || box._bound) return;
   box._bound = true;
   box.addEventListener('click', (e) => {
+    if (e.target.closest('[data-arch-toggle]')) {
+      TASKS.showArchived = !TASKS.showArchived;
+      renderTaskList();
+      return;
+    }
+    const arch = e.target.closest('[data-arch]');
+    if (arch) {
+      e.stopPropagation();
+      archiveTask(arch.dataset.arch);
+      return;
+    }
+    const back = e.target.closest('[data-unarch]');
+    if (back) {
+      e.stopPropagation();
+      unarchiveTask(back.dataset.unarch);
+      return;
+    }
     const del = e.target.closest('[data-del]');
     if (del) {
       e.stopPropagation();
@@ -774,6 +958,24 @@ function bindTasks() {
     const row = e.target.closest('.task');
     if (row) selectTask(row.dataset.id);
   });
+  const placeArchTip = (btn) => {
+    let tip = document.getElementById('archTip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'archTip';
+      tip.className = 'arch-tip';
+      tip.textContent = '归档任务';
+      tip.hidden = true;
+      document.body.appendChild(tip);
+    }
+    if (!btn) { tip.hidden = true; return; }
+    const r = btn.getBoundingClientRect();
+    tip.hidden = false;
+    tip.style.left = (r.left + r.width / 2) + 'px';
+    tip.style.top = (r.top - 6) + 'px';
+  };
+  box.addEventListener('mouseover', (e) => placeArchTip(e.target.closest('.task-arch')));
+  box.addEventListener('mouseleave', () => placeArchTip(null));
   box.addEventListener('keydown', (e) => {
     const row = e.target.closest('.task');
     if (!row) return;
@@ -793,11 +995,9 @@ function bindTasks() {
   });
 
   const neu = $('#btnTaskNew');
-  if (neu) neu.addEventListener('click', () => createTask({}));
+  if (neu) neu.addEventListener('click', () => requestNewTask());
   const neuTask = $('#btnNewTask');
-  if (neuTask) neuTask.addEventListener('click', () => createTask({}));
-  const neu2 = $('#btnReportNew');
-  if (neu2) neu2.addEventListener('click', () => createTask({}));
+  if (neuTask) neuTask.addEventListener('click', () => requestNewTask());
   const label = $('#btnReports');
   if (label) label.addEventListener('click', () => go('report'));
 
@@ -835,8 +1035,7 @@ function bindTasks() {
 
 async function loadTasks() {
   if (!window.api.tasks) {
-    renderTaskList();
-    showReportEmpty();
+    blankForm();
     return;
   }
   try {
@@ -845,10 +1044,9 @@ async function loadTasks() {
   } catch (e) {
     TASKS.list = [];
   }
-  renderTaskList();
-  const first = sortedTasks()[0];
+  const first = activeTasks()[0];
   if (first) selectTask(first.id);
-  else showReportEmpty();
+  else blankForm();
 }
 
 /* ---------------- 模板 ---------------- */
@@ -1849,6 +2047,20 @@ function bindPerm() {
 
 /* ---------------- 设置菜单 ---------------- */
 
+function showSettingsSection(key) {
+  const keys = ['general', 'network', 'llm', 'backup', 'about'];
+  if (keys.indexOf(key) < 0) key = 'general';
+  keys.forEach((k) => {
+    const sec = document.getElementById('sect-' + k);
+    if (sec) sec.hidden = k !== key;
+  });
+  document.querySelectorAll('#settingsPop button[data-sec]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.sec === key);
+  });
+  const sc = $('#settingsScroll');
+  if (sc) sc.scrollTop = 0;
+}
+
 function bindSettingsMenu() {
   const pop = $('#settingsPop');
   const btn = $('#navSettings');
@@ -1865,19 +2077,15 @@ function bindSettingsMenu() {
 
   pop.querySelectorAll('button[data-sec]').forEach((b) => {
     b.addEventListener('click', () => {
-      const key = b.dataset.sec;
+      showSettingsSection(b.dataset.sec);
       go('settings');
       close();
-      const sec = document.getElementById('sect-' + key);
-      if (!sec) return;
-      sec.scrollIntoView({ block: 'start', behavior: motionOff() ? 'auto' : 'smooth' });
-      sec.classList.add('flash');
-      setTimeout(() => sec.classList.remove('flash'), 900);
     });
   });
 
   document.addEventListener('click', close);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  showSettingsSection('general');
 }
 
 function renderGateway(ri) {
@@ -1995,11 +2203,8 @@ function renderModelPop() {
   if (manage) {
     manage.addEventListener('click', () => {
       closeModelPop();
+      showSettingsSection('llm');
       go('settings');
-      setTimeout(() => {
-        const sec = document.getElementById('sect-llm');
-        if (sec) sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      }, 60);
     });
   }
 }

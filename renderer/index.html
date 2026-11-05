@@ -111,11 +111,7 @@
 
     <!-- 报告 -->
     <section class="page on" id="page-report">
-      <div class="report-empty" id="reportEmpty">
-        <p id="reportEmptyText">还没有报告</p>
-        <button class="btn primary" id="btnReportNew" type="button">新建</button>
-      </div>
-      <div class="narrow report-col" id="reportCol" hidden>
+      <div class="narrow report-col" id="reportCol">
         <div class="report-top">
           <input class="title-input" id="rTitle" placeholder="标题" autocomplete="off" spellcheck="false" />
           <div class="btns">
@@ -226,7 +222,7 @@
             </div>
           </div>
 
-          <div class="sect" id="sect-network">
+          <div class="sect" id="sect-network" hidden>
             <h3>网络</h3>
             <div class="klist">
               <div class="krow">
@@ -241,7 +237,7 @@
             </div>
           </div>
 
-          <div class="sect" id="sect-llm">
+          <div class="sect" id="sect-llm" hidden>
             <div class="llm-head">
               <h3>LLM</h3>
               <span class="spacer"></span>
@@ -250,7 +246,7 @@
             <div id="llmPanel"></div>
           </div>
 
-          <div class="sect" id="sect-backup">
+          <div class="sect" id="sect-backup" hidden>
             <h3>同步与备份</h3>
             <div class="klist">
               <div class="krow">
@@ -299,7 +295,7 @@
             <div class="vlist" id="backupList"></div>
           </div>
 
-          <div class="sect" id="sect-about">
+          <div class="sect" id="sect-about" hidden>
             <h3>关于</h3>
             <div class="klist">
               <div class="krow">

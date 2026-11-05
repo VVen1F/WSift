@@ -229,7 +229,6 @@ async function doSend() {
   const r = await window.api.send({ raw, scheme, protocol });
   S.lastReq = raw;
   S.lastRes = r.text || '';
-  S.lastMs = Number(r.ms);
   $('#res').innerHTML = highlight(S.lastRes);
   const proto = (r.protocol || 'h1').toUpperCase();
   $('#statusText').innerHTML = r.ok
@@ -246,7 +245,6 @@ async function doShot() {
     const r = await window.api.capture({
       request: $('#req').value || S.lastReq,
       response: S.lastRes,
-      ms: S.lastMs,
       width: Number(S.settings.ui.shotWidth) || 1600
     });
     rememberShot(r.path);

@@ -202,7 +202,6 @@ ipcMain.handle('shot:capture', async (_e, payload) => {
     request: payload.request,
     response: payload.response,
     width: payload.width || 1600,
-    ms: payload.ms,
     out
   });
   return res;

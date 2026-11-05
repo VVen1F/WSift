@@ -2575,11 +2575,26 @@ function showSettingsSection(key) {
     const sec = document.getElementById('sect-' + k);
     if (sec) sec.hidden = k !== key;
   });
+  document.querySelectorAll('#settingsNav button[data-sec]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.sec === key);
+  });
   document.querySelectorAll('#settingsPop button[data-sec]').forEach((b) => {
     b.classList.toggle('on', b.dataset.sec === key);
   });
   const sc = $('#settingsScroll');
   if (sc) sc.scrollTop = 0;
+}
+
+function bindSettingsNav() {
+  const nav = $('#settingsNav');
+  if (!nav) return;
+  nav.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-sec]');
+    if (!b) return;
+    showSettingsSection(b.dataset.sec);
+    const sc = $('#settingsScroll');
+    if (sc) sc.scrollTop = 0;
+  });
 }
 
 function bindSettingsMenu() {
@@ -2924,6 +2939,7 @@ async function boot() {
   S.settings = await window.api.settings.get();
   bindTheme();
   bindArchive();
+  bindSettingsNav();
   S.templates = await window.api.templates.list();
 
   $('#req').value = SAMPLE;

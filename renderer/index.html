@@ -158,7 +158,16 @@
 
     <!-- 设置 -->
     <section class="page" id="page-settings">
-      <div class="narrow" id="settingsScroll">
+      <div class="settings-shell">
+        <nav class="settings-nav" id="settingsNav">
+          <button data-sec="general" class="on">通用</button>
+          <button data-sec="network">网络</button>
+          <button data-sec="llm">模型</button>
+          <button data-sec="backup">备份</button>
+          <button data-sec="archive">归档</button>
+          <button data-sec="about">关于</button>
+        </nav>
+        <div class="narrow" id="settingsScroll">
         <div class="settings">
 
           <div class="sect" id="sect-general">

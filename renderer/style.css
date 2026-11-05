@@ -1303,3 +1303,29 @@ textarea.inp {
   background: none; color: var(--muted); font-size: 13px; cursor: pointer;
 }
 .prov-add:hover { color: var(--text); border-color: var(--muted); }
+
+/* 组间多留白、组内少留白（DSH 节奏） */
+.sect h3 { margin: 32px 0 6px; }
+.sect:first-child h3 { margin-top: 0; }
+.krow { padding: 16px 0; }
+
+/* 补齐缺少的 hover 反馈 */
+.prov-row:hover { background: var(--hover); }
+.arch-row:hover { background: var(--hover); }
+.settings-nav button:active { background: var(--active); }
+.prov-add:active { background: var(--hover); }
+.btn:active { transform: scale(.985); }
+
+/* 设置页：左导航 + 右内容，照 DSH 的设置面板 */
+.settings-shell { display: flex; height: 100%; min-height: 0; }
+.settings-nav {
+  flex: 0 0 180px; display: flex; flex-direction: column; gap: 2px;
+  padding: 24px 12px; border-right: 0.5px solid var(--line);
+}
+.settings-nav button {
+  height: 34px; padding: 0 12px; border: 0; border-radius: var(--dsw-radius-sm);
+  background: none; color: var(--text); font-size: 13px; text-align: left; cursor: pointer;
+}
+.settings-nav button:hover { background: var(--hover); }
+.settings-nav button.on { background: var(--nav-on); font-weight: 500; }
+#page-settings .narrow { flex: 1; min-width: 0; overflow: auto; }

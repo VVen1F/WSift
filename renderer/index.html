@@ -56,39 +56,51 @@
   <main>
     <!-- 首页 -->
     <section class="page on" id="page-home">
-      <div class="home">
-        <div class="home-top">
-          <h1>今天要做什么？</h1>
-          <p class="sub">把请求拖进输入框，或者直接说你要什么。</p>
+      <div class="home" id="home">
+        <div class="hero" id="hero">
+          <h1 id="heroTitle">上午好呀</h1>
+          <p class="sub">有什么想让我帮忙的吗</p>
         </div>
 
         <div class="chat" id="chatLog">
           <div class="chat-empty" id="chatEmpty">
             <div class="hint">
-              <div class="hint-t">把请求拖进下面的输入框</div>
-              <div class="hint-s">支持 .txt / .http / .har，也可以直接说你要什么</div>
+              把请求拖进下面的输入框，或者直接说你要什么
             </div>
           </div>
         </div>
 
-        <div class="home-bottom">
+        <div class="composer-wrap" id="composerWrap">
           <div class="chips" id="chips"></div>
-          <div class="composer">
-            <button class="attach" id="btnAttach" title="添加文件">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 11.5 12.4 19a5 5 0 0 1-7.1-7.1l8-8a3.4 3.4 0 0 1 4.8 4.8l-7.9 8a1.8 1.8 0 0 1-2.5-2.5l7.1-7.1"/>
-              </svg>
-            </button>
-            <textarea id="chatInput" rows="1" placeholder="拖入请求，或让 AI 写报告、看风险"></textarea>
-            <button class="btn primary" id="btnChatSend">发送</button>
+
+          <div class="composer" id="composer">
+            <div class="c-top">
+              <textarea id="chatInput" rows="1" placeholder="提出后续修改要求"></textarea>
+            </div>
+            <div class="c-bottom">
+              <button class="c-btn" id="btnAttach" title="添加文件">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+              <button class="model-pill" id="btnModelPick">
+                <span id="modelPillText">选择模型</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10l4 4 4-4"/></svg>
+              </button>
+              <span class="spacer"></span>
+              <button class="send" id="btnChatSend" title="发送" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>
+              </button>
+            </div>
           </div>
+
           <div class="quick">
-            <button class="btn ghost" data-q="report">写一份报告</button>
-            <button class="btn ghost" data-q="risk">看看有没有风险</button>
-            <button class="btn ghost" data-q="test">去测试接口</button>
+            <button class="q-chip" data-q="report">写一份报告</button>
+            <button class="q-chip" data-q="risk">看看有没有风险</button>
+            <button class="q-chip" data-q="test">去测试接口</button>
             <span class="spacer"></span>
             <span class="stats" id="homeStats"></span>
           </div>
+
+          <div class="model-pop" id="modelPop" hidden></div>
         </div>
       </div>
       <input type="file" id="filePick" multiple accept=".txt,.http,.md,.har,.json" hidden />
@@ -271,7 +283,12 @@
           </div>
 
           <div class="sect" id="sect-llm">
-            <h3>LLM</h3>
+            <div class="llm-head">
+              <h3>LLM</h3>
+              <span class="muted">点卡片编辑，星标是当前激活的配置</span>
+              <span class="spacer"></span>
+              <button class="btn primary" id="btnProvNew">+ 新建</button>
+            </div>
             <div id="llmPanel"></div>
           </div>
 
@@ -357,6 +374,37 @@
       </div>
     </section>
   </main>
+</div>
+
+<div class="modal" id="provModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <b>新建模型配置</b>
+      <button class="modal-x" id="pmClose">×</button>
+    </div>
+    <p class="modal-sub">新建后不会自动激活，请在卡片上「设为激活」。</p>
+    <div class="klist">
+      <div class="krow"><div class="klabel">名称</div><input class="inp" style="flex:1;max-width:none" id="pmName" placeholder="例如：OpenAI 生产" /></div>
+      <div class="krow"><div class="klabel">格式</div>
+        <select class="inp kin" id="pmKind">
+          <option value="openai">OpenAI 兼容</option>
+          <option value="anthropic">Anthropic</option>
+        </select>
+      </div>
+      <div class="krow"><div class="klabel">模型</div>
+        <input class="inp" style="flex:1;max-width:none" id="pmModel" placeholder="claude-opus-4-8" />
+        <button class="btn" id="pmModelFetch" title="拉取模型">⟳</button>
+      </div>
+      <div class="krow"><div class="klabel">Base URL</div><input class="inp" style="flex:1;max-width:none" id="pmBase" placeholder="https://api.openai.com/v1" /></div>
+      <div class="krow"><div class="klabel">API Key</div><input class="inp" style="flex:1;max-width:none" id="pmKey" type="password" placeholder="sk-…" /></div>
+    </div>
+    <div class="row actions" style="margin-top:16px">
+      <button class="btn" id="pmTest">测试连接</button>
+      <span class="spacer"></span>
+      <button class="btn primary" id="pmCreate">+ 新建</button>
+    </div>
+    <div class="muted" id="pmStatus" style="margin-top:8px"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>

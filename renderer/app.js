@@ -466,26 +466,31 @@ function provSummary(p) {
 
 function providerListHTML() {
   const list = S.settings.providers || [];
-  const row = (p, cls) => `
-    <div class="prov-row ${cls}" data-id="${p.id}">
-      <span class="pico">${esc((p.name || '?').slice(0, 1).toUpperCase())}</span>
-      <div class="pmeta"><b>${esc(p.name)}</b><small>${esc(provSummary(p))}</small></div>
-      <span class="pchip">${esc(p.activeModel || '—')}</span>
-      <label class="switch" data-toggle="${p.id}"><input type="checkbox" ${p.enabled ? 'checked' : ''}/><span></span></label>
-      <span class="chev">›</span>
-    </div>`;
-  const on = list.filter((p) => p.enabled !== false);
-  const off = list.filter((p) => p.enabled === false);
-
-  return `
-    <div class="prov-toolbar">
-      <input class="inp" id="provSearch" placeholder="查找供应商" />
-      <label class="switch"><input type="checkbox" id="provMask" ${S.settings.ui.maskKeys ? 'checked' : ''}/><span></span></label>
-      <span class="muted">账号打码</span>
-    </div>
-    ${on.length ? `<div class="prov-group">${on.map((p) => row(p, '')).join('')}</div>` : ''}
-    ${off.length ? `<div class="prov-group-title">已关闭的 ${off.length}</div><div class="prov-group">${off.map((p) => row(p, 'off')).join('')}</div>` : ''}
-    <button class="btn ghost" id="btnProvAdd" style="margin-top:10px">+ 添加供应商</button>`;
+  if (!list.length) {
+    return '<div class="lc-empty">还没有模型配置，点右上角「+ 新建」加一个</div>';
+  }
+  const activeId = S.settings.activeProviderId;
+  return `<div class="llm-grid">${list
+    .map((p) => {
+      const on = p.id === activeId;
+      const key = providerKey(p);
+      return `<div class="llm-card ${on ? 'on' : ''}" data-id="${p.id}">
+        <div class="lc-top">
+          <button class="star ${on ? 'on' : ''}" data-act="star" title="${on ? '当前激活' : '设为激活'}">${on ? '★' : '☆'}</button>
+          <b>${esc(p.name)}</b>
+          <span class="badge">${p.kind === 'anthropic' ? 'ANTHROPIC' : 'OPENAI'}</span>
+          <span class="spacer"></span>
+          <span class="lc-state ${p.enabled === false ? 'off' : ''}">${p.enabled === false ? '已关闭' : '正常'}</span>
+        </div>
+        <div class="lc-model">${esc(p.activeModel || '—')}</div>
+        <div class="lc-meta">${key ? '…' + esc(key.slice(-4)) : '未填 Key'} · ${(p.models || []).length} 个模型</div>
+        <div class="lc-actions">
+          <button class="btn ${on ? '' : 'primary'}" data-act="activate">${on ? '已激活' : '设为激活'}</button>
+          <button class="btn ghost danger" data-act="del" title="删除">🗑</button>
+        </div>
+      </div>`;
+    })
+    .join('')}</div>`;
 }
 
 function providerDetailHTML(id) {
@@ -662,57 +667,58 @@ function bindProviderDetail(id) {
 }
 
 function bindProviderList() {
-  document.querySelectorAll('.prov-row').forEach((row) => {
-    const id = row.dataset.id;
+  document.querySelectorAll('.llm-card').forEach((card) => {
+    const id = card.dataset.id;
     const p = S.settings.providers.find((x) => x.id === id);
-    row.addEventListener('click', (e) => {
-      if (e.target.closest('.switch')) return;
+    if (!p) return;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
       LLM.detail = id;
       renderLLM();
     });
-    const sw = row.querySelector('[data-toggle] input');
-    if (sw) {
-      sw.addEventListener('change', (e) => {
-        p.enabled = e.target.checked;
-        if (p.enabled) S.settings.activeProviderId = id;
+
+    const star = card.querySelector('[data-act="star"]');
+    if (star) {
+      star.addEventListener('click', (e) => {
+        e.stopPropagation();
+        S.settings.activeProviderId = id;
+        p.enabled = true;
         persist();
         renderLLM();
+        syncModelPill();
+        toast('已激活 ' + p.name);
       });
     }
-  });
 
-  $('#provMask').addEventListener('change', (e) => {
-    S.settings.ui.maskKeys = e.target.checked;
-    persist();
-    renderLLM();
-  });
+    const act = card.querySelector('[data-act="activate"]');
+    if (act) {
+      act.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (S.settings.activeProviderId === id) return;
+        S.settings.activeProviderId = id;
+        p.enabled = true;
+        persist();
+        renderLLM();
+        syncModelPill();
+        toast('已激活 ' + p.name);
+      });
+    }
 
-  $('#provSearch').addEventListener('input', (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    document.querySelectorAll('.prov-row').forEach((row) => {
-      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-    });
-  });
-
-  $('#btnProvAdd').addEventListener('click', () => {
-    const id = 'p' + Date.now().toString(36);
-    S.settings.providers.push({
-      id,
-      name: '新供应商',
-      kind: 'openai',
-      baseURL: 'https://api.openai.com/v1',
-      modelsURL: '',
-      enabled: true,
-      accounts: [{ id: 'acc' + Date.now().toString(36), name: '默认', apiKey: '' }],
-      activeAccountId: '',
-      models: [],
-      activeModel: ''
-    });
-    const np = S.settings.providers[S.settings.providers.length - 1];
-    np.activeAccountId = np.accounts[0].id;
-    persist();
-    LLM.detail = id;
-    renderLLM();
+    const del = card.querySelector('[data-act="del"]');
+    if (del) {
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        S.settings.providers = S.settings.providers.filter((x) => x.id !== id);
+        if (S.settings.activeProviderId === id) {
+          S.settings.activeProviderId = S.settings.providers[0] ? S.settings.providers[0].id : '';
+        }
+        persist();
+        renderLLM();
+        syncModelPill();
+        toast('已删除');
+      });
+    }
   });
 }
 
@@ -743,6 +749,78 @@ $('#btnProvTest') && $('#btnProvTest').addEventListener('click', async () => {
 $('#btnDataDir').addEventListener('click', () => window.api.openPath(S.info.userData));
 
 
+
+
+/* ---------------- 新建模型配置 ---------------- */
+
+function openProvModal() {
+  const m = $('#provModal');
+  m.hidden = false;
+  $('#pmStatus').textContent = '';
+  $('#pmName').value = '';
+  $('#pmModel').value = '';
+  $('#pmBase').value = 'https://api.openai.com/v1';
+  $('#pmKey').value = '';
+  $('#pmKind').value = 'openai';
+  $('#pmName').focus();
+}
+
+function closeProvModal() {
+  $('#provModal').hidden = true;
+}
+
+function draftProvider() {
+  return {
+    id: 'p' + Date.now().toString(36),
+    name: $('#pmName').value.trim() || '未命名服务',
+    kind: $('#pmKind').value,
+    baseURL: $('#pmBase').value.trim(),
+    modelsURL: '',
+    enabled: true,
+    accounts: [{ id: 'acc' + Date.now().toString(36), name: '默认', apiKey: $('#pmKey').value.trim() }],
+    activeAccountId: '',
+    models: $('#pmModel').value.trim() ? [$('#pmModel').value.trim()] : [],
+    activeModel: $('#pmModel').value.trim()
+  };
+}
+
+function bindProvModal() {
+  $('#pmClose').addEventListener('click', closeProvModal);
+  $('#provModal').addEventListener('click', (e) => {
+    if (e.target.id === 'provModal') closeProvModal();
+  });
+
+  $('#pmTest').addEventListener('click', async () => {
+    const d = draftProvider();
+    d.activeAccountId = d.accounts[0].id;
+    if (!d.baseURL) return ($('#pmStatus').textContent = '先填 Base URL');
+    $('#pmStatus').textContent = '测试中…';
+    const r = await window.api.models(flattenProvider(d));
+    $('#pmStatus').textContent = r.ok ? `连接成功，拉到 ${r.models.length} 个模型` : '连接失败：' + r.error;
+    if (r.ok && !$('#pmModel').value && r.models.length) $('#pmModel').value = r.models[0];
+  });
+
+  $('#pmModelFetch').addEventListener('click', async () => {
+    const d = draftProvider();
+    d.activeAccountId = d.accounts[0].id;
+    $('#pmStatus').textContent = '拉取中…';
+    const r = await window.api.models(flattenProvider(d));
+    if (!r.ok) return ($('#pmStatus').textContent = '拉取失败：' + r.error);
+    if (r.models.length) $('#pmModel').value = r.models[0];
+    $('#pmStatus').textContent = `拉到 ${r.models.length} 个模型，已填入第一个`;
+  });
+
+  $('#pmCreate').addEventListener('click', () => {
+    const d = draftProvider();
+    d.activeAccountId = d.accounts[0].id;
+    S.settings.providers.push(d);
+    persist();
+    closeProvModal();
+    renderLLM();
+    syncModelPill();
+    toast('已新建，点卡片上的「设为激活」启用');
+  });
+}
 
 /* ---------------- 云端同步 ---------------- */
 
@@ -1001,6 +1079,9 @@ async function bindSettingsPage(ri) {
   $('#btnBackupShow').addEventListener('click', () => window.api.backup.show());
   refreshBackup();
 
+  $('#btnProvNew').addEventListener('click', openProvModal);
+  bindProvModal();
+
   $('#btnSyncSetup').addEventListener('click', () => {
     const panel = $('#syncPanel');
     panel.hidden = !panel.hidden;
@@ -1166,6 +1247,154 @@ function renderGateway(ri) {
   };
 }
 
+
+/* ---------------- 首页动效与模型选择 ---------------- */
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return '夜深了';
+  if (h < 12) return '上午好呀';
+  if (h < 18) return '下午好呀';
+  return '晚上好呀';
+}
+
+function setChatting(on) {
+  const home = $('#home');
+  if (!home || home.classList.contains('chatting') === on) return;
+  const wrap = $('#composerWrap');
+  const before = wrap.getBoundingClientRect();
+  home.classList.toggle('chatting', on);
+  const after = wrap.getBoundingClientRect();
+  const dy = before.top - after.top;
+  const dx = before.left - after.left;
+  if (Math.abs(dy) > 1 || Math.abs(dx) > 1) {
+    wrap.style.transition = 'none';
+    wrap.style.transform = `translate(${dx}px, ${dy}px)`;
+    void wrap.offsetHeight;
+    wrap.style.transition = 'transform .5s cubic-bezier(.2, .8, .2, 1)';
+    wrap.style.transform = 'translate(0, 0)';
+    setTimeout(() => {
+      wrap.style.transition = '';
+      wrap.style.transform = '';
+    }, 540);
+  }
+}
+
+function syncModelPill() {
+  const p = activeProvider();
+  const el = $('#modelPillText');
+  if (el) el.textContent = p && p.model ? p.model : '选择模型';
+  const all = document.querySelectorAll('.mp-item');
+  if (all.length) renderModelPop();
+}
+
+function renderModelPop() {
+  const pop = $('#modelPop');
+  if (!pop || pop.hidden) return;
+  const cfg = S.settings;
+  const prov = cfg.providers.find((x) => x.id === cfg.activeProviderId) || cfg.providers[0];
+  if (!prov) {
+    pop.innerHTML = '<div class="mp-models"><div class="mp-empty">还没有配置模型</div></div>';
+    return;
+  }
+  const fetched = (LLM.models && LLM.models[prov.id]) || [];
+  const models = Array.from(new Set([...(prov.models || []), ...fetched]));
+
+  pop.innerHTML = `
+    <div class="mp-models">
+      <div class="mp-h">模型</div>
+      ${models.length
+        ? models.map((m) => `<div class="mp-item ${m === prov.activeModel ? 'on' : ''}" data-m="${esc(m)}">
+            <span>${esc(m)}</span>
+            ${m === prov.activeModel ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>' : ''}
+          </div>`).join('')
+        : '<div class="mp-empty">这个供应商还没有模型，去设置里加</div>'}
+    </div>
+    <div class="mp-prov">
+      <div class="mp-h">供应商</div>
+      ${cfg.providers
+        .filter((x) => x.enabled !== false)
+        .map((x) => `<div class="mp-item ${x.id === prov.id ? 'on' : ''}" data-p="${x.id}">
+            <span>${esc(x.name)}</span>
+            ${x.id === prov.id ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>' : ''}
+          </div>`).join('')}
+      <div class="mp-foot" id="mpManage">管理模型</div>
+    </div>`;
+
+  pop.querySelectorAll('[data-m]').forEach((el) => {
+    el.addEventListener('click', () => {
+      prov.activeModel = el.dataset.m;
+      persist();
+      syncModelPill();
+      closeModelPop();
+    });
+  });
+  pop.querySelectorAll('[data-p]').forEach((el) => {
+    el.addEventListener('click', () => {
+      S.settings.activeProviderId = el.dataset.p;
+      persist();
+      syncModelPill();
+    });
+  });
+  const manage = $('#mpManage');
+  if (manage) {
+    manage.addEventListener('click', () => {
+      closeModelPop();
+      go('settings');
+      setTimeout(() => {
+        const sec = document.getElementById('sect-llm');
+        if (sec) sec.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }, 60);
+    });
+  }
+}
+
+function closeModelPop() {
+  const pop = $('#modelPop');
+  if (pop) pop.hidden = true;
+  const pill = $('#btnModelPick');
+  if (pill) pill.classList.remove('on');
+}
+
+function toggleModelPop() {
+  const pop = $('#modelPop');
+  const pill = $('#btnModelPick');
+  if (!pop) return;
+  if (pop.hidden) {
+    pop.hidden = false;
+    pill.classList.add('on');
+    renderModelPop();
+  } else {
+    closeModelPop();
+  }
+}
+
+function bindComposer() {
+  const hero = $('#heroTitle');
+  if (hero) hero.textContent = greeting();
+
+  $('#btnModelPick').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleModelPop();
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#modelPop') || e.target.closest('#btnModelPick')) return;
+    closeModelPop();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModelPop();
+  });
+
+  const ta = $('#chatInput');
+  const send = $('#btnChatSend');
+  const refresh = () => {
+    send.disabled = !ta.value.trim() || HOME.busy;
+  };
+  ta.addEventListener('input', refresh);
+  refresh();
+  syncModelPill();
+}
+
 /* ---------------- 浏览器 ---------------- */
 
 function showBrowserShot(path, note) {
@@ -1309,11 +1538,13 @@ async function sendChat(text) {
   const prov = activeProvider();
   if (!prov || !prov.apiKey) return toast('先在设置里配置模型和 API Key', true);
 
+  setChatting(true);
   HOME.msgs.push({ role: 'user', text: q });
   const ai = { role: 'ai', text: '' };
   HOME.msgs.push(ai);
   if (text == null) $('#chatInput').value = '';
   autoGrow();
+  $('#btnChatSend').disabled = true;
   HOME.busy = true;
   renderHome();
 
@@ -1370,7 +1601,7 @@ function bindHome() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
   });
 
-  document.querySelectorAll('.quick .btn').forEach((b) => {
+  document.querySelectorAll('.quick .q-chip').forEach((b) => {
     b.addEventListener('click', () => {
       const q = b.dataset.q;
       if (q === 'test') return go('repeater');
@@ -1433,6 +1664,7 @@ async function boot() {
     persist();
   });
   bindHome();
+  bindComposer();
   bindBrowser();
   renderStats();
 }

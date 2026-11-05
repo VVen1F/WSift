@@ -36,10 +36,10 @@ function today() {
 function buildMessages({ material, template, meta = {}, extra }) {
   const facts = [
     `模板：\n${template || ''}`,
-    `系统名称：${meta.product || '未提供'}`,
-    `影响地址：${meta.url || '未提供'}`,
-    `漏洞类型：${meta.type || '未提供'}`,
-    `危害等级：${meta.level || '未判定'}`,
+    `系统名称：${meta.product || '从材料里的域名和页面推断'}`,
+    `影响地址：${meta.url || '从材料里的请求行和 Host 推断'}`,
+    `漏洞类型：${meta.type || '从材料推断'}`,
+    `危害等级：${meta.level || '按实际影响面判定'}`,
     `日期：${meta.date || today()}`,
     '',
     '材料（请求、响应、现象、测试记录）：',

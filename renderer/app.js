@@ -295,7 +295,11 @@ function activeProvider() {
 function fillTemplateSelect() {
   const sel = $('#rTemplate');
   const prev = sel.value;
-  sel.innerHTML = S.templates.map((t) => `<option value="${t.id}">${esc(t.name)}（${esc(t.platform)}）</option>`).join('');
+  if (!S.templates.length) {
+    sel.innerHTML = '<option value="">无模板</option>';
+    return;
+  }
+  sel.innerHTML = S.templates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
   if (prev && Array.from(sel.options).some((o) => o.value === prev)) sel.value = prev;
 }
 
@@ -324,7 +328,7 @@ async function generateReport() {
   if (TASKS.busyId) return toast('等当前报告生成完', true);
 
   readFormInto(task, false);
-  const tpl = S.templates.find((t) => t.id === task.templateId) || S.templates[0];
+  const tpl = S.templates.find((t) => t.id === task.templateId) || null;
   const extra = (task.extra || '').trim();
   const cred = (task.cred || '').trim();
   const detail = (task.detail || '').trim();
@@ -845,6 +849,10 @@ async function loadTasks() {
 
 function renderTplList() {
   const box = $('#tplList');
+  if (!S.templates.length) {
+    box.innerHTML = '<div class="task-empty">还没有模板</div>';
+    return;
+  }
   box.innerHTML = S.templates
     .map((t) => `<div class="item ${t.id === S.tplId ? 'on' : ''}" data-id="${t.id}">
         <span class="grow">${esc(t.name)}</span><small>${esc(t.platform)}</small></div>`)
@@ -852,6 +860,35 @@ function renderTplList() {
   box.querySelectorAll('.item').forEach((el) => {
     el.addEventListener('click', () => selectTpl(el.dataset.id));
   });
+}
+
+function templateNameFrom(filePath, fileName) {
+  const raw = fileName || '';
+  const stem = raw.replace(/\.(md|markdown|txt)$/i, '').trim();
+  const generic = /^(漏洞提交模板|漏洞模板|提交模板|模板|template)$/i.test(stem);
+  if (generic && filePath) {
+    const parts = String(filePath).split(/[/\\]/).filter(Boolean);
+    const parent = parts.length >= 2 ? parts[parts.length - 2] : '';
+    if (parent) return parent;
+  }
+  return stem || '未命名模板';
+}
+
+async function importTemplateFiles(fileList) {
+  const files = Array.from(fileList || []).filter((f) => /\.(md|markdown|txt)$/i.test(f.name));
+  if (!files.length) return toast('请拖入 .md 文件', true);
+  let last = null;
+  for (const file of files) {
+    let full = '';
+    try { full = window.api.filePath ? window.api.filePath(file) : (file.path || ''); } catch (e) { full = ''; }
+    const name = templateNameFrom(full, file.name);
+    const body = (await file.text()).replace(/^\uFEFF/, '');
+    last = await window.api.templates.upsert({ name, platform: name, body });
+  }
+  S.templates = await window.api.templates.list();
+  if (last) selectTpl(last.id);
+  fillTemplateSelect();
+  toast(files.length > 1 ? '已导入 ' + files.length + ' 个模板' : '已导入 ' + (last && last.name));
 }
 
 function selectTpl(id) {
@@ -903,26 +940,46 @@ $('#tplBody').addEventListener('input', refreshTplCheck);
 $('#btnTplNew').addEventListener('click', () => {
   S.tplId = null;
   $('#tplName').value = '';
-  $('#tplPlatform').value = '自定义';
-  $('#tplBody').value = '# {{title}}\n\n## 漏洞描述\n\n{{description}}\n';
+  $('#tplPlatform').value = '';
+  $('#tplBody').value = '';
   renderTplList();
+  $('#tplName').focus();
 });
+$('#btnTplImport').addEventListener('click', () => $('#tplFile').click());
+$('#tplFile').addEventListener('change', (e) => {
+  importTemplateFiles(e.target.files);
+  e.target.value = '';
+});
+const tplDrop = $('#tplDrop');
+const tplPage = $('#page-templates');
+if (tplDrop && tplPage) {
+  ['dragenter', 'dragover'].forEach((ev) => tplPage.addEventListener(ev, (e) => {
+    if (![...((e.dataTransfer && e.dataTransfer.types) || [])].includes('Files')) return;
+    e.preventDefault();
+    tplDrop.classList.add('over');
+  }));
+  ['dragleave', 'drop'].forEach((ev) => tplPage.addEventListener(ev, (e) => {
+    e.preventDefault();
+    tplDrop.classList.remove('over');
+  }));
+  tplPage.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) importTemplateFiles(e.dataTransfer.files);
+  });
+}
 $('#btnTplDel').addEventListener('click', async () => {
   if (!S.tplId) return;
   await window.api.templates.remove(S.tplId);
   S.templates = await window.api.templates.list();
   S.tplId = S.templates[0] && S.templates[0].id;
   if (S.tplId) selectTpl(S.tplId);
+  else {
+    $('#tplName').value = '';
+    $('#tplPlatform').value = '';
+    $('#tplBody').value = '';
+  }
   renderTplList();
   fillTemplateSelect();
   toast('已删除');
-});
-$('#btnTplReset').addEventListener('click', async () => {
-  S.templates = await window.api.templates.reset();
-  S.tplId = S.templates[0].id;
-  selectTpl(S.tplId);
-  fillTemplateSelect();
-  toast('已恢复内置模板');
 });
 
 /* ---------------- 设置 ---------------- */
@@ -2175,7 +2232,7 @@ async function sendChat(text) {
   renderHome();
 
   const material = HOME.files.map((f) => `【${f.name}】\n${f.text}`).join('\n\n');
-  const tpl = S.templates.find((t) => t.id === $('#rTemplate').value) || S.templates[0];
+  const tpl = S.templates.find((t) => t.id === $('#rTemplate').value) || null;
   const messages = await window.api.chatMessages({
     material,
     template: tpl ? tpl.body : '',

@@ -74,7 +74,17 @@ function ok(name, cond, extra) {
   const kept = store.migrateProvider({ id: 'other', name: '我的线路', kind: 'anthropic', baseURL: 'https://example.test', apiKey: '', model: 'm' });
   ok('自定义名称保留', kept.name === '我的线路');
   ok('settings 含统计', typeof store.load().stats === 'object');
-  ok('模板内置 5 套', templates.list().length === 5);
+  ok('安装后没有内置模板', templates.list().length === 0);
+  fs.writeFileSync(templates.file(), JSON.stringify([
+    { id: 'general', name: '通用', builtin: true, body: 'x' },
+    { id: 'mine', name: '雷神众测', platform: '雷神众测', builtin: false, body: 'y' }
+  ]));
+  const keptTpl = templates.list();
+  ok('升级时去掉内置模板', keptTpl.length === 1 && keptTpl[0].id === 'mine');
+  ok('雷神模板用文件夹名', templates.nameFromFile('/Users/wenyifan/Documents/众测/雷神众测/漏洞提交模板.md') === '雷神众测');
+  ok('手写文件名保留', templates.nameFromFile('', '雷神众测.md') === '雷神众测');
+  ok('无模板时纯文本', report.buildMessages({ material: 'a', template: '' })[0].content.includes('纯文本'));
+  ok('有模板时按模板写', report.buildMessages({ material: 'a', template: '# 雷神' })[0].content.includes('按模板'));
   ok('模板占位符替换', report.fillTemplate('# {{title}}', { title: 'T' }) === '# T');
   ok('报告 prompt 要求纯文本', report.SYSTEM_PROMPT.includes('纯文本') && report.SYSTEM_PROMPT.includes('数据包'));
   ok('报告 prompt 不要复测', report.SYSTEM_PROMPT.includes('不要出现「复测」'));
@@ -210,7 +220,7 @@ function ok(name, cond, extra) {
   ok('压缩包用报告名', path.basename(named.zip) === titled + '.zip');
 
   console.log('\n[模板占位符]');
-  ok('内置占位符通过', templates.checkVars(templates.BUILTIN[0].body).ok === true);
+  ok('已知占位符通过', templates.checkVars('{{title}} {{url}}').ok === true);
   ok('未知占位符', templates.checkVars('{{nope}}').unknown[0] === 'nope');
   ok('未闭合', templates.checkVars('{{title').unclosed === true);
 
@@ -251,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.7', pkg.version === '0.6.7');
+  ok('版本 0.6.8', pkg.version === '0.6.8');
   const llmMod = require('../electron/llm.js');
   ok('流式正文', llmMod.takeStreamEvent({ type: 'content_block_delta', delta: { text: '甲' } }).text === '甲');
   const payload = llmMod.anthropicPayload({ model: 'glm-4.6' }, 's', [], 0.4, 8192);

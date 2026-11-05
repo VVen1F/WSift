@@ -201,22 +201,24 @@
         <div class="sheet side">
           <div class="pane-h">模板
             <span class="spacer"></span>
-            <button class="btn ghost" id="btnTplNew">新建</button>
+            <button class="btn ghost" id="btnTplImport" type="button">导入</button>
+            <button class="btn ghost" id="btnTplNew" type="button">新建</button>
           </div>
           <div class="list" id="tplList"></div>
+          <div class="tpl-drop" id="tplDrop">把 .md 拖到这里</div>
+          <input type="file" id="tplFile" accept=".md,.markdown,.txt,text/markdown" multiple hidden />
         </div>
         <div class="sheet right">
           <div class="pane-h">编辑
             <span class="spacer"></span>
-            <button class="btn ghost" id="btnTplReset">恢复内置</button>
-            <button class="btn primary" id="btnTplSave">保存</button>
+            <button class="btn primary" id="btnTplSave" type="button">保存</button>
             <button class="btn ghost" id="btnTplDel">删除</button>
           </div>
           <div class="form">
             <label class="f">名称<input class="inp" id="tplName" /></label>
             <label class="f">平台<input class="inp" id="tplPlatform" /></label>
             <label class="f grow">正文
-              <textarea class="inp" id="tplBody" placeholder="Markdown。可用 {{title}} {{url}} 这类占位符"></textarea>
+              <textarea class="inp" id="tplBody" placeholder="手填，或把 .md 拖进来"></textarea>
             </label>
             <div class="form-note" id="tplCheck"></div>
           </div>

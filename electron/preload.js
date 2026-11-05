@@ -1,5 +1,5 @@
 'use strict';
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 let seq = 0;
 
@@ -15,6 +15,13 @@ contextBridge.exposeInMainWorld('api', {
     set: (s) => ipcRenderer.invoke('settings:set', s),
     export: (withKeys) => ipcRenderer.invoke('settings:export', withKeys),
     import: () => ipcRenderer.invoke('settings:import')
+  },
+
+  filePath(file) {
+    try {
+      if (webUtils && webUtils.getPathForFile) return webUtils.getPathForFile(file) || '';
+    } catch (e) { /* 远程页面没有本地路径 */ }
+    return (file && file.path) || '';
   },
 
   templates: {

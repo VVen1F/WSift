@@ -33,9 +33,19 @@ function today() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
+const FOLLOW_TEMPLATE = `用户提供了自己的模板。按模板的章节和版式填写，模板里的表格和标题保留，不要另起一套排版，不要增删章节。
+全文不要出现「复测」。
+模板里如果有请求或数据包的位置，把完整的原始 HTTP 请求填在那里：请求行、全部头、空行、body。没有这个位置就写在正文最后。不要用三个反引号把整篇或请求包起来。不要写成 curl。
+材料里没有的不要编。禁止「值得注意的是」「综上所述」。`;
+
+function promptFor(template) {
+  return String(template || '').trim() ? FOLLOW_TEMPLATE : SYSTEM_PROMPT;
+}
+
 function buildMessages({ material, template, meta = {}, extra }) {
+  const hasTpl = String(template || '').trim();
   const facts = [
-    `模板：\n${template || ''}`,
+    hasTpl ? `模板：\n${template}` : '',
     `系统名称：${meta.product || '从材料里的域名和页面推断'}`,
     `影响地址：${meta.url || '从材料里的请求行和 Host 推断'}`,
     `漏洞类型：${meta.type || '从材料推断'}`,
@@ -45,14 +55,13 @@ function buildMessages({ material, template, meta = {}, extra }) {
     '材料（请求、响应、现象、测试记录）：',
     material || '（无）',
     extra ? `\n其他要求：${extra}` : ''
-  ].join('\n');
+  ].filter((x) => x !== '').join('\n');
 
   return [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: promptFor(template) },
     {
       role: 'user',
-      content:
-        '按材料写报告。忽略模板里的表格、标题和代码标记，只把它当成要写哪些事实。输出纯文本。\n\n' + facts
+      content: (hasTpl ? '按下面的模板和材料写报告。\n\n' : '按材料写报告。输出纯文本。\n\n') + facts
     }
   ];
 }
@@ -80,7 +89,7 @@ function buildChatMessages({ material, template, meta = {}, question, extra }) {
   ].filter(Boolean).join('\n\n');
 
   return [
-    { role: 'system', content: CHAT_SYSTEM + '\n\n' + SYSTEM_PROMPT },
+    { role: 'system', content: CHAT_SYSTEM + '\n\n' + promptFor(template) },
     { role: 'user', content: (facts ? facts + '\n\n' : '') + '用户：' + (question || '') }
   ];
 }
@@ -193,6 +202,7 @@ function save({ markdown, images = [], title = '', baseDir }) {
 
 module.exports = {
   SYSTEM_PROMPT,
+  FOLLOW_TEMPLATE,
   CHAT_SYSTEM,
   buildMessages,
   buildChatMessages,

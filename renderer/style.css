@@ -295,6 +295,17 @@ textarea.inp {
   border-right: 1px solid var(--line);
   padding-right: 16px;
 }
+.tpl-drop {
+  margin: 8px 4px 4px;
+  padding: 16px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  transition: border-color .15s var(--ease), color .15s var(--ease);
+}
+.tpl-drop.over { border-color: var(--text); color: var(--text); }
 .report-grid .side {
   width: 260px;
   flex: 0 0 260px;

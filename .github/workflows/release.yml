@@ -19,16 +19,37 @@ jobs:
           node-version: 22
 
       - name: Install
-        run: npm install
+        run: |
+          npm install
+          for i in 1 2 3 4 5; do
+            npx electron --version && exit 0
+            echo "electron binary missing, retry $i"
+            rm -rf node_modules/electron/dist "$HOME/Library/Caches/electron"
+            sleep $((i * 5))
+          done
+          exit 1
 
       - name: Test
         run: npm test
 
       - name: Smoke test
-        run: npx electron . --smoke
+        run: |
+          for i in 1 2 3; do
+            npx electron . --smoke && exit 0
+            echo "smoke failed, retry $i"
+            sleep $((i * 5))
+          done
+          exit 1
 
       - name: Build dmg
-        run: npx electron-builder --mac dmg --arm64 --x64 --publish never
+        run: |
+          for i in 1 2 3 4 5; do
+            npx electron-builder --mac dmg --arm64 --x64 --publish never && exit 0
+            echo "dmg build failed, retry $i"
+            rm -rf "$HOME/Library/Caches/electron" "$HOME/Library/Caches/electron-builder"
+            sleep $((i * 8))
+          done
+          exit 1
 
       - name: Upload dmg
         uses: actions/upload-artifact@v4
@@ -52,7 +73,13 @@ jobs:
         run: npm test
 
       - name: Build nsis
-        run: npx electron-builder --win nsis --x64 --publish never
+        run: |
+          for i in 1 2 3 4; do
+            npx electron-builder --win nsis --x64 --publish never && exit 0
+            echo "nsis build failed, retry $i"
+            sleep $((i * 8))
+          done
+          exit 1
 
       - name: Upload exe
         uses: actions/upload-artifact@v4

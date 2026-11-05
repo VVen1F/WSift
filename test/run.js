@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.18', pkg.version === '0.6.20');
+  ok('版本 0.6.18', pkg.version === '0.6.21');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -324,6 +324,9 @@ function ok(name, cond, extra) {
   const shotMod = fs.readFileSync(path.join(__dirname, '..', 'electron', 'shot.js'), 'utf8');
   ok('截图接真实毫秒', shotMod.includes('ms: realMs') && shotMod.includes('Number.isFinite(Number(ms))'));
   ok('截图算字节数', shotMod.includes("Buffer.byteLength"));
+  const shotExports = require(path.join(__dirname, '..', 'electron', 'shot.js'));
+  ok('截图高度有下限', shotExports.MIN_HEIGHT === 1200);
+  ok('截图高度有上限', shotExports.MAX_HEIGHT === 3000);
   const appSrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
   ok('发送后记录毫秒', appSrc.includes('S.lastMs = r.ok'));
   ok('截图带上毫秒', appSrc.includes('ms: S.lastMs'));

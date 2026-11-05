@@ -5,6 +5,10 @@ const { BrowserWindow, app } = require('electron');
 
 let pending = null;
 
+// 截图高度：太矮不像窗口，太高一张图放不下
+const MIN_HEIGHT = 1200;
+const MAX_HEIGHT = 3000;
+
 /**
  * 用隐藏窗口渲染 shot.html 并截图，保证图片与界面完全一致。
  */
@@ -38,8 +42,11 @@ async function capture({ request, response, width = 1600, out, ms }) {
     const height = await win.webContents.executeJavaScript(
       'Math.ceil(document.documentElement.getBoundingClientRect().height)'
     );
-    const h = Math.max(240, Math.min(Number(height) || 800, 20000));
+    // 高度有上下限：短响应不留一条窄图，长 body 也不整段铺开
+    const h = Math.max(MIN_HEIGHT, Math.min(Number(height) || MIN_HEIGHT, MAX_HEIGHT));
     win.setContentSize(width, h);
+    // 定高之后让窗口撑满，状态栏贴底
+    await win.webContents.executeJavaScript("document.body.classList.add('fitted')");
 
     await new Promise((r) => setTimeout(r, 220));
 
@@ -185,4 +192,4 @@ function pickSource(sources, display) {
   return sources.find((s) => id && String(s.display_id) === id) || sources[0];
 }
 
-module.exports = { capture, captureScreen, screenAccess, thumbnailSizeFor, looksBlack };
+module.exports = { capture, captureScreen, screenAccess, thumbnailSizeFor, looksBlack, MIN_HEIGHT, MAX_HEIGHT };

@@ -13,7 +13,8 @@
   }
 
   .win { display: flex; flex-direction: column; background: #fff; }
-  .body-row { display: flex; min-height: 0; }
+  body.fitted .win { height: 100vh; }
+  .body-row { display: flex; flex: 1 1 auto; min-height: 0; }
 
   .panes { display: flex; flex: 1 1 auto; min-width: 0; }
   .pane { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid #e2e2e2; }
@@ -44,7 +45,7 @@
   .code {
     margin: 0; padding: 4px 12px 10px 44px; flex: 1 1 auto; min-height: 508px;
     font: 12px/14.5px Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
-    white-space: pre-wrap; overflow-wrap: anywhere; color: #1f1f1f;
+    white-space: pre-wrap; overflow-wrap: anywhere; color: #1f1f1f; overflow: hidden;
     background-image: none;
     background-repeat: no-repeat;
     counter-reset: ln;

@@ -38,7 +38,7 @@ function createWindow() {
     minHeight: 600,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: '#f5f5f7',
+    backgroundColor: '#ffffff',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -110,6 +110,10 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  mainWindow.on('focus', () => {
+    recheckPerm();
   });
 }
 
@@ -211,6 +215,62 @@ const shotDir = () => {
 const stampName = (p) => `${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}${p}`;
 
 let burstCtl = null;
+let permWatch = null;
+let permJob = null;
+
+function sendPerm(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+}
+
+function stopPermWatch() {
+  if (permWatch) {
+    clearInterval(permWatch);
+    permWatch = null;
+  }
+}
+
+function recheckPerm() {
+  const status = shot.screenAccess();
+  sendPerm('perm:status', { status, platform: process.platform });
+  if (status === 'granted' && permJob) {
+    const job = permJob;
+    permJob = null;
+    stopPermWatch();
+    Promise.resolve()
+      .then(job)
+      .catch((e) => {
+        sendPerm('perm:retry', {
+          ok: false,
+          code: e.code || '',
+          error: e.code === 'BLACK_FRAME' ? '画面是黑的。退出 Refract 再打开，授权才会生效。' : e.message
+        });
+      });
+  }
+}
+
+function startPermWatch() {
+  if (permWatch || process.platform !== 'darwin') return;
+  permWatch = setInterval(recheckPerm, 1200);
+}
+
+function needScreen(job) {
+  permJob = async () => {
+    let result = await job();
+    if (result && result.code === 'NO_PERM' && shot.screenAccess() === 'granted') {
+      result = { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 Refract 再打开，授权才会生效。' };
+    }
+    sendPerm('perm:retry', result || { ok: true });
+    return result;
+  };
+  const status = shot.screenAccess();
+  sendPerm('perm:need', {
+    status,
+    platform: process.platform,
+    message: '整屏截图和弹窗取证要读取屏幕。到系统设置勾上 Refract，回到窗口后会自动再拍一次。'
+  });
+  startPermWatch();
+  return { ok: false, code: 'NO_PERM', status, waiting: true, error: '需要屏幕录制权限' };
+}
 
 async function captureBurst() {
   const dir = fs.mkdtempSync(path.join(app.getPath('temp'), 'refract-dlg-'));
@@ -229,7 +289,9 @@ async function captureBurst() {
       const r = await shot.captureScreen(file);
       frames.push({ t, path: file, size: r.size || fs.statSync(file).size });
     } catch (e) {
-      if (e.code === 'NO_PERM') return { dir, frames, perm: false, error: e.message };
+      if (e.code === 'NO_PERM' || e.code === 'BLACK_FRAME') {
+        return { dir, frames, perm: e.code !== 'NO_PERM', error: e.message, code: e.code };
+      }
     }
   }
   return { dir, frames, perm: true };
@@ -260,21 +322,36 @@ async function pickByVision(frames) {
   return n >= 1 && n <= picks.length ? picks[n - 1] : null;
 }
 
-browser.onDialog(async (info) => {
+function deliverDialog(info, result) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('browser:dialog', { phase: 'open', type: info.type, message: info.message });
+    mainWindow.webContents.send('browser:dialog', {
+      phase: 'done',
+      type: info.type,
+      message: info.message,
+      shot: result.shot || null,
+      method: result.method || 'none',
+      frames: result.frames || 0,
+      error: result.error || null,
+      code: result.code || ''
+    });
   }
+}
 
+async function performDialogCapture(info) {
   let chosen = null;
   let error = null;
   let method = 'none';
   let count = 0;
-
+  let code = '';
   try {
     const burst = await captureBurst();
     count = burst.frames.length;
-    if (!burst.perm) {
+    code = burst.code || '';
+    if (burst.code === 'NO_PERM' || burst.code === 'BLACK_FRAME') {
       error = burst.error;
+    } else if (!burst.perm) {
+      error = burst.error;
+      code = code || 'NO_PERM';
     } else if (burst.frames.length) {
       try {
         chosen = await pickByVision(burst.frames);
@@ -287,7 +364,6 @@ browser.onDialog(async (info) => {
         method = 'size';
       }
     }
-
     if (chosen) {
       const dest = path.join(shotDir(), stampName('-dialog.png'));
       fs.copyFileSync(chosen.path, dest);
@@ -296,21 +372,38 @@ browser.onDialog(async (info) => {
     try { fs.rmSync(burst.dir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
   } catch (e) {
     error = e.message;
+    code = e.code || code;
   } finally {
     burstCtl = null;
   }
+  return {
+    ok: !code && !!chosen,
+    shot: chosen ? chosen.path : null,
+    method,
+    frames: count,
+    error,
+    code
+  };
+}
 
+browser.onDialog(async (info) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('browser:dialog', {
-      phase: 'done',
-      type: info.type,
-      message: info.message,
-      shot: chosen ? chosen.path : null,
-      method,
-      frames: count,
-      error
-    });
+    mainWindow.webContents.send('browser:dialog', { phase: 'open', type: info.type, message: info.message });
   }
+
+  const run = async () => {
+    const result = await performDialogCapture(info);
+    deliverDialog(info, result);
+    return { ok: result.ok, path: result.shot, code: result.code, error: result.error };
+  };
+
+  if (process.platform === 'darwin' && shot.screenAccess() !== 'granted') {
+    deliverDialog(info, { error: '需要屏幕录制权限', code: 'NO_PERM' });
+    needScreen(run);
+    return;
+  }
+  const result = await run();
+  if (result.code === 'NO_PERM' && shot.screenAccess() !== 'granted') needScreen(run);
 });
 
 browser.onDialogClosed(() => {
@@ -405,11 +498,13 @@ ipcMain.handle('perm:request', async () => {
   } catch (e) {
     /* 触发系统授权框即可 */
   }
+  recheckPerm();
   return { status: shot.screenAccess(), platform: process.platform };
 });
 ipcMain.handle('perm:open', async () => {
   if (process.platform === 'darwin') {
     await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    startPermWatch();
     return { ok: true };
   }
   return { ok: false, error: '这个平台不需要单独授权' };
@@ -451,12 +546,30 @@ ipcMain.handle('browser:shot', async () => {
   }
 });
 ipcMain.handle('browser:screen', async () => {
-  try {
-    const r = await shot.captureScreen(path.join(shotDir(), stampName('-screen.png')));
-    return { ok: true, path: r.path };
-  } catch (e) {
-    return { ok: false, error: e.message };
+  const file = path.join(shotDir(), stampName('-screen.png'));
+  const shoot = async () => {
+    try {
+      const r = await shot.captureScreen(file);
+      return { ok: true, path: r.path };
+    } catch (e) {
+      if (e.code === 'NO_PERM') {
+        return { ok: false, code: 'NO_PERM', status: e.status, error: e.message };
+      }
+      if (e.code === 'BLACK_FRAME') {
+        return { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 Refract 再打开，授权才会生效。' };
+      }
+      return { ok: false, error: e.message };
+    }
+  };
+  if (process.platform === 'darwin' && shot.screenAccess() !== 'granted') {
+    return needScreen(shoot);
   }
+  const result = await shoot();
+  if (result.code === 'NO_PERM' && shot.screenAccess() !== 'granted') return needScreen(shoot);
+  if (result.code === 'NO_PERM') {
+    return { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 Refract 再打开，授权才会生效。' };
+  }
+  return result;
 });
 ipcMain.handle('browser:close', () => {
   browser.shutdown();
@@ -510,6 +623,7 @@ ipcMain.handle('settings:import', async () => {
   }
 });
 
+ipcMain.handle('templates:check', (_e, body) => templates.checkVars(body));
 ipcMain.handle('templates:list', () => templates.list());
 ipcMain.handle('templates:upsert', (_e, t) => templates.upsert(t));
 ipcMain.handle('templates:remove', (_e, id) => templates.remove(id));

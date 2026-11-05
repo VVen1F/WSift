@@ -172,8 +172,50 @@ function ok(name, cond, extra) {
   ok('model 变成模型列表', mig.models[0] === 'm1' && mig.activeModel === 'm1');
 
   console.log('\n[报告保存]');
-  const saved = report.save({ markdown: '# t', images: [], title: 'demo', baseDir: path.join(process.env.REFRACT_DATA_DIR, 'reports') });
+  const reportRoot = path.join(process.env.REFRACT_DATA_DIR, 'reports');
+  const shotFile = path.join(process.env.REFRACT_DATA_DIR, 'one.png');
+  fs.writeFileSync(shotFile, Buffer.from('png-bytes'));
+  const saved = report.save({ markdown: '# t\n', images: [shotFile], title: '演示', baseDir: reportRoot });
   ok('生成 report.md', fs.existsSync(saved.md));
+  ok('生成 zip', saved.zip && fs.existsSync(saved.zip));
+  const zip = require('../electron/zip.js');
+  const zbuf = fs.readFileSync(saved.zip);
+  const names = zip.list(zbuf).map((e) => e.name);
+  ok('zip 含标题/report.md', names.indexOf('演示/report.md') >= 0, names.join(','));
+  ok('zip 含 images/01.png', names.indexOf('演示/images/01.png') >= 0, names.join(','));
+  const mdInZip = zip.read(zbuf, '演示/report.md').toString('utf8');
+  ok('md 相对路径对得上', mdInZip.includes('](images/01.png)') && !mdInZip.includes(shotFile));
+  ok('文件夹里的图和 md 一致', fs.existsSync(path.join(saved.dir, 'images', '01.png')));
+
+  console.log('\n[模板占位符]');
+  ok('内置占位符通过', templates.checkVars(templates.BUILTIN[0].body).ok === true);
+  ok('未知占位符', templates.checkVars('{{nope}}').unknown[0] === 'nope');
+  ok('未闭合', templates.checkVars('{{title').unclosed === true);
+
+  console.log('\n[安装包选择]');
+  const assets = [
+    { name: 'Refract-0.6.0-arm64.dmg' },
+    { name: 'Refract-0.6.0.dmg' },
+    { name: 'Refract-Setup-0.6.0.exe' },
+    { name: 'Refract-0.6.0.AppImage' }
+  ];
+  ok('mac 选 dmg', /arm64\.dmg$/.test(updater.pickAsset(assets, 'darwin', 'arm64').name));
+  ok('windows 选 exe', /\.exe$/.test(updater.pickAsset(assets, 'win32', 'x64').name));
+
+  console.log('\n[截图尺寸]');
+  const shot = require('../electron/shot.js');
+  ok('高 DPI 用物理像素', shot.thumbnailSizeFor({ size: { width: 1920, height: 1080 }, scaleFactor: 1.5 }).width === 2880);
+  ok('超大屏钳制', shot.thumbnailSizeFor({ size: { width: 5000, height: 2000 }, scaleFactor: 2 }).width === 4096);
+  const blackBmp = Buffer.alloc(16, 0);
+  ok('全黑判定', shot.looksBlack({
+    isEmpty: () => false,
+    resize: () => ({ getSize: () => ({ width: 2, height: 2 }), toBitmap: () => blackBmp })
+  }) === true);
+  const lit = Buffer.from([0, 0, 0, 255, 200, 200, 200, 255, 180, 180, 180, 255, 20, 20, 20, 255]);
+  ok('有内容不算黑', shot.looksBlack({
+    isEmpty: () => false,
+    resize: () => ({ getSize: () => ({ width: 2, height: 2 }), toBitmap: () => lit })
+  }) === false);
 
   console.log('\n[主进程]');
   require('../electron/main.js');

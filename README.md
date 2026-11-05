@@ -1,6 +1,8 @@
 # Refract
 
-漏洞测试与报告工作台。一个 macOS 桌面客户端，把「发包 → 截图 → 写报告」串成一条线。
+漏洞测试与报告工作台。桌面客户端，把「发包 → 截图 → 写报告」串成一条线。
+
+0.6.0：界面收成黑白行式，报告导出为 zip，并提供 Windows 安装包。
 
 ![首页](docs/home.png)
 
@@ -52,7 +54,7 @@
 - 四栏：模板、账号密码、漏洞详情、其他要求；账号密码会一并交给模型当测试上下文
 - 调用你配置的大模型生成 Markdown 报告
 - 后端内置写作约束：标题固定句式、不夸大、段落不超过三句、禁用「值得注意的是」「综上所述」这类腔调，保证每次输出风格一致
-- 生成结果可编辑、可复制、保存时自动把截图放进 `images/` 并附在文末
+- 生成结果可编辑、可复制。导出是一个 zip：`标题/report.md`，截图在 `标题/images/01.png`，正文里用相对路径 `images/01.png`
 
 **模板**
 - 内置通用、补天、漏洞盒子、CNVD、教育行业五套
@@ -60,7 +62,7 @@
 
 **模型**
 - OpenAI 兼容与 Anthropic 兼容两种协议，可加多个服务，随时切换
-- 模型配置以卡片呈现：星标激活、状态、模型、Key 尾号，点卡片进去加账号、勾选模型
+- 模型配置是一行一项：星标激活、状态、模型、Key 尾号，点进去加账号、勾选模型
 - 右上角「+ 新建」弹出配置表单，可先测试连接再创建
 
   ![新建模型配置](docs/newmodel.png)
@@ -88,22 +90,24 @@ npm test         # 无界面冒烟测试
 
 ```bash
 npm run dist:mac     # 需要 macOS，产出 dist/*.dmg
+npm run dist:win     # 需要 Windows，产出 NSIS 安装包 dist/*.exe
 npm run dist:linux   # 可选，产出 AppImage
 ```
 
-推 `v*` 标签会触发 GitHub Actions，在 macOS 上打出 arm64 与 x64 两个 dmg 并附到 Release。
+推 `v*` 标签会触发 GitHub Actions：macOS 打出 arm64 与 x64 两个 dmg，Windows 打出 NSIS exe，一起附到同一个 Release。
 
 ## 数据位置
 
 | 内容 | 路径 |
 | --- | --- |
-| 设置、模板 | `~/Library/Application Support/Refract/` |
+| 设置、模板 | macOS `~/Library/Application Support/Refract/`，Windows `%APPDATA%\Refract\` |
 | 截图 | 同上 `shots/` |
-| 报告 | `~/Documents/Refract/<时间>-<标题>/` |
+| 报告 | `文档/Refract/<时间>-<标题>/`，旁边有同名 `.zip` |
 
 API Key 只写在本机 settings.json，不会上传。
 
 ## 已知限制
 
 - 安装包未做 Apple 签名与公证。首次打开如果被拦，右键 → 打开，或在「系统设置 → 隐私与安全性」里放行。
-- 自动更新依赖 Release 里的 dmg 资产名带 `.dmg`。
+- Windows 安装包未签名。SmartScreen 会提示「Windows 已保护你的电脑」。点「更多信息」，再点「仍要运行」。
+- 自动更新按系统选安装包：macOS 用 dmg，Windows 用 exe。

@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const zip = require('./zip');
 
 /** 后端硬编码的写作约束：所有报告都必须过这一层，保证风格一致。 */
 const SYSTEM_PROMPT = `你是一名有十年经验的 SRC 漏洞报告作者。你的输出只有报告正文，不解释、不寒暄、不复述写作过程。
@@ -104,28 +105,71 @@ function stamp() {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
+function imageFileName(src, index) {
+  const ext = (path.extname(src) || '.png').toLowerCase();
+  const use = ext === '.jpeg' ? '.jpg' : ext === '.png' || ext === '.jpg' || ext === '.webp' || ext === '.gif' ? ext : '.png';
+  return `${String(index).padStart(2, '0')}${use}`;
+}
+
 /**
- * 保存报告与图片到同一文件夹。
- * @returns {{dir:string, md:string, images:string[]}}
+ * 组装 zip 内的文件：`<标题>/report.md` + `<标题>/images/01.png`。
+ * 文末截图链接改成与压缩包内一致的相对路径。
+ */
+function bundle({ markdown, images = [], title = '' }) {
+  const root = slugify(title);
+  const names = [];
+  const files = [];
+  for (const src of images) {
+    if (!src || !fs.existsSync(src)) continue;
+    const name = imageFileName(src, names.length + 1);
+    names.push(name);
+    files.push({ name: `${root}/images/${name}`, data: fs.readFileSync(src) });
+  }
+
+  let md = String(markdown || '').replace(/\n*## 截图[\s\S]*$/, '').replace(/\s+$/, '');
+  if (names.length) {
+    md += '\n\n## 截图\n\n' + names.map((n, i) => `![${i + 1}](images/${n})`).join('\n\n') + '\n';
+  } else {
+    md += '\n';
+  }
+  files.unshift({ name: `${root}/report.md`, data: Buffer.from(md, 'utf8') });
+  return { root, markdown: md, files, names };
+}
+
+/**
+ * 写出文件夹，并在旁边打一个 zip。zip 根目录是标题。
+ * @returns {{dir:string, md:string, zip:string, images:string[]}}
  */
 function save({ markdown, images = [], title = '', baseDir }) {
+  const packed = bundle({ markdown, images, title });
   const root = baseDir || path.join(require('os').homedir(), 'Documents', 'Refract');
-  const dir = path.join(root, `${stamp()}-${slugify(title)}`);
+  const dir = path.join(root, `${stamp()}-${packed.root}`);
   const imgDir = path.join(dir, 'images');
   fs.mkdirSync(imgDir, { recursive: true });
 
-  const written = [];
-  images.forEach((src, i) => {
-    if (!src || !fs.existsSync(src)) return;
-    const ext = path.extname(src) || '.png';
-    const name = `${String(i + 1).padStart(2, '0')}${ext}`;
-    fs.copyFileSync(src, path.join(imgDir, name));
-    written.push(name);
-  });
-
   const mdPath = path.join(dir, 'report.md');
-  fs.writeFileSync(mdPath, markdown || '', 'utf8');
-  return { dir, md: mdPath, images: written };
+  fs.writeFileSync(mdPath, packed.markdown, 'utf8');
+  const written = [];
+  for (const f of packed.files) {
+    if (!f.name.includes('/images/')) continue;
+    const base = path.basename(f.name);
+    fs.writeFileSync(path.join(imgDir, base), f.data);
+    written.push(base);
+  }
+
+  const zipPath = `${dir}.zip`;
+  fs.writeFileSync(zipPath, zip.write(packed.files));
+  return { dir, md: mdPath, zip: zipPath, images: written };
 }
 
-module.exports = { SYSTEM_PROMPT, CHAT_SYSTEM, buildMessages, buildChatMessages, fillTemplate, save, slugify, today };
+module.exports = {
+  SYSTEM_PROMPT,
+  CHAT_SYSTEM,
+  buildMessages,
+  buildChatMessages,
+  fillTemplate,
+  bundle,
+  save,
+  slugify,
+  today
+};

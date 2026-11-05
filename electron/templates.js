@@ -201,4 +201,27 @@ function reset() {
   return saveAll(JSON.parse(JSON.stringify(BUILTIN)));
 }
 
-module.exports = { list, upsert, remove, reset, BUILTIN, file };
+const KNOWN_VARS = [
+  'title', 'type', 'level', 'url', 'date', 'description', 'steps',
+  'impact', 'fix', 'account', 'author', 'product'
+];
+
+/** 模板占位符：未闭合，或用了内置模板里没有的名字。 */
+function checkVars(body) {
+  const s = String(body || '');
+  const open = (s.match(/\{\{/g) || []).length;
+  const close = (s.match(/\}\}/g) || []).length;
+  let unclosed = open !== close;
+  const unknown = [];
+  const re = /\{\{\s*([^}]*?)\s*\}\}/g;
+  let m;
+  while ((m = re.exec(s))) {
+    const name = m[1];
+    if (!/^\w+$/.test(name) || KNOWN_VARS.indexOf(name) < 0) unknown.push(name || '空');
+    if (!name) unclosed = true;
+  }
+  if (/\{\{[^}]*$/.test(s)) unclosed = true;
+  return { ok: !unclosed && unknown.length === 0, unclosed, unknown: [...new Set(unknown)] };
+}
+
+module.exports = { list, upsert, remove, reset, checkVars, KNOWN_VARS, BUILTIN, file };

@@ -50,13 +50,9 @@
         <button data-sec="backup">备份</button>
         <button data-sec="about">关于</button>
         <div class="pop-sep"></div>
-        <button id="menuArchive">归档管理</button>
+        <button data-sec="archive">归档管理</button>
       </div>
-      <div class="gateway" id="gateway" title="点击复制地址">
-        <span class="gdot off" id="gwDot"></span><span id="gwText">服务未启动</span>
-      </div>
-      <div class="ver" id="ver"></div>
-    </div>
+</div>
   </aside>
 
   <main>
@@ -301,6 +297,18 @@
             <div class="vlist" id="backupList"></div>
           </div>
 
+          <div class="sect" id="sect-archive" hidden>
+            <h3>归档管理</h3>
+            <div class="arch-toolbar">
+              <input class="inp arch-search" id="archSearch" placeholder="搜索已归档会话" />
+              <select class="inp kin" id="archSort">
+                <option value="updated">更新时间</option>
+                <option value="name">名称</option>
+              </select>
+            </div>
+            <div id="archList" class="arch-list"></div>
+          </div>
+
           <div class="sect" id="sect-about" hidden>
             <h3>关于</h3>
             <div class="klist">
@@ -432,23 +440,6 @@
   </div>
 </div>
 <div class="ctx" id="taskMenu" hidden role="menu"></div>
-<div class="modal" id="archiveModal" hidden>
-  <div class="modal-card arch-card">
-    <div class="modal-head">
-      <b>归档管理</b>
-      <button class="modal-x" id="archClose">×</button>
-    </div>
-    <div class="arch-toolbar">
-      <input class="inp arch-search" id="archSearch" placeholder="搜索已归档会话" />
-      <select class="inp kin" id="archSort">
-        <option value="updated">更新时间</option>
-        <option value="name">名称</option>
-      </select>
-    </div>
-    <div id="archList" class="arch-list"></div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 <script src="app.js"></script>
 </body>

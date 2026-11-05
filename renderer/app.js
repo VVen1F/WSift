@@ -2489,23 +2489,13 @@ function renderArchive() {
 }
 
 function openArchive() {
-  const m = $('#archiveModal');
-  if (!m) return;
-  m.hidden = false;
+  showSettingsSection('archive');
+  go('settings');
   renderArchive();
-  $('#archSearch').focus();
-}
-
-function closeArchive() {
-  const m = $('#archiveModal');
-  if (m) m.hidden = true;
 }
 
 function bindArchive() {
 
-  if ($('#archClose')) $('#archClose').addEventListener('click', closeArchive);
-  const modal = $('#archiveModal');
-  if (modal) modal.addEventListener('click', (e) => { if (e.target.id === 'archiveModal') closeArchive(); });
   if ($('#archSearch')) $('#archSearch').addEventListener('input', renderArchive);
   if ($('#archSort')) $('#archSort').addEventListener('change', renderArchive);
 
@@ -2579,7 +2569,7 @@ function bindTheme() {
 }
 
 function showSettingsSection(key) {
-  const keys = ['general', 'network', 'llm', 'backup', 'about'];
+  const keys = ['general', 'network', 'llm', 'backup', 'archive', 'about'];
   if (keys.indexOf(key) < 0) key = 'general';
   keys.forEach((k) => {
     const sec = document.getElementById('sect-' + k);
@@ -2605,14 +2595,6 @@ function bindSettingsMenu() {
 
   btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
   pop.addEventListener('click', (e) => e.stopPropagation());
-
-  const arch = $('#menuArchive');
-  if (arch) {
-    arch.addEventListener('click', () => {
-      close();
-      openArchive();
-    });
-  }
 
   pop.querySelectorAll('button[data-sec]').forEach((b) => {
     b.addEventListener('click', () => {

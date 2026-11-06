@@ -404,6 +404,79 @@ function looksLikeRefusal(md) {
   return !hasRequestLine(md) && /无法|抱歉|不能|请补充|请提供|cannot|unable/i.test(head);
 }
 
+
+/* ---------------- 数据包自动截图 ---------------- */
+
+// 从漏洞详情里抽出所有 HTTP 请求包（围栏里或裸文本都认）
+function extractPackets(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const reqLine = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+\S+\s+HTTP\/[\d.]+/;
+  const headRe = /^[A-Za-z0-9-]+:\s?\S/;
+  const out = [];
+  const seen = new Set();
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    const bare = line.replace(/^```[a-zA-Z]*\s*/, '');
+    if (!reqLine.test(bare)) { i++; continue; }
+    const block = [bare];
+    i++;
+    while (i < lines.length) {
+      const cur = lines[i];
+      const t = cur.trim();
+      if (t === '```') { i++; break; }
+      if (!t) {
+        // 空行后面如果是 body（不以 Header: 形式开头），继续收
+        let j = i + 1;
+        const body = [];
+        while (j < lines.length && lines[j].trim() && lines[j].trim() !== '```') body.push(lines[j++]);
+        if (body.length) { block.push('', ...body); i = j; }
+        else i++;
+        break;
+      }
+      if (!headRe.test(t)) break;
+      block.push(t);
+      i++;
+    }
+    const pkt = block.join('\n');
+    const key = pkt.slice(0, 300);
+    if (!seen.has(key)) { seen.add(key); out.push(pkt); }
+  }
+  return out;
+}
+
+// 把详情里的每个数据包都截一张图挂到任务上，已截过的跳过
+async function attachPacketShots(task) {
+  if (!task) return 0;
+  const pkts = extractPackets(task.detail || '');
+  if (!pkts.length) return 0;
+  task.images = Array.isArray(task.images) ? task.images : [];
+  task.shotPackets = Array.isArray(task.shotPackets) ? task.shotPackets : [];
+  const shot = new Set(task.shotPackets);
+  const width = Number(S.settings.ui.shotWidth) || 1600;
+  let added = 0;
+  for (const pkt of pkts) {
+    const key = pkt.slice(0, 300);
+    if (shot.has(key)) continue;
+    try {
+      const r = await window.api.capture({ request: pkt, response: '', width, ms: 0 });
+      if (r && r.path) {
+        task.images.push(r.path);
+        shot.add(key);
+        task.shotPackets.push(key);
+        added++;
+      }
+    } catch (e) {
+      // 单张失败不影响生成
+    }
+  }
+  if (added) {
+    if (task.id === TASKS.id) S.images = task.images;
+    saveTasksSoon();
+  }
+  return added;
+}
+
 async function generateReport() {
   const prov = activeProvider();
   if (!prov || !prov.apiKey) return toast('先在设置里配置模型和 API Key', true);
@@ -429,6 +502,9 @@ async function generateReport() {
     TASKS.starting = false;
     return toast('材料里没有请求包，先发一次包或贴一段请求', true);
   }
+
+  // 详情里的每个数据包先自动截一张，报告里就有图
+  await attachPacketShots(task);
 
   const material = (cred ? '账号密码：\n' + cred + '\n\n' : '') + detail;
   let messages;
@@ -613,6 +689,7 @@ async function saveReport() {
   const task = currentTask();
   if (task) readFormInto(task, false);
   const title = (task && task.title) || mdTitle(S.reportMd);
+  if (task) await attachPacketShots(task);
   const imgs = (S.images && S.images.length ? S.images : (task && task.images) || []).filter(Boolean);
   const md = S.reportMd.replace(/\s+$/, '') + imagesSection(imgs);
   const r = await window.api.saveReport({ markdown: md, images: imgs, title });

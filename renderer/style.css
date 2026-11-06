@@ -75,9 +75,12 @@ html[data-ds-dark-theme] {
     color-scheme: dark;
 }
 
-@supports (corner-shape: superellipse(1.5)) {
-  * , *::before, *::after { corner-shape: superellipse(1.5); }
-  .gdot, .brand .dot, .brand .dot span { corner-shape: round; }
+@supports (corner-shape: squircle) {
+  * , *::before, *::after { corner-shape: squircle; }
+  .gdot, .brand .dot, .brand .dot span,
+  .switch, .switch span::after, .switch::after,
+  .spin, .dot, .prov-dot, .task .dot,
+  input[type="checkbox"], input[type="radio"] { corner-shape: round; }
 }
 
 * {

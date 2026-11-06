@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.18', pkg.version === '0.6.37');
+  ok('版本 0.6.18', pkg.version === '0.6.38');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -339,6 +339,9 @@ function ok(name, cond, extra) {
   ok('发送后记录毫秒', appSrc.includes('S.lastMs = r.ok'));
   ok('截图带上毫秒', appSrc.includes('ms: S.lastMs'));
   ok('版本元素缺失不崩', appSrc.includes("const ver = $('#ver')"));
+  const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'style.css'), 'utf8');
+  ok('控件用连续曲率圆角', css.includes('corner-shape: squircle') && css.includes('@supports (corner-shape: squircle)'));
+  ok('圆形控件退回标准圆角', css.includes('.switch, .switch span::after'));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

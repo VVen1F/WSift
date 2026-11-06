@@ -346,7 +346,14 @@ function deriveMeta(material) {
 
 function mdTitle(md) {
   const line = String(md || '').split(/\r?\n/).map((s) => s.trim()).find(Boolean) || '';
-  return line.replace(/^#+\s*/, '').replace(/[\s]*复测\s*$/g, '').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 80) || '报告';
+  return line
+    .replace(/^#+\s*/, '')
+    // 模型爱把字段名写进标题，去掉这些前缀
+    .replace(/^(漏洞名称|报告名称|标题|名称)\s*[:：]\s*/, '')
+    .replace(/[\s]*复测\s*$/g, '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .trim()
+    .slice(0, 80) || '报告';
 }
 
 const runs = new Map();

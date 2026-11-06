@@ -591,11 +591,14 @@ async function generateReport() {
   // 让模型基于实测响应出探针，再真的打一遍（慢一点没关系）
   try {
     const rounds = Number(S.settings.report && S.settings.report.probeRounds);
-    const n = Number.isFinite(rounds) ? Math.max(0, Math.min(2, rounds)) : 1;
+    const n = Number.isFinite(rounds) ? Math.max(0, Math.min(3, rounds)) : 2;
     if (n > 0 && probes.length) {
       const seen = new Set(probes.map((x) => x.pkt.slice(0, 300)));
+      // 多轮：每轮都把到目前为止的全部实测结果带上，模型据此提下一批
+      for (let round = 0; round < n; round++) {
       const brief = probes.map((p) => p.pkt + '\n--> ' + String(p.res || '').slice(0, 800)).join('\n\n');
       const planned = await planProbes(brief, prov);
+      if (!planned.length) break;
       for (const it of planned) {
         if (it.browser) {
           // XSS 这类：用浏览器打开，弹窗出现时现有链路会整屏截图并挂到任务
@@ -631,6 +634,7 @@ async function generateReport() {
         } catch (e) {
           probes.push({ pkt: it.raw, ok: false, status: 0, ms: 0, res: '', why: it.why, probe: true });
         }
+      }
       }
     }
   } catch (e) { /* 探针失败不影响正常生成 */ }

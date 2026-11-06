@@ -602,9 +602,10 @@ async function generateReport() {
   }
 }
 
-function imagesSection() {
-  if (!S.images.length) return '';
-  return '\n\n' + S.images.map((_, i) => `![](images/${String(i + 1).padStart(2, '0')}.png)`).join('\n\n') + '\n';
+function imagesSection(list) {
+  const imgs = (list || S.images || []).filter(Boolean);
+  if (!imgs.length) return '';
+  return '\n\n' + imgs.map((_, i) => `![](images/${String(i + 1).padStart(2, '0')}.png)`).join('\n\n') + '\n';
 }
 
 async function saveReport() {
@@ -612,8 +613,9 @@ async function saveReport() {
   const task = currentTask();
   if (task) readFormInto(task, false);
   const title = (task && task.title) || mdTitle(S.reportMd);
-  const md = S.reportMd.replace(/\s+$/, '') + imagesSection();
-  const r = await window.api.saveReport({ markdown: md, images: S.images, title });
+  const imgs = (S.images && S.images.length ? S.images : (task && task.images) || []).filter(Boolean);
+  const md = S.reportMd.replace(/\s+$/, '') + imagesSection(imgs);
+  const r = await window.api.saveReport({ markdown: md, images: imgs, title });
   S.reportDir = (r && (r.zip || r.dir)) || '';
   if (task) {
     task.exported = S.reportDir;
@@ -1003,7 +1005,10 @@ function createTask(partial) {
     detail: partial.detail || '',
     extra: partial.extra || '',
     markdown: partial.markdown || '',
-    images: Array.isArray(partial.images) ? partial.images.slice() : []
+    // 之前截的图挂到这条任务上，别让它跟着 pendingShots 丢掉
+    images: Array.isArray(partial.images) && partial.images.length
+      ? partial.images.slice()
+      : S.pendingShots.splice(0, S.pendingShots.length)
   };
   if (!hasContent(incoming)) return requestNewTask();
   flushDraft();

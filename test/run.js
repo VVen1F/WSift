@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.18', pkg.version === '0.6.44');
+  ok('版本 0.6.18', pkg.version === '0.6.45');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -340,6 +340,8 @@ function ok(name, cond, extra) {
   ok('发送后记录毫秒', appSrc.includes('S.lastMs = r.ok'));
   ok('截图带上毫秒', appSrc.includes('ms: S.lastMs'));
   ok('版本元素缺失不崩', appSrc.includes("const ver = $('#ver')"));
+  ok('新建任务带上已截的图', appSrc.includes('S.pendingShots.splice(0, S.pendingShots.length)'));
+  ok('导出用任务自己的图', appSrc.includes('const imgs = (S.images && S.images.length'));
   const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'style.css'), 'utf8');
   ok('控件用连续曲率圆角', css.includes('corner-shape: squircle') && css.includes('@supports (corner-shape: squircle)'));
   ok('圆形控件退回标准圆角', css.includes('.switch, .switch span::after'));

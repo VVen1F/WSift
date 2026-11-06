@@ -478,6 +478,10 @@ function probesFromText(txt) {
     if (!it) continue;
     const url = String(it.url || '');
     if (!/^https?:\/\//i.test(url)) continue;
+    if (it.kind === 'browser' || /^browser$/i.test(String(it.method || ''))) {
+      out.push({ browser: url, why: String(it.why || '') });
+      continue;
+    }
     const u = new URL(url);
     const method = String(it.method || 'GET').toUpperCase();
     const lines = [method + ' ' + (u.pathname || '/') + (u.search || '') + ' HTTP/1.1'];
@@ -501,7 +505,8 @@ function probesFromText(txt) {
 // 用一次轻量对话产出探针计划
 async function planProbes(material, prov) {
   const sys = '你是渗透测试助手。根据材料里的目标与已观测响应，给出最多 4 条用于验证危害的 HTTP 探针，' +
-    '只输出 JSON 数组，元素形如 {"method":"GET","url":"https://...","headers":{},"body":"","why":"说明"}。' +
+    '只输出 JSON 数组，元素形如 {"method":"GET","url":"https://...","headers":{},"body":"","why":"说明"}；' +
+    '如果材料是 XSS/前端类，可以输出 {"kind":"browser","url":"https://...","why":"说明"} 让工具用浏览器打开它。' +
     '要求：只读、无害、可重复；不要写脚本或解释文字。';
   let txt = '';
   await window.api.chat({
@@ -592,6 +597,29 @@ async function generateReport() {
       const brief = probes.map((p) => p.pkt + '\n--> ' + String(p.res || '').slice(0, 800)).join('\n\n');
       const planned = await planProbes(brief, prov);
       for (const it of planned) {
+        if (it.browser) {
+          // XSS 这类：用浏览器打开，弹窗出现时现有链路会整屏截图并挂到任务
+          try {
+            await window.api.browser.open();
+            const before = (task.images || []).length;
+            await window.api.browser.go(it.browser);
+            const t0 = Date.now();
+            let got = false;
+            while (Date.now() - t0 < 9000) {
+              await new Promise((r) => setTimeout(r, 500));
+              if ((task.images || []).length > before) { got = true; break; }
+            }
+            probes.push({
+              pkt: 'GET ' + it.browser + ' HTTP/1.1\nHost: (浏览器)',
+              ok: got, status: got ? 200 : 0, ms: Date.now() - t0,
+              res: got ? '已用浏览器打开该地址，弹窗截图已附在报告图片里' : '浏览器已打开，但 9 秒内没有捕获到弹窗',
+              why: it.why, probe: true
+            });
+          } catch (e) {
+            probes.push({ pkt: 'BROWSER ' + it.browser, ok: false, status: 0, ms: 0, res: '浏览器不可用：' + e.message, why: it.why, probe: true });
+          }
+          continue;
+        }
         const key = it.raw.slice(0, 300);
         if (seen.has(key)) continue;
         seen.add(key);

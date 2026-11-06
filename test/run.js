@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.18', pkg.version === '0.6.41');
+  ok('版本 0.6.18', pkg.version === '0.6.42');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -345,6 +345,22 @@ function ok(name, cond, extra) {
   const reportSrc = fs.readFileSync(path.join(__dirname, '..', 'electron', 'report.js'), 'utf8');
   ok('报告默认导到桌面', reportSrc.includes("'Desktop', 'Refract'"));
   ok('流式预览按节拍刷新', appSrc.includes('STREAM_PAINT_MS') && appSrc.includes('preview.textContent = tail'));
+
+  // markdown 渲染：以 | 开头的非表格行不能死循环（shell 管道续行会触发）
+  const grabFn = (name) => {
+    const at = appSrc.indexOf('function ' + name + '(');
+    let depth = 0;
+    for (let k = appSrc.indexOf('{', at); k < appSrc.length; k++) {
+      if (appSrc[k] === '{') depth++;
+      else if (appSrc[k] === '}') { depth--; if (!depth) return appSrc.slice(at, k + 1); }
+    }
+    return '';
+  };
+  const mdFn = new Function(grabFn('esc') + grabFn('inline') + grabFn('mdToHtml') + '; return mdToHtml;')();
+  const piped = 'curl -sS http://x \\\n  | python3 -c \'print(1)\'\n\n段落';
+  const out = mdFn(piped);
+  ok('管道续行不死循环', out.includes('python3') && out.includes('段落'));
+  ok('普通表格仍能渲染', mdFn('| a | b |\n| --- | --- |\n| 1 | 2 |').includes('<table>'));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

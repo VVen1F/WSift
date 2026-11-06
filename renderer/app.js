@@ -194,6 +194,9 @@ function mdToHtml(md) {
     while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,4}\s|```|\s*\|)/.test(lines[i])) {
       para.push(lines[i++]);
     }
+    // 以 | 开头但又不是表格的行（比如 shell 管道的续行）会让上面一行都收不进来，
+    // 不兜底就是死循环 + 内存爆掉
+    if (!para.length) para.push(lines[i++]);
     out.push(`<p>${inline(para.join(' '))}</p>`);
   }
   return out.join('\n');

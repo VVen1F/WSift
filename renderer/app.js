@@ -594,6 +594,12 @@ async function generateReport() {
     const n = Number.isFinite(rounds) ? Math.max(0, Math.min(3, rounds)) : 2;
     if (n > 0 && probes.length) {
       const seen = new Set(probes.map((x) => x.pkt.slice(0, 300)));
+      // 只允许打详情里出现过的 Host，防止模型跑偏到别的站
+      const hostOf = (pkt) => {
+        const m = /^Host:\s*(\S+)/mi.exec(pkt || '');
+        return m ? m[1].toLowerCase().replace(/:\d+$/, '') : '';
+      };
+      const allowedHosts = new Set(probes.filter((x) => !x.probe).map((x) => hostOf(x.pkt)).filter(Boolean));
       // 多轮：每轮都把到目前为止的全部实测结果带上，模型据此提下一批
       for (let round = 0; round < n; round++) {
       const brief = probes.map((p) => p.pkt + '\n--> ' + String(p.res || '').slice(0, 800)).join('\n\n');
@@ -626,6 +632,11 @@ async function generateReport() {
         const key = it.raw.slice(0, 300);
         if (seen.has(key)) continue;
         seen.add(key);
+        const h = hostOf(it.raw);
+        if (allowedHosts.size && !allowedHosts.has(h)) {
+          probes.push({ pkt: it.raw, ok: false, status: 0, ms: 0, res: '跳过：' + h + ' 不在详情里的目标范围内', why: it.why, probe: true });
+          continue;
+        }
         const m = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(https?:\/\/\S+)/i.exec(it.raw);
         const scheme = m && m[2].toLowerCase().startsWith('http:') ? 'http' : 'https';
         try {

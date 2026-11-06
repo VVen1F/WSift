@@ -463,6 +463,57 @@ async function replayPackets(task) {
   return out;
 }
 
+
+// 让模型根据实测响应提出几条验证探针，返回 [{raw, why}]
+function probesFromText(txt) {
+  const t = String(txt || '');
+  const a = t.indexOf('[');
+  const b = t.lastIndexOf(']');
+  if (a < 0 || b <= a) return [];
+  let arr;
+  try { arr = JSON.parse(t.slice(a, b + 1)); } catch (e) { return []; }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const it of arr.slice(0, 6)) {
+    if (!it) continue;
+    const url = String(it.url || '');
+    if (!/^https?:\/\//i.test(url)) continue;
+    const u = new URL(url);
+    const method = String(it.method || 'GET').toUpperCase();
+    const lines = [method + ' ' + (u.pathname || '/') + (u.search || '') + ' HTTP/1.1'];
+    lines.push('Host: ' + u.host);
+    const headers = it.headers && typeof it.headers === 'object' ? it.headers : {};
+    for (const k of Object.keys(headers)) {
+      if (/^host$/i.test(k)) continue;
+      lines.push(k + ': ' + String(headers[k]));
+    }
+    const body = it.body ? String(it.body) : '';
+    if (body && !Object.keys(headers).some((k) => /^content-length$/i.test(k))) {
+      lines.push('Content-Length: ' + new TextEncoder().encode(body).length);
+    }
+    lines.push('');
+    if (body) lines.push(body);
+    out.push({ raw: lines.join('\n'), why: String(it.why || '') });
+  }
+  return out;
+}
+
+// 用一次轻量对话产出探针计划
+async function planProbes(material, prov) {
+  const sys = '你是渗透测试助手。根据材料里的目标与已观测响应，给出最多 4 条用于验证危害的 HTTP 探针，' +
+    '只输出 JSON 数组，元素形如 {"method":"GET","url":"https://...","headers":{},"body":"","why":"说明"}。' +
+    '要求：只读、无害、可重复；不要写脚本或解释文字。';
+  let txt = '';
+  await window.api.chat({
+    provider: prov,
+    messages: [{ role: 'system', content: sys }, { role: 'user', content: material.slice(0, 6000) }],
+    onNote: () => {},
+    onDelta: (d) => { txt += d; },
+    onDone: () => {}
+  });
+  return probesFromText(txt);
+}
+
 // 把详情里的每个数据包都截一张图挂到任务上，已截过的跳过
 async function attachPacketShots(task, probes) {
   if (!task) return 0;
@@ -531,6 +582,31 @@ async function generateReport() {
   // 先按详情把每个包真发一次，拿真实响应；再据此截图
   let probes = [];
   try { probes = await replayPackets(task); } catch (e) { probes = []; }
+
+  // 让模型基于实测响应出探针，再真的打一遍（慢一点没关系）
+  try {
+    const rounds = Number(S.settings.report && S.settings.report.probeRounds);
+    const n = Number.isFinite(rounds) ? Math.max(0, Math.min(2, rounds)) : 1;
+    if (n > 0 && probes.length) {
+      const seen = new Set(probes.map((x) => x.pkt.slice(0, 300)));
+      const brief = probes.map((p) => p.pkt + '\n--> ' + String(p.res || '').slice(0, 800)).join('\n\n');
+      const planned = await planProbes(brief, prov);
+      for (const it of planned) {
+        const key = it.raw.slice(0, 300);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const m = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(https?:\/\/\S+)/i.exec(it.raw);
+        const scheme = m && m[2].toLowerCase().startsWith('http:') ? 'http' : 'https';
+        try {
+          const r = await window.api.send({ raw: it.raw, scheme, protocol: 'auto', timeout: 20 });
+          probes.push({ pkt: it.raw, ok: !!r.ok, status: r.status || 0, ms: r.ms || 0, res: r.text || '', why: it.why, probe: true });
+        } catch (e) {
+          probes.push({ pkt: it.raw, ok: false, status: 0, ms: 0, res: '', why: it.why, probe: true });
+        }
+      }
+    }
+  } catch (e) { /* 探针失败不影响正常生成 */ }
+
   await attachPacketShots(task, probes);
   if (probes.length) {
     const okN = probes.filter((p) => p.ok).length;
@@ -540,7 +616,8 @@ async function generateReport() {
   const realBlock = probes.length
     ? '\n\n以下是这些请求包\u5b9e\u6d4b\u54cd\u5e94（工具刚刚真实发送得到，不是草稿里的文字）：\n\n' +
       probes.map((p, i) =>
-        '### 包 ' + (i + 1) + '\n```http\n' + p.pkt + '\n```\n实测：' +
+        '### ' + (p.probe ? '探针 ' : '包 ') + (i + 1) + (p.why ? '（' + p.why + '）' : '') +
+        '\n```http\n' + p.pkt + '\n```\n实测：' +
         (p.ok ? 'HTTP ' + p.status + ' · ' + p.ms + 'ms' : '发送失败') + '\n```http\n' +
         String(p.res || '').slice(0, 4000) + '\n```'
       ).join('\n\n')

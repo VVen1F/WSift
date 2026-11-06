@@ -169,7 +169,7 @@ function bundle({ markdown, images = [], title = '' }) {
  */
 function save({ markdown, images = [], title = '', baseDir }) {
   const packed = bundle({ markdown, images, title });
-  const root = baseDir || path.join(require('os').homedir(), 'Documents', 'Refract');
+  const root = baseDir || path.join(require('os').homedir(), 'Desktop', 'Refract');
   let name = packed.root;
   let dir = path.join(root, name);
   let n = 2;

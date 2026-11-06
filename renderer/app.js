@@ -358,6 +358,11 @@ function mdTitle(md) {
 
 const runs = new Map();
 
+// 流式预览的节流参数：报告不是越长越要每帧重排
+const STREAM_PAINT_MS = 240;
+const STREAM_TAIL = 12000;
+const MAX_REPORT_CHARS = 200000;
+
 function stopRun(id) {
   const run = runs.get(id);
   runs.delete(id);
@@ -480,11 +485,13 @@ async function generateReport() {
   const paint = () => {
     raf = 0;
     if (!viewing()) return;
+    const tail = buf.length > STREAM_TAIL ? buf.slice(-STREAM_TAIL) : buf;
     safeDom(() => {
       const preview = $('#mdPreview');
       const status = $('#genStatus');
       if (!preview || !status) return;
-      preview.innerHTML = mdToHtml(buf);
+      // 流式阶段只贴纯文本：整篇 markdown 每 80ms 重解析一次会卡死界面
+      preview.textContent = tail;
       preview.classList.add('live');
       const sec = Math.max(0, Math.round((Date.now() - started) / 1000));
       status.textContent = '生成中 · ' + buf.length + ' 字 · ' + sec + 's';
@@ -518,13 +525,14 @@ async function generateReport() {
       if (!buf) paintWait();
     },
     onDelta: (d) => {
-      buf += d;
-      const live = TASKS.list.find((x) => x.id === taskId);
-      if (live) live.markdown = buf;
-      if (TASKS.id === taskId) {
-        S.reportMd = buf;
-        if (!raf) raf = setTimeout(paint, 80);
+      if (buf.length > MAX_REPORT_CHARS) {
+        // 模型失控时直接掐掉，别把内存和界面拖死
+        if (reportChat && reportChat.cancel) { try { reportChat.cancel(); } catch (e) {} }
+        return;
       }
+      buf += d;
+      // 流式期间不解析 markdown、不拷贝整段到任务对象，只按节拍更新预览
+      if (TASKS.id === taskId && !raf) raf = setTimeout(paint, STREAM_PAINT_MS);
     },
     onDone: (raw) => {
       const live = TASKS.list.find((x) => x.id === taskId);
@@ -552,8 +560,8 @@ async function generateReport() {
         }
         live.updatedAt = Date.now();
       }
+      S.reportMd = md;
       if (viewing()) {
-        S.reportMd = md;
         safeDom(() => {
           if (live && live.title && $('#rTitle')) $('#rTitle').value = live.title;
           const preview = $('#mdPreview');

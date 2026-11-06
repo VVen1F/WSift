@@ -601,7 +601,12 @@ async function generateReport() {
       };
       const allowedHosts = new Set(probes.filter((x) => !x.probe).map((x) => hostOf(x.pkt)).filter(Boolean));
       // 多轮：每轮都把到目前为止的全部实测结果带上，模型据此提下一批
-      for (let round = 0; round < n; round++) {
+      const deep = !!(S.settings.report && S.settings.report.deepProbe);
+      const budget = Math.max(0, Number((S.settings.report && S.settings.report.maxSends) || 20));
+      const total = deep ? Math.min(8, n + 4) : n;
+      let sent = 0;
+      for (let round = 0; round < total; round++) {
+        if (sent >= budget) break;
       const brief = probes.map((p) => p.pkt + '\n--> ' + String(p.res || '').slice(0, 800)).join('\n\n');
       const planned = await planProbes(brief, prov);
       if (!planned.length) break;
@@ -640,6 +645,8 @@ async function generateReport() {
         const m = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(https?:\/\/\S+)/i.exec(it.raw);
         const scheme = m && m[2].toLowerCase().startsWith('http:') ? 'http' : 'https';
         try {
+          if (sent >= budget) continue;
+          sent++;
           const r = await window.api.send({ raw: it.raw, scheme, protocol: 'auto', timeout: 20 });
           probes.push({ pkt: it.raw, ok: !!r.ok, status: r.status || 0, ms: r.ms || 0, res: r.text || '', why: it.why, probe: true });
         } catch (e) {

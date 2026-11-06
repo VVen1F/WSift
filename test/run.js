@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.18', pkg.version === '0.6.52');
+  ok('版本 0.6.18', pkg.version === '0.6.53');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -345,7 +345,7 @@ function ok(name, cond, extra) {
   ok('生成前先真实重放', appSrc.includes('await replayPackets(task)'));
   ok('模型出探针再真打', appSrc.includes('function planProbes') && appSrc.includes('probesFromText'));
   ok('XSS 用浏览器打开并截弹窗', appSrc.includes("it.browser") && appSrc.includes('browser.go(it.browser)'));
-  ok('探针默认两轮', appSrc.includes('round < n') && appSrc.includes(': 2;'));
+  ok('探针默认两轮', appSrc.includes(': 2;') && appSrc.includes('const total = deep'));
   ok('探针只打详情里的目标', appSrc.includes('allowedHosts'));
   ok('导出用任务自己的图', appSrc.includes('const imgs = (S.images && S.images.length'));
   const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'style.css'), 'utf8');

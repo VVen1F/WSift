@@ -445,8 +445,26 @@ function extractPackets(text) {
   return out;
 }
 
+// 逐个重放详情里的包，返回 [{pkt, res, ms, ok}]
+async function replayPackets(task) {
+  const pkts = extractPackets(task && task.detail ? task.detail : '');
+  const out = [];
+  for (const pkt of pkts) {
+    let scheme = 'https';
+    const m = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(https?:\/\/\S+)/i.exec(pkt);
+    if (m) scheme = m[2].toLowerCase().startsWith('http:') ? 'http' : 'https';
+    try {
+      const r = await window.api.send({ raw: pkt, scheme, protocol: 'auto', timeout: 20 });
+      out.push({ pkt, ok: !!r.ok, status: r.status || 0, ms: r.ms || 0, res: r.text || '' });
+    } catch (e) {
+      out.push({ pkt, ok: false, status: 0, ms: 0, res: '' });
+    }
+  }
+  return out;
+}
+
 // 把详情里的每个数据包都截一张图挂到任务上，已截过的跳过
-async function attachPacketShots(task) {
+async function attachPacketShots(task, probes) {
   if (!task) return 0;
   const pkts = extractPackets(task.detail || '');
   if (!pkts.length) return 0;
@@ -454,12 +472,19 @@ async function attachPacketShots(task) {
   task.shotPackets = Array.isArray(task.shotPackets) ? task.shotPackets : [];
   const shot = new Set(task.shotPackets);
   const width = Number(S.settings.ui.shotWidth) || 1600;
+  const byPkt = new Map((probes || []).map((x) => [x.pkt.slice(0, 300), x]));
   let added = 0;
   for (const pkt of pkts) {
     const key = pkt.slice(0, 300);
     if (shot.has(key)) continue;
+    const pr = byPkt.get(key);
     try {
-      const r = await window.api.capture({ request: pkt, response: '', width, ms: 0 });
+      const r = await window.api.capture({
+        request: pkt,
+        response: pr && pr.res ? pr.res : '',
+        width,
+        ms: pr ? pr.ms : 0
+      });
       if (r && r.path) {
         task.images.push(r.path);
         shot.add(key);
@@ -503,10 +528,25 @@ async function generateReport() {
     return toast('材料里没有请求包，先发一次包或贴一段请求', true);
   }
 
-  // 详情里的每个数据包先自动截一张，报告里就有图
-  await attachPacketShots(task);
+  // 先按详情把每个包真发一次，拿真实响应；再据此截图
+  let probes = [];
+  try { probes = await replayPackets(task); } catch (e) { probes = []; }
+  await attachPacketShots(task, probes);
+  if (probes.length) {
+    const okN = probes.filter((p) => p.ok).length;
+    toast('已实测 ' + probes.length + ' 个数据包' + (okN ? '（' + okN + ' 个通）' : ''));
+  }
 
-  const material = (cred ? '账号密码：\n' + cred + '\n\n' : '') + detail;
+  const realBlock = probes.length
+    ? '\n\n以下是这些请求包\u5b9e\u6d4b\u54cd\u5e94（工具刚刚真实发送得到，不是草稿里的文字）：\n\n' +
+      probes.map((p, i) =>
+        '### 包 ' + (i + 1) + '\n```http\n' + p.pkt + '\n```\n实测：' +
+        (p.ok ? 'HTTP ' + p.status + ' · ' + p.ms + 'ms' : '发送失败') + '\n```http\n' +
+        String(p.res || '').slice(0, 4000) + '\n```'
+      ).join('\n\n')
+    : '';
+
+  const material = (cred ? '账号密码：\n' + cred + '\n\n' : '') + detail + realBlock;
   let messages;
   try {
     messages = await window.api.compose({

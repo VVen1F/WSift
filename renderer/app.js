@@ -2598,9 +2598,6 @@ function showSettingsSection(key) {
   document.querySelectorAll('#settingsNav button[data-sec]').forEach((b) => {
     b.classList.toggle('on', b.dataset.sec === key);
   });
-  document.querySelectorAll('#settingsPop button[data-sec]').forEach((b) => {
-    b.classList.toggle('on', b.dataset.sec === key);
-  });
   const sc = $('#settingsScroll');
   if (sc) sc.scrollTop = 0;
 }
@@ -2618,29 +2615,14 @@ function bindSettingsNav() {
 }
 
 function bindSettingsMenu() {
-  const pop = $('#settingsPop');
   const btn = $('#navSettings');
-  if (!pop || !btn) return;
-
-  const close = () => { pop.hidden = true; btn.classList.remove('open'); };
-  const toggle = () => {
-    pop.hidden = !pop.hidden;
-    btn.classList.toggle('open', !pop.hidden);
-  };
-
-  btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
-  pop.addEventListener('click', (e) => e.stopPropagation());
-
-  pop.querySelectorAll('button[data-sec]').forEach((b) => {
-    b.addEventListener('click', () => {
-      showSettingsSection(b.dataset.sec);
-      go('settings');
-      close();
-    });
+  if (!btn) return;
+  // 设置页自带左侧导航，这里只负责打开页面，不再有第二套菜单
+  btn.addEventListener('click', () => {
+    const first = document.querySelector('#settingsNav button[data-sec]');
+    if (first) showSettingsSection(first.dataset.sec);
+    go('settings');
   });
-
-  document.addEventListener('click', close);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   showSettingsSection('general');
 }
 

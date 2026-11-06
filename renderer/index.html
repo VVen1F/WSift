@@ -43,15 +43,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
         设置
       </button>
-      <div class="pop" id="settingsPop" hidden>
-        <button data-sec="general">常规</button>
-        <button data-sec="network">网络</button>
-        <button data-sec="llm">LLM</button>
-        <button data-sec="backup">备份</button>
-        <button data-sec="about">关于</button>
-        <div class="pop-sep"></div>
-        <button data-sec="archive">归档管理</button>
-      </div>
 </div>
   </aside>
 
@@ -171,7 +162,7 @@
         <div class="settings">
 
           <div class="sect" id="sect-general">
-            <h3>常规</h3>
+            <h3>通用</h3>
             <div class="theme-group">
               <div class="theme-title">外观</div>
               <div class="theme-row">
@@ -250,7 +241,7 @@
 
           <div class="sect" id="sect-llm" hidden>
             <div class="llm-head">
-              <h3>LLM</h3>
+              <h3>模型</h3>
               <span class="spacer"></span>
               <button class="btn primary" id="btnProvNew" type="button">新建</button>
             </div>
@@ -258,7 +249,7 @@
           </div>
 
           <div class="sect" id="sect-backup" hidden>
-            <h3>同步与备份</h3>
+            <h3>备份</h3>
             <div class="klist">
               <div class="krow">
                 <div class="klabel">云端同步<small>WebDAV，或 GitHub 仓库里的一个文件</small></div>

@@ -1332,3 +1332,9 @@ textarea.inp {
 .settings-nav button:hover { background: var(--hover); }
 .settings-nav button.on { background: var(--nav-on); font-weight: 500; }
 #page-settings .narrow { flex: 1; min-width: 0; overflow: auto; }
+
+/* 设置页布局：导航和内容各自留出边距，内容不再顶着窗口右缘 */
+.settings-nav { flex: 0 0 196px; padding: 20px 16px; }
+.settings-nav button { height: 36px; margin-bottom: 2px; border-radius: 8px; }
+#page-settings .settings { padding: 24px 40px 48px; max-width: 900px; }
+#page-settings .narrow { scrollbar-gutter: stable; }

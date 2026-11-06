@@ -2593,6 +2593,9 @@ function showSettingsSection(key) {
     const sec = document.getElementById('sect-' + k);
     if (sec) sec.hidden = k !== key;
   });
+  document.querySelectorAll('#settingsPop button[data-sec]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.sec === key);
+  });
   if (key === 'llm' && typeof renderLLM === 'function') renderLLM();
   if (key === 'archive' && typeof renderArchive === 'function') renderArchive();
   document.querySelectorAll('#settingsNav button[data-sec]').forEach((b) => {
@@ -2602,27 +2605,38 @@ function showSettingsSection(key) {
   if (sc) sc.scrollTop = 0;
 }
 
-function bindSettingsNav() {
-  const nav = $('#settingsNav');
-  if (!nav) return;
-  nav.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-sec]');
-    if (!b) return;
-    showSettingsSection(b.dataset.sec);
-    const sc = $('#settingsScroll');
-    if (sc) sc.scrollTop = 0;
-  });
-}
-
 function bindSettingsMenu() {
+  const pop = $('#settingsPop');
   const btn = $('#navSettings');
   if (!btn) return;
-  // 设置页自带左侧导航，这里只负责打开页面，不再有第二套菜单
-  btn.addEventListener('click', () => {
-    const first = document.querySelector('#settingsNav button[data-sec]');
-    if (first) showSettingsSection(first.dataset.sec);
-    go('settings');
+
+  const close = () => {
+    if (pop) pop.hidden = true;
+    btn.classList.remove('open');
+  };
+  const open = () => {
+    if (!pop) return;
+    pop.hidden = false;
+    btn.classList.add('open');
+  };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (pop && pop.hidden) open();
+    else close();
   });
+  if (pop) {
+    pop.addEventListener('click', (e) => e.stopPropagation());
+    pop.querySelectorAll('button[data-sec]').forEach((b) => {
+      b.addEventListener('click', () => {
+        showSettingsSection(b.dataset.sec);
+        go('settings');
+        close();
+      });
+    });
+  }
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   showSettingsSection('general');
 }
 
@@ -2942,7 +2956,6 @@ async function boot() {
   S.settings = await window.api.settings.get();
   bindTheme();
   bindArchive();
-  bindSettingsNav();
   S.templates = await window.api.templates.list();
 
   $('#req').value = SAMPLE;

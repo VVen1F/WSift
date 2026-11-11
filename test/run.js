@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.68', pkg.version === '0.6.68');
+  ok('版本 0.6.69', pkg.version === '0.6.69');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -341,6 +341,29 @@ function ok(name, cond, extra) {
   ok('更新走带代理的客户端', typeof netMod.fetchJSON === 'function' && typeof netMod.download === 'function');
   const updaterSrc = fs.readFileSync(path.join(__dirname, '..', 'electron', 'updater.js'), 'utf8');
   ok('更新真的传了代理', updaterSrc.includes('proxy: opts.proxy'));
+  {
+    // GitHub 的 release 下载地址一定 302，不跟就会存下 0 字节安装包
+    const httpMod = require('http');
+    const payload = Buffer.alloc(64 * 1024, 3);
+    const srv = httpMod.createServer((q, s) => {
+      if (q.url === '/a') { s.writeHead(302, { location: '/b' }); s.end(); return; }
+      s.writeHead(200, { 'content-length': payload.length });
+      s.end(payload);
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    const port = srv.address().port;
+    const tmpDl = path.join(process.env.REFRACT_DATA_DIR, 'dl.bin');
+    let dl = null;
+    try { dl = await netMod.download(`http://127.0.0.1:${port}/a`, tmpDl, {}); } catch (e) { dl = { error: e.message }; }
+    srv.close();
+    ok('更新下载会跟 302', dl && dl.bytes === payload.length && fs.statSync(tmpDl).size === payload.length, dl);
+    const up = require(path.join(__dirname, '..', 'electron', 'updater.js'));
+    const empty = path.join(process.env.REFRACT_DATA_DIR, 'empty.bin');
+    fs.writeFileSync(empty, '');
+    let err = null;
+    try { await up.install(empty); } catch (e) { err = e.message; }
+    ok('空安装包直接报错', !!err && /不完整/.test(err), err);
+  }
   const appSrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
   ok('发送后记录毫秒', appSrc.includes('S.lastMs = r.ok'));
   ok('截图带上毫秒', appSrc.includes('ms: S.lastMs'));

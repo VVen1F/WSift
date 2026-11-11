@@ -3251,4 +3251,9 @@ async function boot() {
   renderStats();
 }
 
-boot();
+// 启动里任何一步 IPC 抛错，后面 bindSettings/bindBrowser 都不会执行，界面就成了「点不动」。
+// 这里兜住并给个重试按钮。
+boot().catch((err) => {
+  console.error(err);
+  toast('启动出错：' + ((err && err.message) || err), true, { label: '重试', run: () => location.reload() });
+});

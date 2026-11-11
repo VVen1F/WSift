@@ -74,11 +74,71 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('did-finish-load', () => console.log('RENDERER_LOADED'));
-  mainWindow.webContents.on('render-process-gone', () => {
+  // 渲染进程挂了（内存、GPU 驱动、系统杀子进程）不要把窗口留成白屏：自动重载，一分钟最多 3 次
+  const crashTimes = [];
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('RENDERER_GONE ' + JSON.stringify(details || {}));
     if (SMOKE) {
-      console.error('RENDERER_GONE');
       app.exit(1);
+      return;
     }
+    const now = Date.now();
+    while (crashTimes.length && now - crashTimes[0] > 60000) crashTimes.shift();
+    if (crashTimes.length >= 3) return;
+    crashTimes.push(now);
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        try { mainWindow.webContents.reload(); } catch (e) { /* 已经没了 */ }
+      }
+    }, 400);
+  });
+  // 上面那两个事件在无头/部分环境不触发，再加一条自己 ping 的看门狗：
+  // 10 秒一次，连续 3 次（约 30 秒）没响应就重启渲染进程，别让窗口一直「点不动」。
+  let pingMiss = 0;
+  const ping = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('ping timeout')), 6000));
+    Promise.race([mainWindow.webContents.executeJavaScript('1'), timeout])
+      .then(() => { pingMiss = 0; })
+      .catch(() => {
+        pingMiss++;
+        console.error('PING_MISS ' + pingMiss);
+        if (pingMiss >= 3) {
+          pingMiss = 0;
+          try { mainWindow.webContents.forcefullyCrashRenderer(); } catch (e) { /* 忽略 */ }
+        }
+      });
+  }, 10000);
+  mainWindow.on('closed', () => clearInterval(ping));
+
+  // 渲染进程卡住（同步死循环、巨量 DOM）时用户看到的就是「点不动」：10 秒没缓过来就重启渲染进程
+  let unresponsiveTimer = null;
+  const onHang = () => {
+    console.error('UNRESPONSIVE');
+    if (unresponsiveTimer) return;
+    unresponsiveTimer = setTimeout(() => {
+      unresponsiveTimer = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        try { mainWindow.webContents.forcefullyCrashRenderer(); } catch (e) { /* 忽略 */ }
+      }
+    }, 10000);
+  };
+  const onAlive = () => {
+    if (unresponsiveTimer) { clearTimeout(unresponsiveTimer); unresponsiveTimer = null; }
+  };
+  // 两个对象历史上都发过这两个事件，都挂上，哪个先来算哪个
+  mainWindow.webContents.on('unresponsive', onHang);
+  mainWindow.webContents.on('responsive', onAlive);
+  mainWindow.on('unresponsive', onHang);
+  mainWindow.on('responsive', onAlive);
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url, isMain) => {
+    if (!isMain || code === -3) return;
+    console.error('LOAD_FAILED ' + code + ' ' + desc + ' ' + url);
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        try { mainWindow.webContents.reload(); } catch (e) { /* 忽略 */ }
+      }
+    }, 1000);
   });
   mainWindow.on('close', (e) => {
     try {
@@ -172,6 +232,11 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// GPU/网络等子进程挂了留个日志，方便对着白屏排查
+app.on('child-process-gone', (_e, d) => {
+  console.error('CHILD_GONE ' + JSON.stringify(d || {}));
 });
 
 /* ---------------- IPC ---------------- */

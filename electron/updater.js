@@ -2,7 +2,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFile } = require('child_process');
 const net = require('./net');
 
 const OWNER = 'VVen1F';
@@ -59,28 +59,45 @@ async function download(url, onProgress, opts = {}) {
   return file;
 }
 
-/** macOS：挂载 dmg，替换 /Applications 里的 app，然后由主进程重启。 */
-function install(file) {
+function run(cmd, args, timeout = 180000) {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { timeout }, (err, stdout, stderr) => {
+      if (err) {
+        const msg = String(stderr || err.message || '').trim().split('\n')[0];
+        return reject(Object.assign(new Error(msg || `${cmd} 失败`), { code: err.code }));
+      }
+      resolve(stdout);
+    });
+  });
+}
+
+/**
+ * macOS：挂载 dmg，替换 /Applications 里的 app，然后由主进程重启。
+ * 全程异步——hdiutil 挂载要几秒，用同步版会把主进程卡住，界面看着就像死了。
+ */
+async function install(file) {
   const { shell } = require('electron');
+  if (!file || !fs.existsSync(file)) throw new Error('安装包不存在，重新下载一次');
+  const size = fs.statSync(file).size;
+  if (size < 1024 * 1024) throw new Error(`安装包不完整（${Math.round(size / 1024)} KB），重新下载一次`);
   if (process.platform !== 'darwin') {
-    shell.openPath(file);
+    const err = await shell.openPath(file);
+    if (err) throw new Error(err);
     return { mode: 'open', file };
   }
   const mnt = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-mnt-'));
   try {
-    execFileSync('hdiutil', ['attach', file, '-nobrowse', '-quiet', '-mountpoint', mnt], { stdio: 'ignore' });
+    await run('hdiutil', ['attach', file, '-nobrowse', '-quiet', '-mountpoint', mnt]);
     const appName = fs.readdirSync(mnt).find((f) => f.endsWith('.app'));
     if (!appName) throw new Error('安装包中没有找到 .app');
     const src = path.join(mnt, appName);
     const destRoot = app_is_writable() ? '/Applications' : path.dirname(app_path());
-    execFileSync('rsync', ['-a', '--delete', src + '/', path.join(destRoot, appName) + '/'], { stdio: 'ignore' });
-    return { mode: 'installed', file, app: path.join(destRoot, appName) };
+    const dest = path.join(destRoot, appName);
+    await run('rsync', ['-a', '--delete', src + '/', dest + '/']);
+    if (!fs.existsSync(path.join(dest, 'Contents', 'MacOS'))) throw new Error('安装包复制失败，检查 /Applications 权限');
+    return { mode: 'installed', file, app: dest };
   } finally {
-    try {
-      execFileSync('hdiutil', ['detach', mnt, '-quiet'], { stdio: 'ignore' });
-    } catch (e) {
-      /* 忽略卸载失败 */
-    }
+    await run('hdiutil', ['detach', mnt, '-quiet']).catch(() => {});
   }
 }
 

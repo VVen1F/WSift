@@ -8,13 +8,34 @@ const { openSocket } = require('./http');
 
 const DEFAULT_TIMEOUT = 30000;
 
-function openRequest(urlStr, opts = {}) {
+/**
+ * 发一个 GET。跟着 3xx 走：GitHub 的 release 下载地址一定 302 到
+ * release-assets.githubusercontent.com，不跟就会存下 0 字节的“安装包”。
+ */
+function openRequest(urlStr, opts = {}, depth = 0) {
   const u = new URL(urlStr);
   const secure = u.protocol === 'https:';
   const port = Number(u.port) || (secure ? 443 : 80);
   const headers = { host: u.host, 'user-agent': 'refract', ...(opts.headers || {}) };
 
   return new Promise((resolve, reject) => {
+    const onResponse = (res) => {
+      const loc = res.headers.location;
+      if (res.statusCode >= 300 && res.statusCode < 400 && loc && depth < 5) {
+        res.resume();
+        let next;
+        try {
+          next = new URL(loc, urlStr).toString();
+        } catch (e) {
+          reject(new Error('下载地址跳转无效：' + loc));
+          return;
+        }
+        openRequest(next, opts, depth + 1).then(resolve, reject);
+        return;
+      }
+      resolve(res);
+    };
+
     const fire = (socket) => {
       const mod = secure ? https : http;
       const req = mod.request(
@@ -27,7 +48,7 @@ function openRequest(urlStr, opts = {}) {
           agent: false,
           ...(socket ? { createConnection: () => socket } : {})
         },
-        resolve
+        onResponse
       );
       req.on('error', reject);
       req.setTimeout(opts.timeout || DEFAULT_TIMEOUT, () => req.destroy(new Error('连接超时')));
@@ -56,7 +77,8 @@ async function fetchJSON(url, opts = {}) {
 }
 
 async function download(url, file, opts = {}) {
-  const res = await openRequest(url, { ...opts, timeout: opts.timeout || 120000 });
+  const res = await openRequest(url, { ...opts, timeout: opts.timeout || 180000 });
+  if (res.statusCode >= 300) throw new Error(`下载地址没有跳到真实文件（HTTP ${res.statusCode}）`);
   if (res.statusCode >= 400) throw new Error(`HTTP ${res.statusCode}`);
   const total = Number(res.headers['content-length']) || 0;
   const fd = fs.openSync(file, 'w');
@@ -70,6 +92,8 @@ async function download(url, file, opts = {}) {
   } finally {
     fs.closeSync(fd);
   }
+  if (!received) throw new Error('下载到的文件是空的');
+  if (total && received < total) throw new Error(`下载不完整：${received}/${total} 字节`);
   return { file, bytes: received };
 }
 

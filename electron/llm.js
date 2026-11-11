@@ -2,6 +2,8 @@
 // 极简 LLM 客户端：OpenAI 兼容 + Anthropic 兼容，支持流式。
 const httpc = require('./http');
 const DEFAULT_TIMEOUT = 120000;
+const IDLE_TIMEOUT = 90000;
+const HARD_TIMEOUT = 10 * 60 * 1000;
 
 function joinURL(base, suffix) {
   return String(base || '').replace(/\/+$/, '') + suffix;
@@ -202,23 +204,52 @@ async function chat({ provider, messages, onDelta, onNote, signal, temperature =
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
-  if (signal) signal.addEventListener('abort', () => controller.abort());
+  if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
+
+  // 原来的写法是「整条请求 120 秒」，正文长的报告写不完就被掐掉；
+  // 改成看有没有新数据：IDLE 秒没动静才停，总时长兜到 10 分钟。
+  let lastAt = Date.now();
+  const startedAt = Date.now();
+  let idleHit = false;
+  let hardHit = false;
+  const watchdog = setInterval(() => {
+    const now = Date.now();
+    if (now - lastAt > IDLE_TIMEOUT) { idleHit = true; controller.abort(); return; }
+    if (now - startedAt > HARD_TIMEOUT) { hardHit = true; controller.abort(); }
+  }, 2000);
+  const touch = () => { lastAt = Date.now(); };
+  const delta = (d) => { touch(); if (onDelta) onDelta(d); };
+  const note = (n) => { touch(); if (onNote) onNote(n); };
 
   try {
     if (provider.kind === 'anthropic') {
-      return await chatAnthropic(provider, messages, onDelta, onNote, controller.signal, temperature, maxTokens);
+      return await chatAnthropic(provider, messages, delta, note, controller.signal, temperature, maxTokens);
     }
-    return await chatOpenAI(provider, messages, onDelta, onNote, controller.signal, temperature, maxTokens);
+    return await chatOpenAI(provider, messages, delta, note, controller.signal, temperature, maxTokens);
   } catch (err) {
-    if ((signal && signal.aborted) || controller.signal.aborted || err.name === 'AbortError') {
+    if ((signal && signal.aborted)) {
+      const e = new Error('已停止');
+      e.code = 'ABORT';
+      throw e;
+    }
+    if (idleHit) {
+      const e = new Error('模型 ' + Math.round(IDLE_TIMEOUT / 1000) + ' 秒没有返回数据，已停止');
+      e.code = 'IDLE';
+      throw e;
+    }
+    if (hardHit) {
+      const e = new Error('超过 ' + Math.round(HARD_TIMEOUT / 60000) + ' 分钟还没写完，已停止');
+      e.code = 'TIMEOUT';
+      throw e;
+    }
+    if (controller.signal.aborted || err.name === 'AbortError') {
       const e = new Error('已停止');
       e.code = 'ABORT';
       throw e;
     }
     throw err;
   } finally {
-    clearTimeout(timer);
+    clearInterval(watchdog);
   }
 }
 

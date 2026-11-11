@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.66', pkg.version === '0.6.66');
+  ok('版本 0.6.67', pkg.version === '0.6.67');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -331,6 +331,11 @@ function ok(name, cond, extra) {
   const shotExports = require(path.join(__dirname, '..', 'electron', 'shot.js'));
   ok('截图高度有下限 860', shotExports.MIN_HEIGHT === 860);
   ok('截图高度有上限 2500', shotExports.MAX_HEIGHT === 2500);
+  ok('超时参数秒/毫秒都认', httpc.timeoutMs(20) === 20000 && httpc.timeoutMs(30000) === 30000 && httpc.timeoutMs(undefined) === 30000);
+  const reportMod = require(path.join(__dirname, '..', 'electron', 'report.js'));
+  const placed = reportMod.placeImages('前情\n\nGET /a HTTP/1.1\nHost: x\nConnection: close\n\n说明一\n\nPOST /b HTTP/1.1\nHost: x\n\n{"a":1}\n\n说明二\n', ['01.png', '02.png']);
+  ok('每张图跟在对应数据包后面', placed.indexOf('Connection: close') < placed.indexOf('images/01.png') && placed.indexOf('images/01.png') < placed.indexOf('说明一') && placed.indexOf('{"a":1}') < placed.indexOf('images/02.png') && (placed.match(/!\[\]\(images\//g) || []).length === 2);
+  ok('包不够时图排文末', reportMod.placeImages('GET /a HTTP/1.1\nHost: x\n', ['01.png', '02.png']).trim().endsWith('![](images/02.png)'));
   ok('网络设置能填代理', ui.includes('id="setProxy"'));
   const netMod = require(path.join(__dirname, '..', 'electron', 'net.js'));
   ok('更新走带代理的客户端', typeof netMod.fetchJSON === 'function' && typeof netMod.download === 'function');

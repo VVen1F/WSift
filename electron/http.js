@@ -27,6 +27,17 @@ function header(headers, name) {
   return hit ? hit[1] : '';
 }
 
+/**
+ * timeout 既接受毫秒也接受秒：小于 1000 当秒算。
+ * 之前调用方传 20（秒）被当成 20ms，HTTP/2 连接还没握完就判超时，
+ * 于是详情里的包全部重放失败、截图里只剩 CONNECTION_ERROR。
+ */
+function timeoutMs(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return 30000;
+  return n < 1000 ? Math.round(n * 1000) : Math.round(n);
+}
+
 async function send(raw, opts = {}) {
   const protocol = opts.protocol || 'auto';
   const wantH2 = protocol === 'h2' || (protocol === 'auto' && (opts.scheme || 'https') === 'https');
@@ -184,7 +195,7 @@ function openSocket(target, scheme, proxyStr, servername) {
 }
 
 async function sendH1(raw, opts = {}) {
-  const timeout = opts.timeout || 30000;
+  const timeout = timeoutMs(opts.timeout);
   const req = parseRequest(raw);
 
   let scheme = opts.scheme || 'https';
@@ -303,4 +314,4 @@ function dechunk(buf) {
   return Buffer.concat(out);
 }
 
-module.exports = { send, parseRequest, decodeResponse, dechunk, parseProxy, openSocket };
+module.exports = { send, parseRequest, decodeResponse, dechunk, parseProxy, openSocket, timeoutMs };

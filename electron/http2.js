@@ -2,7 +2,7 @@
 // HTTP/2 发送：把编辑器里的 h1 报文翻译成 h2 请求，响应再还原成可读报文体。
 const http2 = require('http2');
 const zlib = require('zlib');
-const { parseRequest } = require('./http');
+const { parseRequest, timeoutMs } = require('./http');
 
 const DROP = new Set([
   'connection', 'keep-alive', 'proxy-connection', 'transfer-encoding',
@@ -66,7 +66,7 @@ function connect(origin, timeout) {
 
 async function send(raw, opts = {}) {
   const req = parseRequest(raw);
-  const timeout = opts.timeout || 30000;
+  const timeout = timeoutMs(opts.timeout);
 
   let scheme = opts.scheme || 'https';
   let host = '';

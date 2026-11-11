@@ -40,6 +40,7 @@ function today() {
 }
 
 const FOLLOW_TEMPLATE = `用户提供了自己的模板。按模板的章节和版式填写，模板里的表格和标题保留，不要另起一套排版，不要增删章节。
+每个数据包下面只写一两句实测结论（状态码、关键响应头），不要把整段响应头或 HTML 正文粘进正文；证据看图。
 全文不要出现「复测」。
 模板里如果有请求或数据包的位置，把完整的原始 HTTP 请求填在那里：请求行、全部头、空行、body。没有这个位置就写在正文最后。不要用三个反引号把整篇或请求包起来。不要写成 curl。
 材料里没有的不要编。禁止「值得注意的是」「综上所述」。`;
@@ -147,6 +148,55 @@ function imageFileName(src, index) {
  * 组装 zip 内的文件：`<标题>/report.md` + `<标题>/images/01.png`。
  * 文末截图链接改成与压缩包内一致的相对路径。
  */
+const REQ_LINE = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+\S+\s+HTTP\/[\d.]+/;
+const HDR_LINE = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+:\s?\S/;
+
+/**
+ * 正文里每个 HTTP 包的首行和末行。
+ * 末行 = 最后一个头；如果后面紧跟空行 + JSON/数组 body，就吃到 body 结束。
+ */
+function packetBlocks(lines) {
+  const blocks = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!REQ_LINE.test(lines[i].trim())) continue;
+    let j = i + 1;
+    while (j < lines.length && HDR_LINE.test(lines[j].trim())) j++;
+    let end = Math.max(i, j - 1);
+    if (j < lines.length && lines[j].trim() === '' && j + 1 < lines.length && /^[{[<]/.test(lines[j + 1].trim())) {
+      let k = j + 1;
+      while (k < lines.length && lines[k].trim() !== '') k++;
+      end = k - 1;
+    }
+    blocks.push({ start: i, end });
+    i = end;
+  }
+  return blocks;
+}
+
+/** 每张图插到对应数据包下面；包不够就把剩下的排在文末。 */
+function placeImages(md, names) {
+  const links = (names || []).map((n) => `![](images/${n})`);
+  if (!links.length) return md;
+  const lines = md.split('\n');
+  const blocks = packetBlocks(lines);
+  if (!blocks.length) return md.replace(/\s+$/, '') + '\n\n' + links.join('\n\n') + '\n';
+  const out = [];
+  let bi = 0;
+  for (let i = 0; i < lines.length; i++) {
+    out.push(lines[i]);
+    const b = blocks[bi];
+    if (b && i === b.end && bi < links.length) {
+      out.push('', links[bi]);
+      bi++;
+    }
+  }
+  while (bi < links.length) {
+    out.push('', links[bi]);
+    bi++;
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') + '\n';
+}
+
 function bundle({ markdown, images = [], title = '' }) {
   const root = slugify(title);
   const names = [];
@@ -158,12 +208,8 @@ function bundle({ markdown, images = [], title = '' }) {
     files.push({ name: `${root}/images/${name}`, data: fs.readFileSync(src) });
   }
 
-  let md = toPlain(String(markdown || '').replace(/\n*## 截图[\s\S]*$/, ''));
-  if (names.length) {
-    md += '\n\n' + names.map((n) => `![](images/${n})`).join('\n\n') + '\n';
-  } else {
-    md += '\n';
-  }
+  const body = toPlain(String(markdown || '').replace(/\n*## 截图[\s\S]*$/, ''));
+  const md = (names.length ? placeImages(body, names) : body).replace(/\s+$/, '') + '\n';
   files.unshift({ name: `${root}/report.md`, data: Buffer.from(md, 'utf8') });
   return { root, markdown: md, files, names };
 }
@@ -207,6 +253,8 @@ function save({ markdown, images = [], title = '', baseDir }) {
 }
 
 module.exports = {
+  placeImages,
+  packetBlocks,
   SYSTEM_PROMPT,
   FOLLOW_TEMPLATE,
   CHAT_SYSTEM,

@@ -196,7 +196,8 @@ ipcMain.handle('http:send', async (_e, payload) => {
 
 ipcMain.handle('shot:capture', async (_e, payload) => {
   const dir = shotDir();
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+  // 到毫秒：一轮生成里连拍几张时，秒级文件名会互相覆盖，图就少了几张
+  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 17);
   const out = path.join(dir, `${stamp}.png`);
   const res = await shot.capture({
     request: payload.request,

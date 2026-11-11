@@ -426,11 +426,16 @@ function extractPackets(text) {
       const t = cur.trim();
       if (t === '```') { i++; break; }
       if (!t) {
-        // 空行后面如果是 body（不以 Header: 形式开头），继续收
+        // 空行后面是 body 才继续收：JSON/XML/表单，或者声明了 Content-Length 且不是中文段落。
+        // 否则这一段是紧跟着的说明文字，收进去会让截图里的请求包多出几行汉字。
         let j = i + 1;
         const body = [];
         while (j < lines.length && lines[j].trim() && lines[j].trim() !== '```') body.push(lines[j++]);
-        if (body.length) { block.push('', ...body); i = j; }
+        const hasLen = block.some((l) => /^(content-length|transfer-encoding):/i.test(l.trim()));
+        const first = body.length ? body[0].trim() : '';
+        const looksBody = !!first && (/^[{[<]/.test(first) || /=[^&\s]/.test(first));
+        const plainBody = hasLen && !!first && !/[\u4e00-\u9fa5，。：；（）]/.test(first);
+        if (body.length && (looksBody || plainBody)) { block.push('', ...body); i = j; }
         else i++;
         break;
       }
@@ -542,7 +547,7 @@ async function attachPacketShots(task, probes) {
         ms: pr ? pr.ms : 0
       });
       if (r && r.path) {
-        task.images.push(r.path);
+        if (!task.images.includes(r.path)) task.images.push(r.path);
         shot.add(key);
         task.shotPackets.push(key);
         added++;
@@ -669,7 +674,7 @@ async function generateReport() {
         '### ' + (p.probe ? '探针 ' : '包 ') + (i + 1) + (p.why ? '（' + p.why + '）' : '') +
         '\n```http\n' + p.pkt + '\n```\n实测：' +
         (p.ok ? 'HTTP ' + p.status + ' · ' + p.ms + 'ms' : '发送失败') + '\n```http\n' +
-        String(p.res || '').slice(0, 4000) + '\n```'
+        String(p.res || '').slice(0, 800) + '\n```'
       ).join('\n\n')
     : '';
 
@@ -858,7 +863,8 @@ async function saveReport() {
   const title = (task && task.title) || mdTitle(S.reportMd);
   if (task) await attachPacketShots(task);
   const imgs = (S.images && S.images.length ? S.images : (task && task.images) || []).filter(Boolean);
-  const md = S.reportMd.replace(/\s+$/, '') + imagesSection(imgs);
+  // 图片链接由 report.bundle() 按包位插好，这里再拼一次会出现重复的 ![](images/NN.png)
+  const md = S.reportMd.replace(/\s+$/, '');
   const r = await window.api.saveReport({ markdown: md, images: imgs, title });
   S.reportDir = (r && (r.zip || r.dir)) || '';
   if (task) {
@@ -2892,6 +2898,8 @@ function bindSettingsMenu() {
 function renderGateway(ri) {
   const dot = $('#gwDot');
   const text = $('#gwText');
+  // 首页/设置里没有网关那两块时不报错（没开远程访问时也会走到这里）
+  if (!dot || !text) return;
   if (!ri || !ri.url) {
     dot.classList.add('off');
     text.textContent = '服务未启动';

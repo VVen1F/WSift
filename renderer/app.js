@@ -348,15 +348,24 @@ function deriveMeta(material) {
 }
 
 function mdTitle(md) {
-  const line = String(md || '').split(/\r?\n/).map((s) => s.trim()).find(Boolean) || '';
-  return line
+  const lines = String(md || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const clean = (line) => line
     .replace(/^#+\s*/, '')
     // 模型爱把字段名写进标题，去掉这些前缀
     .replace(/^(漏洞名称|报告名称|标题|名称)\s*[:：]\s*/, '')
     .replace(/[\s]*复测\s*$/g, '')
     .replace(/[\\/:*?"<>|]/g, '')
     .trim()
-    .slice(0, 80) || '报告';
+    .slice(0, 80);
+  // 模板一般有「漏洞名称：xxx」，直接用它，别再拿「漏洞报告」这种小标题当文件名
+  const named = lines.find((l) => /^(漏洞名称|报告名称|标题|名称)\s*[:：]\s*\S/.test(l));
+  if (named) {
+    const t = clean(named);
+    if (t) return t;
+  }
+  const generic = /^(漏洞报告|漏洞详情|报告|复测|漏洞|详情)$/;
+  const first = lines.map((l) => l.replace(/^#+\s*/, '')).find((l) => l && !generic.test(l)) || '';
+  return clean(first) || '报告';
 }
 
 const runs = new Map();

@@ -5,9 +5,10 @@ const { BrowserWindow, app } = require('electron');
 
 let pending = null;
 
-// 截图高度：太矮不像窗口，太高一张图放不下
-const MIN_HEIGHT = 1200;
-const MAX_HEIGHT = 3000;
+// 截图高度（CSS px，截图为设备像素）：太矮不像窗口，太长一张图放不下。
+// 默认 1600x860 → Retina 下 3200x1720（80:43）；正文变长跟着长，最多 2500 → 5000。
+const MIN_HEIGHT = 860;
+const MAX_HEIGHT = 2500;
 
 /**
  * 用隐藏窗口渲染 shot.html 并截图，保证图片与界面完全一致。

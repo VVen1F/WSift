@@ -261,7 +261,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.65', pkg.version === '0.6.65');
+  ok('版本 0.6.66', pkg.version === '0.6.66');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -329,8 +329,8 @@ function ok(name, cond, extra) {
   ok('截图接真实毫秒', shotMod.includes('ms: realMs') && shotMod.includes('Number.isFinite(Number(ms))'));
   ok('截图算字节数', shotMod.includes("Buffer.byteLength"));
   const shotExports = require(path.join(__dirname, '..', 'electron', 'shot.js'));
-  ok('截图高度有下限', shotExports.MIN_HEIGHT === 1200);
-  ok('截图高度有上限', shotExports.MAX_HEIGHT === 3000);
+  ok('截图高度有下限 860', shotExports.MIN_HEIGHT === 860);
+  ok('截图高度有上限 2500', shotExports.MAX_HEIGHT === 2500);
   ok('网络设置能填代理', ui.includes('id="setProxy"'));
   const netMod = require(path.join(__dirname, '..', 'electron', 'net.js'));
   ok('更新走带代理的客户端', typeof netMod.fetchJSON === 'function' && typeof netMod.download === 'function');

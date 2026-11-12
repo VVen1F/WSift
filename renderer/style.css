@@ -1379,9 +1379,9 @@ textarea.inp {
 .ls-link:hover { text-decoration: underline; }
 
 /* 雷神账号列表 */
-#sect-leishen .krow.top .klabel { flex: 0 0 210px; padding-right: 24px; }
+#sect-leishen .krow.top .klabel { flex: 0 0 168px; padding-right: 12px; }
 #sect-leishen .krow.top { justify-content: flex-start; }
-.ls-accounts { display: flex; flex-direction: column; gap: 0; width: 500px; min-width: 500px; }
+.ls-accounts { display: flex; flex-direction: column; gap: 0; flex: 1 1 auto; min-width: 0; max-width: 500px; }
 .ls-acc { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid var(--line); }
 .ls-acc:last-child { border-bottom: 0; }
 .ls-acc-mail { font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

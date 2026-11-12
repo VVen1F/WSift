@@ -2937,6 +2937,26 @@ function showSettingsSection(key) {
   if (sc) sc.scrollTop = 0;
 }
 
+/**
+ * 浮层边界：默认向上弹；上方放不下就翻到下方，左右也不许出界。
+ * DSH 的 popover 规则里明确要求做窗口边界检测。
+ */
+function fitPop(pop, anchor) {
+  if (!pop || pop.hidden || !anchor) return;
+  pop.style.top = '';
+  pop.style.bottom = '';
+  pop.style.marginTop = '';
+  pop.style.marginBottom = '';
+  const r = pop.getBoundingClientRect();
+  const ar = anchor.getBoundingClientRect();
+  const vh = window.innerHeight;
+  if (r.top < 8 && ar.bottom + r.height + 8 < vh) {
+    pop.style.bottom = 'auto';
+    pop.style.top = '100%';
+    pop.style.marginTop = '4px';
+  }
+}
+
 function bindSettingsMenu() {
   const pop = $('#settingsPop');
   const btn = $('#navSettings');
@@ -2950,6 +2970,7 @@ function bindSettingsMenu() {
     if (!pop) return;
     pop.hidden = false;
     btn.classList.add('open');
+    fitPop(pop, btn);
   };
 
   btn.addEventListener('click', (e) => {

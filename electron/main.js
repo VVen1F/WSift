@@ -768,8 +768,12 @@ function lsAccount(id) {
   return list.find((a) => a.id === id) || null;
 }
 
-function lsAnyToken() {
-  const acc = lsAccounts().find((a) => a.token);
+/** 拉类型用哪个 token：优先当前账号，没有就用任意一个登录了的。 */
+function lsAnyToken(preferredId) {
+  const list = lsAccounts();
+  const own = list.find((a) => a.id === preferredId && a.token);
+  if (own) return own.token;
+  const acc = list.find((a) => a.token);
   return acc ? acc.token : '';
 }
 
@@ -924,7 +928,7 @@ ipcMain.handle('leishen:loginAuto', async (event, payload) => {
 
 ipcMain.handle('leishen:types', async (_e, opts) => {
   const force = !!(opts && opts.force);
-  const token = lsAnyToken();
+  const token = lsAnyToken(opts && opts.accountId);
   if (!token) return { ok: false, auth: true, error: '先登录雷神众测' };
   if (!force && lsTypesCache.list.length && Date.now() - lsTypesCache.at < 10 * 60 * 1000) {
     return { ok: true, list: lsTypesCache.list, cached: true };

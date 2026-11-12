@@ -163,10 +163,14 @@ function ok(name, cond, extra) {
   const bkJson = JSON.parse(fs.readFileSync(bkList[0].path, 'utf8'));
   ok('默认不含 Key', bkJson.providers.every((p) => (p.accounts || []).every((a) => !a.apiKey)));
   const bkLs = store.load();
-  bkLs.leishen = { email: 'a@b.c', password: 'pw-secret', imapCode: 'imap-secret', token: 'tok-secret' };
+  bkLs.leishen = {
+    email: 'a@b.c', password: 'pw-secret', imapCode: 'imap-secret', token: 'tok-secret',
+    accounts: [{ id: 'x', email: 'x@y.z', password: 'acc-pw', imapCode: 'acc-imap', token: 'acc-tok' }]
+  };
   const bkLsFile = backup.snapshot(bkLs, false);
   const bkLsText = fs.readFileSync(bkLsFile, 'utf8');
   ok('备份不带雷神密码和 token', !bkLsText.includes('pw-secret') && !bkLsText.includes('tok-secret') && !bkLsText.includes('imap-secret'));
+  ok('备份也不带多账号的密码和 token', !bkLsText.includes('acc-pw') && !bkLsText.includes('acc-imap') && !bkLsText.includes('acc-tok'));
   ok('能读回来', Array.isArray(backup.restore(bkList[0].path).providers));
   ok('到期判断', backup.due({ backup: { auto: '1h', lastAt: new Date().toISOString() } }) === false);
 
@@ -278,7 +282,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.82', pkg.version === '0.6.82');
+  ok('版本 0.6.83', pkg.version === '0.6.83');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');

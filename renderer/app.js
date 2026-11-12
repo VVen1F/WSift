@@ -3377,7 +3377,7 @@ function lsDeleteAccount(id) {
 /* ---- 登录 ---- */
 
 function lsFillTypes(force) {
-  return window.api.leishen.types({ force: !!force }).then((r) => {
+  return window.api.leishen.types({ force: !!force, accountId: LS.accountId }).then((r) => {
     if (!r || !r.ok) return false;
     LS.types = r.list || [];
     const preset = (S.settings && S.settings.leishenBugtype) || (LS.cfg && LS.cfg.bugtype) || '';

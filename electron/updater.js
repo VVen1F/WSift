@@ -28,7 +28,8 @@ function pickAsset(assets, platform, arch) {
     return dmgs.find((a) => (cpu === 'arm64' ? /arm64/i.test(a.name) : !/arm64/i.test(a.name))) || dmgs[0] || null;
   }
   if (plat === 'win32') return list.find((a) => /\.exe$/i.test(a.name)) || null;
-  return list.find((a) => /AppImage$/i.test(a.name)) || list.find((a) => /\.(zip|exe)$/i.test(a.name)) || null;
+  // Linux 只认 AppImage：没有就返回 null，别把 Windows 安装包下下来
+  return list.find((a) => /AppImage$/i.test(a.name)) || null;
 }
 
 async function check(current, opts = {}) {

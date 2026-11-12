@@ -282,7 +282,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('品牌与 appId 是 WSift', pkg.productName === 'WSift' && pkg.build.productName === 'WSift' && pkg.build.appId === 'com.wenyifan.wsift');
-  ok('版本 0.8.0', pkg.version === '0.8.0');
+  ok('版本 0.8.1', pkg.version === '0.8.1');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -538,6 +538,15 @@ function ok(name, cond, extra) {
   ok('圆形控件退回标准圆角', css.includes('.switch, .switch span::after'));
   const reportSrc = fs.readFileSync(path.join(__dirname, '..', 'electron', 'report.js'), 'utf8');
   ok('报告默认导到桌面', reportSrc.includes("'Desktop', 'WSift'"));
+  {
+    const up = require('../electron/updater.js');
+    const assets = [{ name: 'WSift-0.8.0-arm64.dmg' }, { name: 'WSift-0.8.0-x64.dmg' }, { name: 'WSift-0.8.0-x64.exe' }];
+    ok('mac 选 arm64 包', up.pickAsset(assets, 'darwin', 'arm64').name.includes('arm64'));
+    ok('mac 选 x64 包', !up.pickAsset(assets, 'darwin', 'x64').name.includes('arm64'));
+    ok('win 选 exe', /\.exe$/.test(up.pickAsset(assets, 'win32', 'x64').name));
+    ok('linux 没有 AppImage 时不给 Windows 包', up.pickAsset(assets, 'linux', 'x64') === null);
+    ok('linux 有 AppImage 时选它', up.pickAsset([{ name: 'WSift-0.8.0.AppImage' }], 'linux', 'x64').name.endsWith('.AppImage'));
+  }
   ok('流式预览按节拍刷新', appSrc.includes('STREAM_PAINT_MS') && appSrc.includes('preview.textContent = tail'));
 
   // markdown 渲染：以 | 开头的非表格行不能死循环（shell 管道续行会触发）

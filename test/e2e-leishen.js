@@ -81,6 +81,25 @@ app.whenReady().then(async () => {
   })()`);
   if (!login || login.error || !login.gotToken) return fail('登录：' + JSON.stringify(login));
 
+  // 连点两下只能发一次：两个并发提交，必须一个成功一个被挡
+  const race = await run(`(async () => {
+    const payload = {
+      draft: true,
+      reportMarkdown: '标题\\n\\n正文一段',
+      fields: { title: '并发测试', grade: 'high', bugtype: 'SQL注入', projectId: '11665', url: 'https://x/y?id=1', describe: '描述', danger: '危害', detailHtml: '正文', repair: '修复', judgeBasis: '依据' },
+      images: [],
+      captcha: { code: 'race-cap', text: '1234' }
+    };
+    let out = [];
+    try {
+      out = await Promise.all([window.api.leishen.submit(payload), window.api.leishen.submit(payload)]);
+    } catch (e) {
+      return { threw: String((e && e.message) || e) };
+    }
+    return { okCount: out.filter((x) => x && x.ok).length, blocked: out.filter((x) => x && /别重复点|还在提交/.test(x.error || '')).length, errors: out.map((x) => x && x.error), out };
+  })()`);
+  if (!race || race.okCount !== 1 || race.blocked !== 1) return fail('连点保护：' + JSON.stringify(race));
+
   const submit = await run(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     S.reportMd = ${JSON.stringify(MD)};

@@ -588,7 +588,8 @@ function mimeFor(name) {
   if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
   if (lower.endsWith('.gif')) return 'image/gif';
   if (lower.endsWith('.webp')) return 'image/webp';
-  return 'image/png';
+  if (lower.endsWith('.png')) return 'image/png';
+  return 'application/octet-stream';
 }
 
 async function upload(token, apiPath, field, filename, raw, mime, timeout = 60000) {
@@ -632,7 +633,13 @@ async function uploadReport(token, filename, raw) {
   return String((payload && payload.ret) || '');
 }
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;   // 平台编辑器写死的 uploadImgMaxSize
+
 async function uploadImage(token, filename, raw) {
+  // 平台端图片上限 5MB（编辑器 uploadImgMaxSize 写死），超了先拦下来别等平台报错
+  if (raw && raw.length > MAX_IMAGE_BYTES) {
+    throw new LeishenError('图片 ' + filename + ' 超过平台 5MB 上限，重截一张再试', 'IMAGE');
+  }
   const payload = await upload(token, '/portal/uploadfile', 'myFileName', filename, raw, mimeFor(filename));
   assertUploadOk(payload, '图片上传失败');
   let ret = payload.ret;
@@ -697,7 +704,11 @@ function composePayload(fields, imageUrls, reportValue) {
   const parts = [];
   const blocks = String(fields.holedetail || '').split(/\n{2,}/);
   for (const block of blocks) {
-    const text = block.trim().split(/\n/).map((l) => l.replace(/^#+\s*/, '')).join('\n').trim();
+    const text = block.trim().split(/\n/)
+      .filter((l) => !/^!\[[^\]]*\]\([^)]*\)\s*$/.test(l.trim()))   // md 图片链接不写进正文，图会单独上传
+      .map((l) => l.replace(/^#+\s*/, ''))
+      .join('\n')
+      .trim();
     if (!text) continue;
     parts.push('<p>' + escapeHtml(text).replace(/\n/g, '<br>') + '</p>');
   }

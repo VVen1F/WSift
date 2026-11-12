@@ -931,11 +931,13 @@ ipcMain.handle('leishen:pickReport', async () => {
   const r = await dialog.showOpenDialog(mainWindow, {
     title: '选择要一并提交的报告',
     properties: ['openFile'],
-    filters: [{ name: '报告', extensions: ['docx', 'pdf', 'doc'] }]
+    filters: [{ name: 'Word 报告（平台只收 docx）', extensions: ['docx'] }]
   });
   if (r.canceled || !r.filePaths.length) return { ok: false, canceled: true };
   return { ok: true, file: r.filePaths[0] };
 });
+
+let lsSubmitting = false;
 
 ipcMain.handle('leishen:submit', async (event, payload) => {
   const p = payload || {};
@@ -946,6 +948,10 @@ ipcMain.handle('leishen:submit', async (event, payload) => {
   if (!fields.bugtype) return { ok: false, error: '没选漏洞类型' };
   if (!fields.projectid) return { ok: false, error: '没填项目 ID' };
   if (!p.captcha || !p.captcha.text || !p.captcha.code) return { ok: false, retry: true, error: '验证码没填' };
+  if (!String(fields.holedetail || '').trim()) return { ok: false, error: '正文是空的，平台必填' };
+  // 连点两下不能变成两条漏洞：只要有一个还在飞，后面的直接挡掉
+  if (lsSubmitting) return { ok: false, error: '上一次还在提交，别重复点' };
+  lsSubmitting = true;
   try {
     // 平台要求必须带 .docx 报告：没手动选就按当前报告现生成一份
     let reportBytes = null;
@@ -977,7 +983,10 @@ ipcMain.handle('leishen:submit', async (event, payload) => {
       return { ok: false, auth: true, error: '登录已失效，重新登录' };
     }
     const msg = String(e.message || '提交失败');
-    return { ok: false, error: msg, retry: /验证码/.test(msg) };
+    // 平台失败后验证码基本就作废了，一律让前端换一张；网络超时也换，避免拿废码重试
+    return { ok: false, error: msg, retry: true };
+  } finally {
+    lsSubmitting = false;
   }
 });
 

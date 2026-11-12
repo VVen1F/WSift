@@ -278,7 +278,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.79', pkg.version === '0.6.79');
+  ok('版本 0.6.80', pkg.version === '0.6.80');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -479,6 +479,16 @@ function ok(name, cond, extra) {
     ok('提交字段和平台表单一一对应', JSON.stringify(Object.keys(composed).sort()) === JSON.stringify(wantKeys), Object.keys(composed).sort());
     const decoded = Buffer.from(composed.holedetail, 'base64').toString('utf8');
     ok('正文用平台占位符并带图', decoded.startsWith('[[§p§]]第一段[[§/p§]]') && decoded.includes('[[§img src="https://cdn/1.png"§]]'), decoded.slice(0, 80));
+    const withLink = ls.composePayload(ls.makeFields({ title: 't', grade: 'high', bugtype: 'X', projectId: '1', detailHtml: '第一段\n\n![](images/01.png)\n\n第二段' }), [], '');
+    const linkDecoded = Buffer.from(withLink.holedetail, 'base64').toString('utf8');
+    ok('正文里的 md 图片链接不会重复写进去', !linkDecoded.includes('![](images/01.png)') && linkDecoded.includes('第一段') && linkDecoded.includes('第二段'), linkDecoded);
+    let imgErr = null;
+    try {
+      await ls.uploadImage('tok', 'big.png', Buffer.alloc(5 * 1024 * 1024 + 1));
+    } catch (e) {
+      imgErr = e;
+    }
+    ok('超过 5MB 的图片先拦下', !!imgErr && imgErr.code === 'IMAGE', imgErr && imgErr.message);
   }
   {
     // ddddocr 桥：把图片 base64 喂给子进程，读回识别结果（这里用假命令验证管道）

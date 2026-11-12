@@ -1209,17 +1209,13 @@ function renderTaskList() {
   const clearBtn = $('#btnTasksClear');
   if (clearBtn) clearBtn.hidden = tasks.length === 0;
   ensureWorkspaces();
-  if (!tasks.length && !archived.length && TASKS.workspaces.length <= 1) {
+  if (!tasks.length && TASKS.workspaces.length <= 1) {
     box.innerHTML = workspaceHtml() + '<div class="task-empty">还没有报告</div>';
     setClearArm(false);
     return;
   }
-  let html = workspaceHtml();
-  if (archived.length) {
-    html += `<button class="task-arch-head" type="button" data-arch-toggle>已归档会话 ${archived.length}</button>`;
-    if (TASKS.showArchived) archived.forEach((t) => { html += taskRow(t, true); });
-  }
-  box.innerHTML = html;
+  // 归档的任务只在「归档管理」里出现，侧栏不再单列一组
+  box.innerHTML = workspaceHtml();
   if (focusId) {
     const again = box.querySelector('.task[data-id="' + focusId + '"]');
     if (again) again.focus();

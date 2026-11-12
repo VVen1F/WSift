@@ -83,7 +83,14 @@
 - 模块数量不影响顶部锚点；内容多了只向下滚动。
 - 新加设置分类时直接复用 `.sect` + `.klist` + `.krow`，不要再写新的行样式或另加 padding。
 
-## 9. 图标
+## 9. 弹窗内缩
+
+- 标题、副标题、表单、底部按钮统一 **24px** 左右内缩（`.modal-head` / `.modal-sub` / `.ls-card .ls-form` / `.row.actions` 都是 24）。
+- 注意 `.modal-card .form { padding: 0 }` 的特异性高于 `.ls-form`，加内缩时要用 `.ls-card .ls-form`。
+- 关闭按钮 28×28、图标 16（`close-outline`），不是 `×` 字符。
+- 表单区独立滚动，底部按钮固定；弹窗最大高 `calc(100vh - 40px)`。
+
+## 10. 图标
 
 - 线性 SVG，stroke 1.7，尺寸 14/16/18，`currentColor`。
 - 语义固定：发送=箭头、截图=相机/方块、删除=垃圾桶、复制=双层方块、设置=齿轮。

@@ -469,6 +469,8 @@ textarea.inp {
   font-size: 14px; line-height: 22px;
 }
 .theme-cube svg { width: 22px; height: 22px; }
+.theme-cube .nav-ic { width: 22px; height: 22px; flex: none; opacity: 1; }
+.theme-cube .nav-ic svg { width: 22px; height: 22px; }
 .theme-cube:hover:not(.on) { background: var(--hover); }
 .theme-cube.on { background: var(--sidebar); border-color: var(--caption); }
 .icon-btn {
@@ -917,9 +919,11 @@ textarea.inp {
 .ack input { width: 14px; height: 14px; margin-top: 3px; }
 .modal .row.actions, .modal-card .row.actions { padding: 0 24px; margin-top: 20px; justify-content: flex-end; }
 .modal-x {
-  border: 0; background: none; font-size: 18px; line-height: 1; color: var(--muted);
-  padding: 2px 6px; border-radius: var(--dsw-radius-sm);
+  border: 0; background: none; color: var(--muted);
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border-radius: var(--dsw-radius-sm);
 }
+.modal-x svg { width: 16px; height: 16px; }
 .modal-x:hover { background: var(--hover); color: var(--text); }
 .modal-sub { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .modal-card .form { padding: 0; overflow: visible; flex: 0 0 auto; }
@@ -1372,7 +1376,8 @@ textarea.inp {
   border: 0.5px solid var(--line); border-radius: var(--dsw-radius-xs); background: #fff; object-fit: contain;
 }
 .ls-cap .inp { width: 140px; }
-.ls-form { padding: 0 24px; }
+/* 和 .modal-card .form（padding:0）同级覆盖，弹窗内所有内容统一 24px 内缩 */
+.ls-card .ls-form { padding: 0 24px; }
 .ls-three { display: grid; grid-template-columns: 1fr 1.8fr 1fr; gap: 10px; }
 .ls-attach { align-items: center; gap: 8px; margin: 10px 0 2px; }
 .ls-card .modal-sub { margin-bottom: 10px; }

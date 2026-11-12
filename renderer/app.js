@@ -1148,7 +1148,7 @@ function kickSwap() {
   col.classList.add('swap');
 }
 
-const ARCH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8z"/><path d="M3 8l2.2-3h13.6L21 8"/><path d="M10 12h4"/></svg>';
+const ARCH_ICON = typeof icon === 'function' ? icon('archive-outline', 16) : '';
 
 function taskRow(t, archivedRow) {
   const onPage = document.getElementById('page-report').classList.contains('on');
@@ -3078,7 +3078,7 @@ function renderModelPop() {
   const provs = cfg.providers.filter((x) => x.enabled !== false);
   const q = (pop._q || '').trim().toLowerCase();
   const shown = q ? models.filter((m) => m.toLowerCase().indexOf(q) >= 0) : models;
-  const check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+  const check = typeof icon === 'function' ? icon('check-outline', 16) : '';
 
   pop.innerHTML = `
     ${provs.length > 1 ? `<div class="mp-list mp-provs">${provs.map((x) => `<div class="mp-item ${x.id === prov.id ? 'on' : ''}" data-p="${x.id}"><span>${esc(x.name)}</span>${x.id === prov.id ? check : ''}</div>`).join('')}</div>` : ''}

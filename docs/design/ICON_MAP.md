@@ -1,6 +1,6 @@
 # 图标映射表
 
-图标全部来自 DeepSeek Harness 官方资源，**不自行绘制**：
+共 26 个图标，全部来自 DeepSeek Harness 官方资源，**不自行绘制**：
 
 - 来源：`deepseek-ai/deepseek-harness` → `packages/client/ui-primitives/src/icons/artwork.ts`
 - 许可：MIT License, Copyright (c) 2026 DeepSeek。复制到本项目的 `renderer/icons.js` 时保留原始 `<svg>`、`viewBox` 和路径，只注入宽高。
@@ -28,6 +28,11 @@
 | 保存 | `save-outline` | 16 | 模板保存 |
 | 编辑 | `edit-outline` | 16 | 重命名 |
 | 面板折叠 | `panel-left-outline` | 16 | 侧栏收起 |
+| 浅色外观 | `light-outline` | 22 | 设置 → 外观 |
+| 深色外观 | `dark-outline` | 22 | 设置 → 外观 |
+| 跟随系统 | `followsystem-outline` | 22 | 设置 → 外观 |
+| 弹窗关闭 | `close-outline` | 16 | 所有弹窗右上角（替换 `×` 字符） |
+| 完成勾选 | `check-outline` | 16 | 模型选择当前项 |
 | 警告 / 提示 | `warning-outline` / `info-outline` | 16 | 错误提示 |
 
 ## 使用方式

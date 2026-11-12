@@ -3243,7 +3243,6 @@ const LS = {
   parsed: null,
   loginCap: null,
   submitCap: null,
-  reportFile: '',
   loginAccountId: '',
   editingId: ''
 };
@@ -3600,15 +3599,6 @@ async function lsLoadProject(quiet) {
 
 /* ---- 提交 ---- */
 
-function lsPaintAttach() {
-  const on = !!($('#lsAttachDocx') && $('#lsAttachDocx').checked);
-  if ($('#lsAttachText')) {
-    $('#lsAttachText').textContent = LS.reportFile
-      ? LS.reportFile.split('/').pop()
-      : (on ? '勾了：按当前报告自动生成 docx' : '默认不传；勾上会按当前报告生成 docx 一起交');
-  }
-}
-
 async function lsRefreshSubmitCap() {
   const r = await window.api.leishen.captcha();
   if (!r.ok) return lsNote('#lsSubmitNote', r.error || '取验证码失败', true);
@@ -3650,9 +3640,6 @@ async function lsOpenSubmit() {
   if ($('#lsDetail')) $('#lsDetail').value = f.detail || '';
   lsFillSelect($('#lsType'), '选择类型', LS.types, f.guess || (LS.cfg && LS.cfg.bugtype) || '');
   lsFillGrades(null, f.grade, f.gradeText);
-  LS.reportFile = '';
-  if ($('#lsAttachDocx')) $('#lsAttachDocx').checked = false;
-  lsPaintAttach();
   const imgs = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
   if ($('#lsImageCount')) $('#lsImageCount').textContent = imgs.length ? imgs.length + ' 张截图会一起上传' : '没有截图';
   lsNote('#lsSubmitNote', '');
@@ -3685,9 +3672,6 @@ async function lsSendSubmit(draft) {
   const payload = {
     draft: !!draft,
     accountId,
-    attachReport: !!($('#lsAttachDocx') && $('#lsAttachDocx').checked),
-    reportFile: LS.reportFile || '',
-    reportMarkdown: S.reportMd || '',
     images,
     captcha: { code: LS.submitCap.code, text },
     fields: {
@@ -3785,14 +3769,6 @@ function bindLeishen() {
   if ($('#lsSubmitRefresh')) $('#lsSubmitRefresh').addEventListener('click', () => lsRefreshSubmitCap());
   if ($('#lsSubmitBtn')) $('#lsSubmitBtn').addEventListener('click', () => lsSendSubmit(false));
   if ($('#lsDraftBtn')) $('#lsDraftBtn').addEventListener('click', () => lsSendSubmit(true));
-  if ($('#lsAttachDocx')) $('#lsAttachDocx').addEventListener('change', () => lsPaintAttach());
-  if ($('#lsPickReport')) {
-    $('#lsPickReport').addEventListener('click', async () => {
-      const r = await window.api.leishen.pickReport();
-      if (r && r.ok) { LS.reportFile = r.file; lsPaintAttach(); }
-    });
-  }
-  if ($('#lsClearReport')) $('#lsClearReport').addEventListener('click', () => { LS.reportFile = ''; lsPaintAttach(); });
   if ($('#lsAccount')) {
     $('#lsAccount').addEventListener('change', async () => {
       LS.accountId = $('#lsAccount').value;

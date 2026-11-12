@@ -6,7 +6,7 @@
  *
  * 起一个假平台（test/mock-platform.js，按实测契约回包），驱动真窗口走：
  * 加两个账号 → 选 A 登录（图形码 + 假 IMAP 收邮箱码）→ 换 token →
- * 拉类型 → 选账号/项目/等级 → 生成 docx → 传图 → 提交；
+ * 拉类型 → 选账号/项目/等级 → 传图 → 提交；
  * 中途切到 B 账号，确认项目列表跟着变、只列参与中的项目。
  */
 const path = require('path');
@@ -166,7 +166,7 @@ app.whenReady().then(async () => {
       await sleep(500);
       note = document.getElementById('lsSubmitNote').textContent;
       if (document.getElementById('lsSubmitModal').hidden) return { ok: true };
-      if (note && !/提交中|上传|生成 docx/.test(note)) return { ok: false, error: note };
+      if (note && !/提交中|上传/.test(note)) return { ok: false, error: note };
     }
     return { ok: false, error: '超时：' + note };
   })()`);
@@ -177,7 +177,7 @@ app.whenReady().then(async () => {
   if (mock.state.submitted.length !== 1) problems.push('平台没收到提交');
   if (sent.holegrade !== 'high') problems.push('等级不是 high：' + sent.holegrade);
   if (sent.holeCode !== sent.holegrade) problems.push('holeCode 和 holegrade 不一致');
-  if (sent.holeReport) problems.push('默认不该带 docx，但带了：' + sent.holeReport);
+  if (sent.holeReport) problems.push('不该带附件，但带了：' + sent.holeReport);
   let detail = '';
   try { detail = Buffer.from(String(sent.holedetail || ''), 'base64').toString('utf8'); } catch (e) { detail = ''; }
   if (!detail.startsWith('[[\u00a7p\u00a7]]')) problems.push('正文编码不对');
@@ -187,46 +187,8 @@ app.whenReady().then(async () => {
   if (String(sent.projectid) !== '11665') problems.push('项目 id 不对：' + sent.projectid);
   if (problems.length) return fail(problems.join('；'));
 
-  // 5) 勾上「附带 docx」再提一次，这次必须带上 holeReport
-  const withDocx = await run(`(async () => {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    document.getElementById('btnSubmit').click();
-    for (let i = 0; i < 150; i++) {
-      await sleep(200);
-      const m = document.getElementById('lsSubmitModal');
-      const img = document.getElementById('lsSubmitCap');
-      if (m && !m.hidden && img && img.src.startsWith('data:image')) break;
-    }
-    await sleep(1500);
-    window.__s5 = {
-      hidden: document.getElementById('lsSubmitModal').hidden,
-      loginOpen: !document.getElementById('lsLoginModal').hidden,
-      accounts: (typeof LS !== 'undefined' ? LS.accounts.length : -1),
-      accountId: (typeof LS !== 'undefined' ? LS.accountId : '?'),
-      accountSel: (document.getElementById('lsAccount') || {}).value,
-      projects: (typeof LS !== 'undefined' ? LS.projects.length : -1),
-      toast: (document.getElementById('toast') || {}).textContent,
-      md: (typeof S !== 'undefined' ? String(S.reportMd || '').length : -1)
-    };
-    document.getElementById('lsAttachDocx').checked = true;
-    document.getElementById('lsAttachDocx').dispatchEvent(new Event('change', { bubbles: true }));
-    document.getElementById('lsSubmitCode').value = ${JSON.stringify(mock.CAPTCHA_TEXT)};
-    document.getElementById('lsSubmitBtn').click();
-    let note = '';
-    for (let i = 0; i < 120; i++) {
-      await sleep(500);
-      note = document.getElementById('lsSubmitNote').textContent;
-      if (document.getElementById('lsSubmitModal').hidden) return { ok: true, note: note, s5: window.__s5 };
-      if (note && !/提交中|上传|生成 docx/.test(note)) return { ok: false, error: note, s5: window.__s5 };
-    }
-    return { ok: false, error: '超时：' + note, s5: window.__s5 };
-  })()`);
-  if (!withDocx || !withDocx.ok) return fail('附带 docx 提交：' + JSON.stringify(withDocx));
-  const sent2 = mock.state.submitted[1] || {};
-  if (!sent2.holeReport) return fail('勾了附带 docx 却没带 holeReport：n=' + mock.state.submitted.length + ' step5=' + JSON.stringify(withDocx));
-
   console.log('E2E 通过：两个账号 → A 登录 → A 项目 ' + dialog.aProjects.join('/') +
     ' → B 项目 ' + dialog.bProjects.join('/') + ' → 等级 ' + dialog.aGrades.join('/') +
-    ' → 传图 2 张 → 提交成功（默认不带 docx，勾上后带 ' + sent2.holeReport + '）');
+    ' → 传图 2 张 → 提交成功（正文文字 + 图片，无附件）');
   app.exit(0);
 });

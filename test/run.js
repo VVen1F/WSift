@@ -282,7 +282,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.84', pkg.version === '0.6.84');
+  ok('版本 0.6.85', pkg.version === '0.6.85');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -464,26 +464,15 @@ function ok(name, cond, extra) {
     ok('没有等级表时返回空数组', Array.isArray(none) && none.length === 0);
   }
   {
-    // 平台只收 .docx：现生成一份，至少保证是合法 zip 包、名字对、图真的在里面
-    const docxMod = require(path.join(__dirname, '..', 'electron', 'docx.js'));
-    const onePx = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-    const pngFile = path.join(process.env.REFRACT_DATA_DIR, 'shot.png');
-    fs.writeFileSync(pngFile, onePx);
-    const built = docxMod.build({ markdown: '某站 SQL 注入\n\n第一段说明\n\n![](images/01.png)\n\n第二段', title: '某站 SQL 注入', images: [pngFile] });
-    const buf = built.buffer;
-    ok('docx 是合法 zip 头', buf.slice(0, 4).toString('binary') === 'PK\u0003\u0004');
-    ok('docx 带 document 和图片', buf.includes('word/document.xml') && buf.includes('word/media/image1.png') && buf.includes('[Content_Types].xml'));
-    ok('图片真的进了 docx', built.images === 1 && buf.length > onePx.length + 500, [built.images, built.bytes]);
-    ok('图片链接不留在正文里', !buf.includes('![](images/'));
-    ok('docx 有正文段落', buf.includes('第一段说明') || buf.includes('5L2g5aW9') || buf.length > 2000, built.bytes);
     const bad = ls.makeFields({ title: 't', grade: '严重', bugtype: 'SQL注入', projectId: '11665' });
     ok('严重映射成平台认的 urgent', bad.holegrade === 'urgent' && bad.holeCode === 'urgent');
-    const composed = ls.composePayload(ls.makeFields({ title: 't', grade: '高危', bugtype: 'SQL注入', projectId: '11665', detailHtml: '第一段\n\n第二段' }), ['https://cdn/1.png'], 'r.docx');
-    const wantKeys = ['POC', 'bugtype', 'holeCode', 'holeReport', 'holedanger', 'holedescribe', 'holedetail', 'holegrade', 'holetitle', 'holeurl', 'judgeBasis', 'projectid', 'repairpropose'];
-    ok('提交字段和平台表单一一对应', JSON.stringify(Object.keys(composed).sort()) === JSON.stringify(wantKeys), Object.keys(composed).sort());
+    const composed = ls.composePayload(ls.makeFields({ title: 't', grade: '高危', bugtype: 'SQL注入', projectId: '11665', detailHtml: '第一段\n\n第二段' }), ['https://cdn/1.png']);
+    const wantKeys = ['POC', 'bugtype', 'holeCode', 'holedanger', 'holedescribe', 'holedetail', 'holegrade', 'holetitle', 'holeurl', 'judgeBasis', 'projectid', 'repairpropose'];
+    ok('提交字段和平台表单一一对应（没有附件字段）', JSON.stringify(Object.keys(composed).sort()) === JSON.stringify(wantKeys), Object.keys(composed).sort());
+    ok('提交体里没有 holeReport', !('holeReport' in composed));
     const decoded = Buffer.from(composed.holedetail, 'base64').toString('utf8');
     ok('正文用平台占位符并带图', decoded.startsWith('[[§p§]]第一段[[§/p§]]') && decoded.includes('[[§img src="https://cdn/1.png"§]]'), decoded.slice(0, 80));
-    const withLink = ls.composePayload(ls.makeFields({ title: 't', grade: 'high', bugtype: 'X', projectId: '1', detailHtml: '第一段\n\n![](images/01.png)\n\n第二段' }), [], '');
+    const withLink = ls.composePayload(ls.makeFields({ title: 't', grade: 'high', bugtype: 'X', projectId: '1', detailHtml: '第一段\n\n![](images/01.png)\n\n第二段' }), []);
     const linkDecoded = Buffer.from(withLink.holedetail, 'base64').toString('utf8');
     ok('正文里的 md 图片链接不会重复写进去', !linkDecoded.includes('![](images/01.png)') && linkDecoded.includes('第一段') && linkDecoded.includes('第二段'), linkDecoded);
     let imgErr = null;

@@ -700,7 +700,7 @@ function makeFields(f = {}) {
  * 纯组装：把正文段落和平台上的图片地址拼成平台要的 holedetail（编码后）。
  * 单独拆出来是为了能脱离网络断言字段。
  */
-function composePayload(fields, imageUrls, reportValue) {
+function composePayload(fields, imageUrls) {
   const parts = [];
   const blocks = String(fields.holedetail || '').split(/\n{2,}/);
   for (const block of blocks) {
@@ -713,12 +713,11 @@ function composePayload(fields, imageUrls, reportValue) {
     parts.push('<p>' + escapeHtml(text).replace(/\n/g, '<br>') + '</p>');
   }
   for (const url of imageUrls || []) parts.push(`<p><img src="${url}"></p>`);
-  const payload = Object.assign({}, fields, { holedetail: encodeHoleDetail(parts.join('')) });
-  if (reportValue) payload.holeReport = reportValue;
-  return payload;
+  // 平台正文只有文字 + 图片，没有附件字段
+  return Object.assign({}, fields, { holedetail: encodeHoleDetail(parts.join('')) });
 }
 
-async function buildDetail(token, fields, images, opts = {}) {
+async function buildDetail(token, fields, images) {
   const urls = [];
   for (const item of images || []) {
     const file = typeof item === 'string' ? item : item && item.path;
@@ -726,14 +725,7 @@ async function buildDetail(token, fields, images, opts = {}) {
     const url = await uploadImage(token, path.basename(file), fs.readFileSync(file));
     urls.push(url);
   }
-  let reportValue = '';
-  if (opts.reportBytes && opts.reportName) {
-    // 平台只收 .docx，这里传主进程刚生成的那份
-    reportValue = await uploadReport(token, opts.reportName, opts.reportBytes);
-  } else if (opts.reportFile && fs.existsSync(opts.reportFile)) {
-    reportValue = await uploadReport(token, path.basename(opts.reportFile), fs.readFileSync(opts.reportFile));
-  }
-  return composePayload(fields, urls, reportValue);
+  return composePayload(fields, urls);
 }
 
 function escapeHtml(s) {

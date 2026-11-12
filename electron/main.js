@@ -16,7 +16,6 @@ const backup = require('./backup');
 const sync = require('./sync');
 const tasks = require('./tasks');
 const leishen = require('./leishen');
-const docx = require('./docx');
 
 let mainWindow = null;
 let remoteInfo = null;
@@ -1033,16 +1032,6 @@ ipcMain.handle('leishen:parse', (_e, md, types) => {
   }
 });
 
-ipcMain.handle('leishen:pickReport', async () => {
-  const r = await dialog.showOpenDialog(mainWindow, {
-    title: '选择要一并提交的报告',
-    properties: ['openFile'],
-    filters: [{ name: 'Word 报告（平台只收 docx）', extensions: ['docx'] }]
-  });
-  if (r.canceled || !r.filePaths.length) return { ok: false, canceled: true };
-  return { ok: true, file: r.filePaths[0] };
-});
-
 let lsSubmitting = false;
 
 ipcMain.handle('leishen:submit', async (event, payload) => {
@@ -1061,27 +1050,9 @@ ipcMain.handle('leishen:submit', async (event, payload) => {
   lsSubmitting = true;
   try {
     // 平台要求必须带 .docx 报告：没手动选就按当前报告现生成一份
-    // 报告附件是可选的：网页端必填，但接口侧不校验（你们面板提交时就没带）。
-    // 默认不生成 docx，勾了「附带报告」才生成 / 才用选中的文件。
-    let reportBytes = null;
-    let reportName = '';
-    const wantReport = p.attachReport !== false;
-    if (p.reportFile && !fs.existsSync(p.reportFile)) return { ok: false, error: '报告文件不见了，重新选一次' };
-    if (p.reportFile && fs.existsSync(p.reportFile)) {
-      reportName = path.basename(p.reportFile);
-      if (!/\.docx$/i.test(reportName)) return { ok: false, error: '平台只收 .docx 报告，选一个 docx 或者留空自动生成' };
-      reportBytes = fs.readFileSync(p.reportFile);
-    } else if (wantReport) {
-      if (!String(p.reportMarkdown || '').trim()) return { ok: false, error: '没有报告正文，先生成报告再提交' };
-      lsNote(event, '生成 docx 报告');
-      const built = docx.build({ markdown: p.reportMarkdown, title: fields.holetitle, images: p.images || [] });
-      reportBytes = built.buffer;
-      reportName = (fields.holetitle || '漏洞报告').replace(/[\\/:*?"<>|]/g, '').slice(0, 60) + '.docx';
-    } else if (!String(fields.holedetail || '').trim()) {
-      return { ok: false, error: '没有报告正文，先生成报告再提交' };
-    }
+    // 平台只收正文（文字）+ 正文图片，没有附件字段，别传任何文件
     lsNote(event, (p.draft ? '存草稿' : '提交') + '：上传正文图片');
-    const body = await leishen.buildDetail(acc.token, fields, p.images || [], { reportBytes, reportName });
+    const body = await leishen.buildDetail(acc.token, fields, p.images || []);
     body.checkCode = String(p.captcha.text);
     body.code = String(p.captcha.code);
     lsNote(event, p.draft ? '存草稿中' : '提交中');

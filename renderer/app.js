@@ -3362,6 +3362,67 @@ async function lsRefreshSubmitCap() {
   if ($('#lsSubmitCode')) $('#lsSubmitCode').value = '';
 }
 
+const LS_FALLBACK_LEVELS = [
+  { code: 'urgent', name: '紧急' },
+  { code: 'high', name: '高危' },
+  { code: 'middle', name: '中危' },
+  { code: 'low', name: '低危' }
+];
+
+function lsFillGrades(levels, wantCode, wantText) {
+  const sel = $('#lsGrade');
+  if (!sel) return;
+  const list = levels && levels.length ? levels : LS_FALLBACK_LEVELS;
+  sel.innerHTML = list.map((x) => '<option value="' + esc(x.code) + '">' + esc(x.name) + '</option>').join('');
+  let pick = '';
+  if (wantText) {
+    const hit = list.find((x) => (x.name && (x.name.includes(wantText) || wantText.includes(x.name))));
+    if (hit) pick = hit.code;
+  }
+  if (!pick && wantCode && list.some((x) => x.code === wantCode)) pick = wantCode;
+  if (!pick) {
+    const hit = list.find((x) => /高危/.test(x.name || '')) || list.find((x) => x.code === 'high');
+    pick = hit ? hit.code : list[0].code;
+  }
+  sel.value = pick;
+}
+
+function lsPaintTemplateLink() {
+  const a = $('#lsTemplateLink');
+  if (!a) return;
+  if (LS.projectTemplate) {
+    a.hidden = false;
+    a.title = LS.projectTemplate;
+  } else {
+    a.hidden = true;
+  }
+}
+
+/** 输入项目 ID 后拉项目名、平台官方的等级表和报告模板。 */
+async function lsLoadProject(quiet) {
+  const id = ($('#lsProjectId') && $('#lsProjectId').value || '').trim();
+  if (!id) return false;
+  if (!quiet) lsNote('#lsSubmitNote', '读取项目…');
+  let r = null;
+  try {
+    r = await window.api.leishen.project(id);
+  } catch (e) {
+    r = { ok: false, error: e.message };
+  }
+  if (!r || !r.ok) {
+    if (!quiet) lsNote('#lsSubmitNote', (r && r.error) || '项目读不到', true);
+    lsFillGrades(null, LS.parsed && LS.parsed.grade, LS.parsed && LS.parsed.gradeText);
+    return false;
+  }
+  LS.projectName = r.name || '';
+  LS.projectTemplate = r.template || '';
+  LS.projectLevels = r.levels || [];
+  lsFillGrades(LS.projectLevels, LS.parsed && LS.parsed.grade, LS.parsed && LS.parsed.gradeText);
+  lsPaintTemplateLink();
+  if (!quiet) lsNote('#lsSubmitNote', (LS.projectName ? '项目：' + LS.projectName : '') + (LS.projectTemplate ? '（有官方报告模板）' : ''));
+  return true;
+}
+
 async function lsOpenSubmit() {
   if (!S.reportMd) return toast('先生成报告', true);
   await lsLoadCfg();
@@ -3386,13 +3447,19 @@ async function lsOpenSubmit() {
   if ($('#lsRepair')) $('#lsRepair').value = f.repair || '';
   if ($('#lsDetail')) $('#lsDetail').value = f.detail || '';
   if ($('#lsProjectId')) $('#lsProjectId').value = (LS.cfg && LS.cfg.projectId) || '';
+  LS.parsed = f;
+  lsFillGrades(null, f.grade, f.gradeText);
   lsFillSelect($('#lsType'), '选择类型', LS.types, f.guess || (LS.cfg && LS.cfg.bugtype) || '');
   LS.reportFile = '';
   lsPaintAttach();
   const imgs = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
   if ($('#lsImageCount')) $('#lsImageCount').textContent = imgs.length ? imgs.length + ' 张截图会一起上传' : '没有截图';
   lsNote('#lsSubmitNote', '');
+  LS.projectTemplate = '';
+  LS.projectLevels = [];
+  lsPaintTemplateLink();
   if ($('#lsSubmitModal')) $('#lsSubmitModal').hidden = false;
+  if (($('#lsProjectId') || {}).value) await lsLoadProject(true);
   await lsRefreshSubmitCap();
 }
 
@@ -3508,6 +3575,17 @@ function bindLeishen() {
   if ($('#lsSubmitRefresh')) $('#lsSubmitRefresh').addEventListener('click', () => lsRefreshSubmitCap());
   if ($('#lsSubmitBtn')) $('#lsSubmitBtn').addEventListener('click', () => lsSendSubmit(false));
   if ($('#lsDraftBtn')) $('#lsDraftBtn').addEventListener('click', () => lsSendSubmit(true));
+  if ($('#lsProjectId')) {
+    const load = debounce(() => { if (LS.cfg && LS.cfg.token) lsLoadProject(false); }, 600);
+    $('#lsProjectId').addEventListener('input', load);
+    $('#lsProjectId').addEventListener('change', () => { if (LS.cfg && LS.cfg.token) lsLoadProject(false); });
+  }
+  if ($('#lsTemplateLink')) {
+    $('#lsTemplateLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (LS.projectTemplate) window.api.openExternal(LS.projectTemplate);
+    });
+  }
   if ($('#lsPickReport')) {
     $('#lsPickReport').addEventListener('click', async () => {
       const r = await window.api.leishen.pickReport();

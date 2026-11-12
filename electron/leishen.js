@@ -387,6 +387,43 @@ async function bugTypes(token) {
   return rows;
 }
 
+/* ---------------- 项目信息 ---------------- */
+
+/** 项目详情：名字 + 官方报告模板下载地址。 */
+async function projectDetail(token, projectId) {
+  const j = await request('GET', '/project/getProjectdetail', {
+    token,
+    params: { id: String(projectId || '').trim() },
+    allowError: true
+  });
+  if (String((j && j.errcode)) !== '0') throw new LeishenError(String((j && j.errmsg) || '查不到这个项目'), 'PROJECT');
+  const data = ((j && j.ret) || {}).data || {};
+  return {
+    name: String(data.projectname || ''),
+    template: String(data.holeReportTemplate || '')
+  };
+}
+
+/** 项目自己的漏洞等级表（不同项目可能不是 urgent/high/middle/low）。 */
+function mapLevels(ret) {
+  return (Array.isArray(ret) ? ret : [])
+    .map((x) => ({
+      code: String((x && x.holeCode) || ''),
+      name: String((x && x.holeLevelName) || ''),
+      desc: String((x && x.holeDescription) || '')
+    }))
+    .filter((x) => x.code);
+}
+
+async function projectLevels(token, projectId) {
+  const j = await request('GET', '/setHole/getHoleLevel/' + encodeURIComponent(String(projectId || '').trim()), {
+    token,
+    allowError: true
+  });
+  if (String((j && j.errcode)) !== '0') return [];
+  return mapLevels(j && j.ret);
+}
+
 /* ---------------- 上传 ---------------- */
 
 function mimeFor(name) {
@@ -679,6 +716,9 @@ module.exports = {
   latestUid,
   codeFromMail,
   bugTypes,
+  projectDetail,
+  projectLevels,
+  mapLevels,
   uploadReport,
   uploadImage,
   encodeHoleDetail,

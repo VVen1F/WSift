@@ -859,6 +859,24 @@ ipcMain.handle('leishen:types', async (_e, opts) => {
   }
 });
 
+ipcMain.handle('leishen:project', async (_e, projectId) => {
+  const cfg = lsCfg();
+  if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };
+  const id = String(projectId || '').trim();
+  if (!id) return { ok: false, error: '项目 ID 是空的' };
+  try {
+    const detail = await leishen.projectDetail(cfg.token, id);
+    const levels = await leishen.projectLevels(cfg.token, id).catch(() => []);
+    return { ok: true, name: detail.name, template: detail.template, levels };
+  } catch (e) {
+    if (e.code === 'AUTH') {
+      lsSave({ token: '' });
+      return { ok: false, auth: true, error: '登录已失效，重新登录' };
+    }
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle('leishen:parse', (_e, md, types) => {
   try {
     const fields = leishen.parseReport(md);

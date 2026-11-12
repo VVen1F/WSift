@@ -266,7 +266,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.72', pkg.version === '0.6.72');
+  ok('版本 0.6.73', pkg.version === '0.6.73');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -372,6 +372,12 @@ function ok(name, cond, extra) {
   const enc2 = ls.encryptPassword('test123');
   ok('密码 AES 稳定且不是明文', enc1 === enc2 && enc1.length === 24 && enc1 !== 'test123');
   ok('设置里有雷神默认项', store.DEFAULTS.leishen && store.DEFAULTS.leishen.token === '' && store.load().leishen && typeof store.load().leishen.projectId === 'string');
+  {
+    const mapped = ls.mapLevels([{ holeCode: 'urgent', holeLevelName: '紧急', holeDescription: 'd' }, { holeCode: '', holeLevelName: '空的' }, null]);
+    ok('项目等级表映射丢掉空值', mapped.length === 1 && mapped[0].code === 'urgent' && mapped[0].name === '紧急' && mapped[0].desc === 'd', mapped);
+    const none = ls.mapLevels(undefined);
+    ok('没有等级表时返回空数组', Array.isArray(none) && none.length === 0);
+  }
   {
     // 平台只收 .docx：现生成一份，至少保证是合法 zip 包、名字对、图真的在里面
     const docxMod = require(path.join(__dirname, '..', 'electron', 'docx.js'));

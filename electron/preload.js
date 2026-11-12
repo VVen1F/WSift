@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('api', {
       return ipcRenderer.invoke('leishen:loginAuto', payload).finally(() => ipcRenderer.off('leishen:progress', h));
     },
     types: (opts) => ipcRenderer.invoke('leishen:types', opts),
+    project: (projectId) => ipcRenderer.invoke('leishen:project', projectId),
     parse: (md, types) => ipcRenderer.invoke('leishen:parse', md, types),
     pickReport: () => ipcRenderer.invoke('leishen:pickReport'),
     submit: (payload, onNote) => {

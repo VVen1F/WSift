@@ -1365,3 +1365,5 @@ textarea.inp {
 .f-hint { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .ls-gate .ls-cap { padding: 0; margin-top: 0; }
 .ls-gate .form-note { margin-top: 8px; min-height: 16px; }
+.ls-link { font-size: 12px; color: var(--accent, #3f69f6); text-decoration: none; }
+.ls-link:hover { text-decoration: underline; }

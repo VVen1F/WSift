@@ -866,9 +866,29 @@ ipcMain.handle('leishen:project', async (_e, projectId) => {
   const id = String(projectId || '').trim();
   if (!id) return { ok: false, error: '项目 ID 是空的' };
   try {
-    const detail = await leishen.projectDetail(cfg.token, id);
-    const levels = await leishen.projectLevels(cfg.token, id).catch(() => []);
-    return { ok: true, name: detail.name, template: detail.template, levels };
+    // 项目详情可能查不到（没参与），但等级只要账号参与过就能查，所以分开来
+    let detail = { name: '', template: '' };
+    try {
+      detail = await leishen.projectDetail(cfg.token, id);
+    } catch (e) {
+      if (e.code === 'AUTH') throw e;
+    }
+    const cache = (cfg.grades && cfg.grades[id]) || null;
+    const fresh = cache && Date.now() - Number(cache.at || 0) < 6 * 3600 * 1000;
+    let levels = fresh ? cache.rows || [] : [];
+    let fromCache = levels.length > 0;
+    if (!levels.length) {
+      levels = await leishen.projectLevels(cfg.token, id).catch(() => []);
+      if (levels.length) {
+        const grades = Object.assign({}, cfg.grades || {}, { [id]: { rows: levels, at: Date.now() } });
+        lsSave({ grades });
+      } else if (cache && cache.rows && cache.rows.length) {
+        // 项目已结束会返回「无权操作」，这时用上次缓存
+        levels = cache.rows;
+        fromCache = true;
+      }
+    }
+    return { ok: true, name: detail.name, template: detail.template, levels, fromCache };
   } catch (e) {
     if (e.code === 'AUTH') {
       lsSave({ token: '' });

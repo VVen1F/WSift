@@ -48,7 +48,8 @@ const DEFAULTS = {
     token: '',
     tokenAt: '',
     projectId: '',
-    bugtype: ''
+    bugtype: '',
+    grades: {}          // 项目 id -> { rows: [{code,name}], at }，6 小时过期
   },
   ui: {
     theme: 'system',

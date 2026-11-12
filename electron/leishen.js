@@ -9,14 +9,15 @@ const fs = require('fs');
 const path = require('path');
 const { execFile, spawn } = require('child_process');
 
-const BASE = 'https://www.bountyteam.com/web/v1';
-const ORIGIN = 'https://www.bountyteam.com';
+// 测试时可以指到本地假平台上（LEISHEN_API_BASE / LEISHEN_ORIGIN），生产就是官网
+const BASE = process.env.LEISHEN_API_BASE || 'https://www.bountyteam.com/web/v1';
+const ORIGIN = process.env.LEISHEN_ORIGIN || 'https://www.bountyteam.com';
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 const AES_KEY = Buffer.from('bceori33ptky987r', 'utf8');
 const AES_IV = AES_KEY;
 
-const IMAP_HOST = 'imap.qq.com';
-const IMAP_PORT = 993;
+const IMAP_HOST = process.env.LEISHEN_IMAP_HOST || 'imap.qq.com';
+const IMAP_PORT = Number(process.env.LEISHEN_IMAP_PORT) || 993;
 const MAIL_SENDER = 'auth_thorsrc@dbappsecurity.com';
 
 class LeishenError extends Error {
@@ -40,6 +41,21 @@ function encryptPassword(plain) {
 }
 
 /* ---------------- HTTP ---------------- */
+
+/**
+ * 平台不是所有接口成功都回 errcode 0：查项目等级这类接口成功也回 200（errmsg「操作成功」），
+ * 失败则是 200 +「无权操作」「保存漏洞失败」这种文案。所以 0 直接算成功，200 看文案。
+ */
+function isOk(payload) {
+  const code = String(payload && payload.errcode);
+  if (code === '0') return true;
+  if (code === '200') {
+    const msg = String((payload && payload.errmsg) || '');
+    return !/失败|错误|无权|异常|不能|不存在|已结束|未通过/.test(msg);
+  }
+  return false;
+}
+
 
 function headersFor(token, extra) {
   const h = { Origin: ORIGIN, Referer: ORIGIN + '/', 'User-Agent': USER_AGENT };
@@ -78,7 +94,7 @@ async function request(method, apiPath, opts = {}) {
   if (code === '401' || code === '403' || (code !== '0' && /登录|权限|失效|未登录/.test(msg))) {
     throw new LeishenError(msg || '登录已失效', 'AUTH');
   }
-  if (!opts.allowError && code !== '0') {
+  if (!opts.allowError && !isOk(payload)) {
     throw new LeishenError(msg || '平台返回错误', 'API');
   }
   return payload;
@@ -143,7 +159,7 @@ async function sendEmailCode({ email, code, text }) {
     params: { email: email || '', photoCode: text || '', code: code || '' },
     allowError: true
   });
-  return String(j && j.errcode) === '0';
+  return isOk(j);
 }
 
 async function loginWithCode({ email, password, checkcode }) {
@@ -155,12 +171,13 @@ async function loginWithCode({ email, password, checkcode }) {
     },
     allowError: true
   });
-  if (String(j && j.errcode) !== '0') {
+  const tok = String((((j && j.ret) || {}).token) || '');
+  if (!isOk(j) && !tok) {
     let msg = String((j && j.errmsg) || '登录失败');
     if (msg === '登录失败或未登录') msg = '平台密码不正确';
     throw new LeishenError(msg, 'LOGIN');
   }
-  const token = String(((j && j.ret) || {}).token || '');
+  const token = tok || String((((j && j.ret) || {}).token) || '');
   if (!token) throw new LeishenError('登录成功但没拿到 token');
   return token;
 }
@@ -396,7 +413,7 @@ async function projectDetail(token, projectId) {
     params: { id: String(projectId || '').trim() },
     allowError: true
   });
-  if (String((j && j.errcode)) !== '0') throw new LeishenError(String((j && j.errmsg) || '查不到这个项目'), 'PROJECT');
+  if (!isOk(j)) throw new LeishenError(String((j && j.errmsg) || '查不到这个项目'), 'PROJECT');
   const data = ((j && j.ret) || {}).data || {};
   return {
     name: String(data.projectname || ''),
@@ -420,8 +437,9 @@ async function projectLevels(token, projectId) {
     token,
     allowError: true
   });
-  if (String((j && j.errcode)) !== '0') return [];
-  return mapLevels(j && j.ret);
+  // 成功可能是 errcode 0 也可能是 200（errmsg「操作成功」），一律看 ret
+  const rows = mapLevels(j && j.ret);
+  return rows;
 }
 
 /* ---------------- 上传 ---------------- */
@@ -465,7 +483,7 @@ async function upload(token, apiPath, field, filename, raw, mime, timeout = 6000
 
 function assertUploadOk(payload, fallback) {
   const code = String(payload && payload.errcode);
-  if (code === '0') return;
+  if (code === '0' || (code === '200' && isOk(payload))) return;
   const msg = String((payload && payload.errmsg) || fallback || '上传失败');
   // 上传接口同样把登录失效放在 errcode 200 里
   if (code === '401' || code === '403' || /登录|权限|失效/.test(msg)) throw new LeishenError(msg, 'AUTH');
@@ -580,7 +598,7 @@ async function submit(token, payload, draft) {
   const body = Object.assign({}, payload);
   if (!String(body.id || '').trim()) delete body.id;
   const data = await request('POST', apiPath, { token, body, allowError: true });
-  if (String((data && data.errcode)) !== '0') {
+  if (!isOk(data)) {
     throw new LeishenError(String((data && data.errmsg) || (draft ? '没有存成草稿' : '没有提交成功')).slice(0, 200), 'SUBMIT');
   }
   return data;
@@ -713,6 +731,7 @@ module.exports = {
   ORIGIN,
   GRADES,
   GRADES_TEXT: GRADE_BY_TEXT,
+  isOk,
   gradeKey,
   encryptPassword,
   request,

@@ -278,7 +278,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.76', pkg.version === '0.6.76');
+  ok('版本 0.6.77', pkg.version === '0.6.77');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -384,6 +384,18 @@ function ok(name, cond, extra) {
   const enc2 = ls.encryptPassword('test123');
   ok('密码 AES 稳定且不是明文', enc1 === enc2 && enc1.length === 24 && enc1 !== 'test123');
   ok('设置里有雷神默认项', store.DEFAULTS.leishen && store.DEFAULTS.leishen.token === '' && store.load().leishen && typeof store.load().leishen.projectId === 'string');
+  {
+    // 平台有的接口成功也回 errcode 200，靠文案区分（真机实测：等级接口 200 + 操作成功）
+    const ok200 = ls.isOk({ errcode: 200, errmsg: '操作成功' });
+    const ok0 = ls.isOk({ errcode: '0' });
+    const noAuth = ls.isOk({ errcode: 200, errmsg: '无权操作' });
+    const failed = ls.isOk({ errcode: '200', errmsg: '保存漏洞失败' });
+    const submitted = ls.isOk({ errcode: '200', errmsg: '提交成功' });
+    ok('errcode 200 + 操作成功算成功', ok200 && ok0 && submitted);
+    ok('无权操作/保存失败算失败', !noAuth && !failed);
+    const cache = store.load().leishen.grades;
+    ok('等级缓存是对象', cache && typeof cache === 'object');
+  }
   {
     const mapped = ls.mapLevels([{ holeCode: 'urgent', holeLevelName: '紧急', holeDescription: 'd' }, { holeCode: '', holeLevelName: '空的' }, null]);
     ok('项目等级表映射丢掉空值', mapped.length === 1 && mapped[0].code === 'urgent' && mapped[0].name === '紧急' && mapped[0].desc === 'd', mapped);

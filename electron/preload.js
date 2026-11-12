@@ -49,6 +49,11 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.on('leishen:progress', h);
       return ipcRenderer.invoke('leishen:login', payload).finally(() => ipcRenderer.off('leishen:progress', h));
     },
+    loginAuto: (payload, onNote) => {
+      const h = (_e, p) => onNote && onNote(p && p.note);
+      ipcRenderer.on('leishen:progress', h);
+      return ipcRenderer.invoke('leishen:loginAuto', payload).finally(() => ipcRenderer.off('leishen:progress', h));
+    },
     types: (opts) => ipcRenderer.invoke('leishen:types', opts),
     parse: (md, types) => ipcRenderer.invoke('leishen:parse', md, types),
     pickReport: () => ipcRenderer.invoke('leishen:pickReport'),

@@ -773,7 +773,7 @@ ipcMain.handle('leishen:captcha', async () => {
   }
 });
 
-ipcMain.handle('leishen:login', async (event, payload) => {
+async function lsDoLogin(event, payload) {
   const p = payload || {};
   const cfg = lsCfg();
   const email = String(p.email || cfg.email || '').trim();
@@ -804,6 +804,38 @@ ipcMain.handle('leishen:login', async (event, payload) => {
     if (e.code === 'AUTH') lsSave({ token: '' });
     return { ok: false, error: e.message, retry: e.code === 'LOGIN' };
   }
+}
+
+ipcMain.handle('leishen:login', (event, payload) => lsDoLogin(event, payload));
+
+// 本机装了 ddddocr 就自己认验证码，认不出再让人填
+ipcMain.handle('leishen:loginAuto', async (event, payload) => {
+  const p = payload || {};
+  if (!(await leishen.ocrReady())) {
+    return { ok: false, noOcr: true, error: '本机没装 ddddocr，手动填一次验证码就行' };
+  }
+  let last = '验证码没认出来';
+  for (let i = 0; i < 6; i++) {
+    lsNote(event, '识别验证码 ' + (i + 1) + '/6');
+    let cap = null;
+    try {
+      cap = await leishen.imageCode();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+    const png = Buffer.from(String(cap.image || '').split(',')[1] || '', 'base64');
+    const text = await leishen.ocrImage(png).catch(() => '');
+    if (!/^[0-9A-Za-z]{4,5}$/.test(text)) {
+      last = '验证码没认准';
+      continue;
+    }
+    lsNote(event, '认到 ' + text + '，提交');
+    const r = await lsDoLogin(event, Object.assign({}, p, { code: cap.code, text }));
+    if (r.ok) return r;
+    if (!r.retry) return r;
+    last = r.error || last;
+  }
+  return { ok: false, retry: true, error: last + '，手动填一次' };
 });
 
 ipcMain.handle('leishen:types', async (_e, opts) => {

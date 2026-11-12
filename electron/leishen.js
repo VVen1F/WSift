@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const tls = require('tls');
 const fs = require('fs');
 const path = require('path');
+const { execFile, spawn } = require('child_process');
 
 const BASE = 'https://www.bountyteam.com/web/v1';
 const ORIGIN = 'https://www.bountyteam.com';
@@ -88,6 +89,49 @@ async function imageCode() {
   const j = await request('GET', '/imageCode');
   const ret = (j && j.ret) || {};
   return { code: String(ret.code || ''), image: String(ret.photo || '') };
+}
+
+/* ---------------- 图形码识别（可选，装了 ddddocr 才用） ---------------- */
+
+let ocrState = null;
+
+/** 本机有没有 python3 + ddddocr。有就能自动识别验证码，没有就手动填。 */
+function ocrReady() {
+  if (ocrState !== null) return Promise.resolve(ocrState);
+  return new Promise((resolve) => {
+    execFile('python3', ['-c', 'import ddddocr, PIL; print("ok")'], { timeout: 20000 }, (err, out) => {
+      ocrState = !err && /ok/.test(String(out || ''));
+      resolve(ocrState);
+    });
+  });
+}
+
+/**
+ * 把验证码图片交给 ddddocr 识别。默认调用本机 python3，
+ * 测试时可以传 opts.cmd / opts.args 换成别的东西。
+ */
+function ocrImage(png, opts = {}) {
+  const code = [
+    'import sys, base64, re',
+    'import ddddocr',
+    'raw = base64.b64decode(sys.stdin.read())',
+    'engine = ddddocr.DdddOcr(show_ad=False)',
+    'print(re.sub(r"[^0-9a-zA-Z]", "", engine.classification(raw) or ""))'
+  ].join('\n');
+  return new Promise((resolve, reject) => {
+    const child = spawn(opts.cmd || 'python3', opts.args || ['-c', code], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.once('error', reject);
+    child.once('close', (code0) => {
+      const text = String(out).trim();
+      if (code0 === 0 && text) return resolve(text);
+      reject(new Error(String(err || '验证码没认出来').trim().split('\n')[0].slice(0, 120)));
+    });
+    child.stdin.end(Buffer.isBuffer(png) ? png.toString('base64') : String(png || ''));
+  });
 }
 
 /* ---------------- 登录 ---------------- */
@@ -610,6 +654,8 @@ module.exports = {
   encryptPassword,
   request,
   imageCode,
+  ocrReady,
+  ocrImage,
   sendEmailCode,
   loginWithCode,
   fetchLatestCode,

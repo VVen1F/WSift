@@ -266,7 +266,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.70', pkg.version === '0.6.70');
+  ok('版本 0.6.71', pkg.version === '0.6.71');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -372,6 +372,16 @@ function ok(name, cond, extra) {
   const enc2 = ls.encryptPassword('test123');
   ok('密码 AES 稳定且不是明文', enc1 === enc2 && enc1.length === 24 && enc1 !== 'test123');
   ok('设置里有雷神默认项', store.DEFAULTS.leishen && store.DEFAULTS.leishen.token === '' && store.load().leishen && typeof store.load().leishen.projectId === 'string');
+  {
+    // ddddocr 桥：把图片 base64 喂给子进程，读回识别结果（这里用假命令验证管道）
+    let ocrText = '';
+    try {
+      ocrText = await ls.ocrImage(Buffer.from('fake-png'), { cmd: 'python3', args: ['-c', 'print("ab12")'] });
+    } catch (e) { ocrText = 'ERR ' + e.message; }
+    ok('验证码识别桥能拿到结果', ocrText === 'ab12', ocrText);
+    const ready = await ls.ocrReady();
+    ok('没装 ddddocr 时能识别出来', typeof ready === 'boolean');
+  }
   ok('网络设置能填代理', ui.includes('id="setProxy"'));
   const netMod = require(path.join(__dirname, '..', 'electron', 'net.js'));
   ok('更新走带代理的客户端', typeof netMod.fetchJSON === 'function' && typeof netMod.download === 'function');

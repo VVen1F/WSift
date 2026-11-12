@@ -3325,6 +3325,29 @@ async function lsDoLogin() {
   if (r && r.retry) await lsRefreshLoginCap();
 }
 
+async function lsDoLoginAuto() {
+  if ($('#lsLoginAuto')) $('#lsLoginAuto').disabled = true;
+  if ($('#lsLoginGo')) $('#lsLoginGo').disabled = true;
+  lsNote('#lsLoginNote', '自动识别中…');
+  let r = null;
+  try {
+    r = await window.api.leishen.loginAuto({}, (note) => lsNote('#lsLoginNote', note || ''));
+  } catch (e) {
+    r = { ok: false, error: e.message };
+  }
+  if ($('#lsLoginAuto')) $('#lsLoginAuto').disabled = false;
+  if ($('#lsLoginGo')) $('#lsLoginGo').disabled = false;
+  if (r && r.ok) {
+    if ($('#lsLoginModal')) $('#lsLoginModal').hidden = true;
+    toast('已登录雷神众测');
+    await lsLoadCfg();
+    await lsLoadTypes(false);
+    return;
+  }
+  lsNote('#lsLoginNote', (r && r.error) || '自动登录失败', true);
+  await lsRefreshLoginCap();
+}
+
 /* ---- 提交 ---- */
 
 function lsPaintAttach() {
@@ -3468,6 +3491,7 @@ function bindLeishen() {
   if ($('#lsLoginCancel')) $('#lsLoginCancel').addEventListener('click', () => { $('#lsLoginModal').hidden = true; });
   if ($('#lsLoginRefresh')) $('#lsLoginRefresh').addEventListener('click', () => lsRefreshLoginCap());
   if ($('#lsLoginGo')) $('#lsLoginGo').addEventListener('click', () => lsDoLogin());
+  if ($('#lsLoginAuto')) $('#lsLoginAuto').addEventListener('click', () => lsDoLoginAuto());
   if ($('#lsLoginCode')) {
     $('#lsLoginCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') lsDoLogin(); });
   }

@@ -6,12 +6,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-process.env.REFRACT_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-data-'));
+process.env.WSIFT_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'wsift-data-'));
 
 const handlers = new Map();
 const stub = {
   app: {
-    getPath: (k) => (k === 'userData' ? process.env.REFRACT_DATA_DIR : os.tmpdir()),
+    getPath: (k) => (k === 'userData' ? process.env.WSIFT_DATA_DIR : os.tmpdir()),
     getVersion: () => '0.1.0',
     getName: () => 'Refract',
     whenReady: () => Promise.resolve(),
@@ -113,7 +113,7 @@ function ok(name, cond, extra) {
   ok('上下文裁剪保留 system', llm.trimMessages(longMsgs, 1)[0].role === 'system');
   ok('上下文裁剪会丢掉最早的消息', llm.trimMessages(longMsgs, 1).length < longMsgs.length);
   ok('不限上下文时原样返回', llm.trimMessages(longMsgs, 0).length === longMsgs.length);
-  ok('会话 id 固定', typeof llm.SESSION_ID === 'string' && llm.SESSION_ID.startsWith('refract-'));
+  ok('会话 id 固定', typeof llm.SESSION_ID === 'string' && llm.SESSION_ID.startsWith('wsift-'));
 
   ok('LLM joinURL', llm.joinURL('https://x/v1/', '/chat') === 'https://x/v1/chat');
   ok('版本比较', updater.cmp('0.1.0', '0.1.1') === -1 && updater.cmp('1.0.0', '0.9.9') === 1);
@@ -218,8 +218,8 @@ function ok(name, cond, extra) {
   ok('model 变成模型列表', mig.models[0] === 'm1' && mig.activeModel === 'm1');
 
   console.log('\n[报告保存]');
-  const reportRoot = path.join(process.env.REFRACT_DATA_DIR, 'reports');
-  const shotFile = path.join(process.env.REFRACT_DATA_DIR, 'one.png');
+  const reportRoot = path.join(process.env.WSIFT_DATA_DIR, 'reports');
+  const shotFile = path.join(process.env.WSIFT_DATA_DIR, 'one.png');
   fs.writeFileSync(shotFile, Buffer.from('png-bytes'));
   const saved = report.save({ markdown: '# t\n', images: [shotFile], title: '演示', baseDir: reportRoot });
   ok('生成 report.md', fs.existsSync(saved.md));
@@ -281,8 +281,8 @@ function ok(name, cond, extra) {
   console.log('\n[报告任务]');
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-  ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.7.0', pkg.version === '0.7.0');
+  ok('品牌与 appId 是 WSift', pkg.productName === 'WSift' && pkg.build.productName === 'WSift' && pkg.build.appId === 'com.wenyifan.wsift');
+  ok('版本 0.8.0', pkg.version === '0.8.0');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -509,13 +509,13 @@ function ok(name, cond, extra) {
     });
     await new Promise((r) => srv.listen(0, '127.0.0.1', r));
     const port = srv.address().port;
-    const tmpDl = path.join(process.env.REFRACT_DATA_DIR, 'dl.bin');
+    const tmpDl = path.join(process.env.WSIFT_DATA_DIR, 'dl.bin');
     let dl = null;
     try { dl = await netMod.download(`http://127.0.0.1:${port}/a`, tmpDl, {}); } catch (e) { dl = { error: e.message }; }
     srv.close();
     ok('更新下载会跟 302', dl && dl.bytes === payload.length && fs.statSync(tmpDl).size === payload.length, dl);
     const up = require(path.join(__dirname, '..', 'electron', 'updater.js'));
-    const empty = path.join(process.env.REFRACT_DATA_DIR, 'empty.bin');
+    const empty = path.join(process.env.WSIFT_DATA_DIR, 'empty.bin');
     fs.writeFileSync(empty, '');
     let err = null;
     try { await up.install(empty); } catch (e) { err = e.message; }
@@ -537,7 +537,7 @@ function ok(name, cond, extra) {
   ok('控件用连续曲率圆角', css.includes('corner-shape: squircle') && css.includes('@supports (corner-shape: squircle)'));
   ok('圆形控件退回标准圆角', css.includes('.switch, .switch span::after'));
   const reportSrc = fs.readFileSync(path.join(__dirname, '..', 'electron', 'report.js'), 'utf8');
-  ok('报告默认导到桌面', reportSrc.includes("'Desktop', 'Refract'"));
+  ok('报告默认导到桌面', reportSrc.includes("'Desktop', 'WSift'"));
   ok('流式预览按节拍刷新', appSrc.includes('STREAM_PAINT_MS') && appSrc.includes('preview.textContent = tail'));
 
   // markdown 渲染：以 | 开头的非表格行不能死循环（shell 管道续行会触发）

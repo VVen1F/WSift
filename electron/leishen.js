@@ -291,7 +291,7 @@ async function openInbox(email, imapCode, timeout = 20000) {
   const conn = new Imap(sock);
   const greet = await conn.readLine(timeout);
   if (!/^\* OK/i.test(greet)) throw new Error('邮箱没有正常应答：' + greet.slice(0, 60));
-  const id = await conn.cmd('ID ("name" "Refract" "version" "1.0")', timeout).catch(() => null);
+  const id = await conn.cmd('ID ("name" "WSift" "version" "1.0")', timeout).catch(() => null);
   const login = await conn.cmd(`LOGIN ${quote(email)} ${quote(imapCode)}`, timeout);
   if (!login.ok) {
     const msg = login.line || '';

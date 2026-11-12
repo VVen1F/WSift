@@ -1,6 +1,10 @@
-# Refract
+# WSift
 
-漏洞测试与报告工作台。桌面客户端，把「发包 → 截图 → 写报告」串成一条线。
+**Security Testing Workspace** · Wen + Sift
+
+本地化的漏洞复测、证据管理与报告交付工作台：把「发包 → 截图 → 写报告 → 交到平台」串成一条线。所有数据和截图都留在本机。
+
+![WSift](build/icon.png)
 
 ![首页](docs/home.png)
 
@@ -113,9 +117,9 @@ npm run dist:linux   # 可选，产出 AppImage
 
 | 内容 | 路径 |
 | --- | --- |
-| 设置、模板 | macOS `~/Library/Application Support/Refract/`，Windows `%APPDATA%\Refract\` |
+| 设置、模板 | macOS `~/Library/Application Support/WSift/`，Windows `%APPDATA%\WSift\` |
 | 截图 | 同上 `shots/`，可在设置里改到别的文件夹 |
-| 报告 | `文档/Refract/<时间>-<标题>/`，旁边有同名 `.zip` |
+| 报告 | `文档/WSift/<时间>-<标题>/`，旁边有同名 `.zip` |
 | 报告草稿 | 同上 `tasks.json` |
 
 API Key 只写在本机 settings.json，不会上传。
@@ -127,6 +131,8 @@ API Key 只写在本机 settings.json，不会上传。
 - 自动更新按系统选安装包：macOS 用 dmg，Windows 用 exe。
 
 ## 更新记录
+
+0.8.0：品牌迁移为 WSift（图标、名称、品牌蓝 #3978E8、仓库改名）；旧数据目录自动沿用，不丢配置和报告。
 
 0.7.0：DSH 细节校准收尾：模型页标题行动作对齐。
 

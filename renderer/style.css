@@ -30,12 +30,19 @@
   --hover: rgba(38, 49, 72, 0.06);
   --active: rgba(38, 49, 72, 0.1);
   --nav-on: #ebeef2;
-  --accent: #4176e6;          /* DSH deepseek-500 */
-  --accent-hover: #5b8bf0;    /* DSH deepseek-400 */
+  /* WSift 品牌色（唯一的强调色来源） */
+  --brand-primary: #3978e8;
+  --brand-hover: #2868d8;
+  --brand-active: #2058be;
+  --brand-subtle: #eaf1ff;
+  --brand-focus: #75a7ff;
+  --brand-foreground: #ffffff;
+  --accent: var(--brand-primary);
+  --accent-hover: var(--brand-hover);
   --on-accent: #ffffff;
   --code-bg: #f9fafb;
   --sel: #ebeef2;
-  --focus: #4176e6;
+  --focus: var(--brand-focus);
   --mask: rgba(0, 0, 0, 0.24);
   --toast-bg: #353638;
   --toast-fg: #ffffff;
@@ -67,12 +74,18 @@ html[data-ds-dark-theme] {
     --hover: rgba(255, 255, 255, 0.08);
     --active: rgba(255, 255, 255, 0.14);
     --nav-on: #43454a;
-    --accent: #5686fe;
-    --accent-hover: #7aaaff;
+    --brand-primary: #5b8df6;
+    --brand-hover: #74a2fa;
+    --brand-active: #3f73dd;
+    --brand-subtle: rgba(57, 120, 232, 0.18);
+    --brand-focus: #8fb4ff;
+    --brand-foreground: #ffffff;
+    --accent: var(--brand-primary);
+    --accent-hover: var(--brand-hover);
     --on-accent: #ffffff;
     --code-bg: #1b1b1c;
     --sel: #43454a;
-    --focus: #7aaaff;
+    --focus: var(--brand-focus);
     --mask: rgba(0, 0, 0, 0.5);
     --toast-bg: #43454a;
     --toast-fg: #ffffff;
@@ -85,7 +98,7 @@ html[data-ds-dark-theme] {
 
 @supports (corner-shape: squircle) {
   * , *::before, *::after { corner-shape: squircle; }
-  .gdot, .brand .dot, .brand .dot span,
+  .gdot,
   .switch, .switch span::after, .switch::after,
   .spin, .dot, .prov-dot, .task .dot,
   input[type="checkbox"], input[type="radio"] { corner-shape: round; }
@@ -134,6 +147,7 @@ button { cursor: default; }
   border-right: 0.5px solid var(--line);
 }
 
+.brand-logo { width: 22px; height: 22px; object-fit: contain; display: block; flex: none; }
 .brand {
   display: flex;
   align-items: center;
@@ -606,7 +620,7 @@ textarea.inp {
 .toast.on { opacity: 1; }
 .toast.act { pointer-events: auto; display: flex; align-items: center; gap: 10px; }
 .toast-act {
-  border: 0; background: none; color: #7aaaff; font: inherit; font-size: 14px;
+  border: 0; background: none; color: var(--brand-hover); font: inherit; font-size: 14px;
   padding: 0; margin-inline: 3px; cursor: default; pointer-events: auto;
 }
 .toast-act:hover { opacity: 0.8; }

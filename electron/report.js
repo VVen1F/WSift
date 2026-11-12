@@ -75,7 +75,7 @@ function buildMessages({ material, template, meta = {}, extra }) {
   ];
 }
 
-const CHAT_SYSTEM = `你是 Refract 里的助手，帮用户做漏洞测试和写报告。
+const CHAT_SYSTEM = `你是 WSift 里的助手，帮用户做漏洞测试和写报告。
 
 【回答】
 - 简洁直接，不寒暄，不复述用户说过的话
@@ -224,7 +224,7 @@ function bundle({ markdown, images = [], title = '' }) {
  */
 function save({ markdown, images = [], title = '', baseDir }) {
   const packed = bundle({ markdown, images, title });
-  const root = baseDir || path.join(require('os').homedir(), 'Desktop', 'Refract');
+  const root = baseDir || path.join(require('os').homedir(), 'Desktop', 'WSift');
   let name = packed.root;
   let dir = path.join(root, name);
   let n = 2;

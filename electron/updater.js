@@ -6,7 +6,7 @@ const { execFile } = require('child_process');
 const net = require('./net');
 
 const OWNER = 'VVen1F';
-const REPO = 'refract';
+const REPO = 'WSift';
 
 function cmp(a, b) {
   const pa = String(a).replace(/^v/, '').split('.').map(Number);
@@ -53,7 +53,7 @@ async function check(current, opts = {}) {
 
 async function download(url, onProgress, opts = {}) {
   const name = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'update.bin');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-update-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wsift-update-'));
   const file = path.join(dir, name);
   await net.retry(() => net.download(url, file, { proxy: opts.proxy || '', onProgress }));
   return file;
@@ -85,7 +85,7 @@ async function install(file) {
     if (err) throw new Error(err);
     return { mode: 'open', file };
   }
-  const mnt = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-mnt-'));
+  const mnt = fs.mkdtempSync(path.join(os.tmpdir(), 'wsift-mnt-'));
   try {
     await run('hdiutil', ['attach', file, '-nobrowse', '-quiet', '-mountpoint', mnt]);
     const appName = fs.readdirSync(mnt).find((f) => f.endsWith('.app'));

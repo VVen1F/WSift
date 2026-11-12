@@ -16,7 +16,7 @@ function openRequest(urlStr, opts = {}, depth = 0) {
   const u = new URL(urlStr);
   const secure = u.protocol === 'https:';
   const port = Number(u.port) || (secure ? 443 : 80);
-  const headers = { host: u.host, 'user-agent': 'refract', ...(opts.headers || {}) };
+  const headers = { host: u.host, 'user-agent': 'WSift', ...(opts.headers || {}) };
 
   return new Promise((resolve, reject) => {
     const onResponse = (res) => {

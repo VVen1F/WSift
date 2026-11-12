@@ -1,6 +1,6 @@
-# Refract 设计规范（对齐 DSH）
+# WSift 设计规范（对齐 DSH）
 
-这份规范把 DeepSeek Harness 的设计原则落到 Refract 这个桌面客户端上。所有界面改动先对照这里，再动 CSS。
+这份规范把 DeepSeek Harness 的设计原则落到 WSift 这个桌面客户端上。所有界面改动先对照这里，再动 CSS。
 规则来源：DSH 的 `dsh-client-ui-ux`（workflow / alignment / spacing / icons）与 `ui-layout`、`ui-theme`、`ui-sidebar` 三个包的说明。
 
 ## 1. 视觉基础

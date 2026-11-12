@@ -18,7 +18,7 @@ function basicAuth(user, pass) {
 
 async function webdavPut(cfg, text) {
   const s = cfg.sync.webdav || {};
-  const url = joinUrl(s.url, s.path || 'refract-settings.json');
+  const url = joinUrl(s.url, s.path || 'wsift-settings.json');
   if (!s.url) throw new Error('没填 WebDAV 地址');
   const res = await fetch(url, {
     method: 'PUT',
@@ -36,7 +36,7 @@ async function webdavPut(cfg, text) {
 
 async function webdavGet(cfg) {
   const s = cfg.sync.webdav || {};
-  const url = joinUrl(s.url, s.path || 'refract-settings.json');
+  const url = joinUrl(s.url, s.path || 'wsift-settings.json');
   if (!s.url) throw new Error('没填 WebDAV 地址');
   const res = await fetch(url, { headers: { Authorization: basicAuth(s.user, s.pass) } });
   if (res.status === 404) throw new Error('远端还没有这份文件');
@@ -54,14 +54,14 @@ function repoOf(s) {
 async function githubPut(cfg, text) {
   const s = cfg.sync.github || {};
   const repo = repoOf(s);
-  const path = (s.path || 'refract-settings.json').replace(/^\/+/, '');
+  const path = (s.path || 'wsift-settings.json').replace(/^\/+/, '');
   const branch = s.branch || 'main';
   const api = `https://api.github.com/repos/${repo}/contents/${encodeURI(path)}`;
   const headers = {
     Authorization: `Bearer ${s.token || ''}`,
     Accept: 'application/vnd.github+json',
     'Content-Type': 'application/json',
-    'User-Agent': 'refract'
+    'User-Agent': 'WSift'
   };
 
   let sha;
@@ -76,7 +76,7 @@ async function githubPut(cfg, text) {
   const res = await fetch(api, {
     method: 'PUT',
     headers,
-    body: JSON.stringify({ message: 'refract: 同步设置', content: b64(text), branch, ...(sha ? { sha } : {}) })
+    body: JSON.stringify({ message: 'wsift: 同步设置', content: b64(text), branch, ...(sha ? { sha } : {}) })
   });
   if (!res.ok) {
     const detail = await res.text();
@@ -88,14 +88,14 @@ async function githubPut(cfg, text) {
 async function githubGet(cfg) {
   const s = cfg.sync.github || {};
   const repo = repoOf(s);
-  const path = (s.path || 'refract-settings.json').replace(/^\/+/, '');
+  const path = (s.path || 'wsift-settings.json').replace(/^\/+/, '');
   const branch = s.branch || 'main';
   const api = `https://api.github.com/repos/${repo}/contents/${encodeURI(path)}?ref=${encodeURIComponent(branch)}`;
   const res = await fetch(api, {
     headers: {
       Authorization: `Bearer ${s.token || ''}`,
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'refract'
+      'User-Agent': 'WSift'
     }
   });
   if (res.status === 404) throw new Error('仓库里还没有这份文件');
@@ -135,7 +135,7 @@ async function test(cfg) {
   const kind = cfg.sync && cfg.sync.kind;
   if (kind === 'webdav') {
     const s = cfg.sync.webdav || {};
-    const url = joinUrl(s.url, s.path || 'refract-settings.json');
+    const url = joinUrl(s.url, s.path || 'wsift-settings.json');
     if (!s.url) throw new Error('没填 WebDAV 地址');
     const res = await fetch(url, { method: 'HEAD', headers: { Authorization: basicAuth(s.user, s.pass) } });
     if (res.status === 401) throw new Error('认证失败，检查用户名和密码');
@@ -145,7 +145,7 @@ async function test(cfg) {
     const s = cfg.sync.github || {};
     const repo = repoOf(s);
     const res = await fetch(`https://api.github.com/repos/${repo}`, {
-      headers: { Authorization: `Bearer ${s.token || ''}`, Accept: 'application/vnd.github+json', 'User-Agent': 'refract' }
+      headers: { Authorization: `Bearer ${s.token || ''}`, Accept: 'application/vnd.github+json', 'User-Agent': 'WSift' }
     });
     if (res.status === 401 || res.status === 403) throw new Error('Token 无效或没有权限');
     if (res.status === 404) throw new Error('找不到仓库，检查 owner/repo 和 Token');

@@ -144,7 +144,7 @@ async function ensure(p = 9222) {
   try {
     await devtools(`http://127.0.0.1:${port}/json/version`);
   } catch (e) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-chrome-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wsift-chrome-'));
     proc = spawn(bin, [
       `--remote-debugging-port=${port}`,
       `--user-data-dir=${dir}`,

@@ -1,8 +1,8 @@
 {
-  "name": "refract",
-  "productName": "Refract",
-  "version": "0.7.0",
-  "description": "SRC 复测与报告工作台：发包、截图、LLM、模板、统一风格报告",
+  "name": "wsift",
+  "productName": "WSift",
+  "version": "0.8.0",
+  "description": "WSift — Security Testing Workspace：本地漏洞复测、证据管理与报告交付工作台",
   "main": "electron/main.js",
   "author": "WenYifan",
   "license": "MIT",
@@ -22,8 +22,8 @@
     "electron-builder": "^26.0.12"
   },
   "build": {
-    "appId": "com.wenyifan.refract",
-    "productName": "Refract",
+    "appId": "com.wenyifan.wsift",
+    "productName": "WSift",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -50,7 +50,7 @@
       "identity": null
     },
     "dmg": {
-      "title": "Refract ${version}"
+      "title": "WSift ${version}"
     },
     "linux": {
       "target": [
@@ -75,7 +75,8 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Refract"
-    }
+      "shortcutName": "WSift"
+    },
+    "artifactName": "WSift-${version}-${arch}.${ext}"
   }
 }

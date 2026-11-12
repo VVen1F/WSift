@@ -9,7 +9,7 @@ function joinURL(base, suffix) {
   return String(base || '').replace(/\/+$/, '') + suffix;
 }
 
-const SESSION_ID = 'refract-' + Math.random().toString(36).slice(2, 10);
+const SESSION_ID = 'wsift-' + Math.random().toString(36).slice(2, 10);
 const queues = new Map();
 
 /** 自定义会话头：值固定为本次进程的 session id，便于网关做粘性/缓存。 */

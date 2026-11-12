@@ -55,7 +55,7 @@ function createWindow() {
     if (SMOKE) {
       setTimeout(async () => {
         try {
-          const out = path.join(app.getPath('temp'), 'refract-smoke.png');
+          const out = path.join(app.getPath('temp'), 'wsift-smoke.png');
           const r = await shot.capture({
             request: 'GET / HTTP/1.1\nHost: smoke\n\n',
             response: 'HTTP/1.1 200 OK\nContent-Type: application/json\n\n{"ok":true}',
@@ -157,7 +157,7 @@ function createWindow() {
           buttons: ['退出', '取消'],
           defaultId: 1,
           cancelId: 1,
-          message: '确定要退出 Refract 吗？'
+          message: '确定要退出 WSift 吗？'
         })
         .then((r) => {
           if (r.response === 0) {
@@ -312,7 +312,7 @@ function recheckPerm() {
         sendPerm('perm:retry', {
           ok: false,
           code: e.code || '',
-          error: e.code === 'BLACK_FRAME' ? '画面是黑的。退出 Refract 再打开，授权才会生效。' : e.message
+          error: e.code === 'BLACK_FRAME' ? '画面是黑的。退出 WSift 再打开，授权才会生效。' : e.message
         });
       });
   }
@@ -327,7 +327,7 @@ function needScreen(job) {
   permJob = async () => {
     let result = await job();
     if (result && result.code === 'NO_PERM' && shot.screenAccess() === 'granted') {
-      result = { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 Refract 再打开，授权才会生效。' };
+      result = { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 WSift 再打开，授权才会生效。' };
     }
     sendPerm('perm:retry', result || { ok: true });
     return result;
@@ -336,14 +336,14 @@ function needScreen(job) {
   sendPerm('perm:need', {
     status,
     platform: process.platform,
-    message: '整屏截图和弹窗取证要读取屏幕。到系统设置勾上 Refract，回到窗口后会自动再拍一次。'
+    message: '整屏截图和弹窗取证要读取屏幕。到系统设置勾上 WSift，回到窗口后会自动再拍一次。'
   });
   startPermWatch();
   return { ok: false, code: 'NO_PERM', status, waiting: true, error: '需要屏幕录制权限' };
 }
 
 async function captureBurst() {
-  const dir = fs.mkdtempSync(path.join(app.getPath('temp'), 'refract-dlg-'));
+  const dir = fs.mkdtempSync(path.join(app.getPath('temp'), 'wsift-dlg-'));
   const stops = [150, 600, 1200, 2200, 3800, 6000, 9000];
   const frames = [];
   const started = Date.now();
@@ -638,7 +638,7 @@ ipcMain.handle('browser:screen', async () => {
         return { ok: false, code: 'NO_PERM', status: e.status, error: e.message };
       }
       if (e.code === 'BLACK_FRAME') {
-        return { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 Refract 再打开，授权才会生效。' };
+        return { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 WSift 再打开，授权才会生效。' };
       }
       return { ok: false, error: e.message };
     }
@@ -649,7 +649,7 @@ ipcMain.handle('browser:screen', async () => {
   const result = await shoot();
   if (result.code === 'NO_PERM' && shot.screenAccess() !== 'granted') return needScreen(shoot);
   if (result.code === 'NO_PERM') {
-    return { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 Refract 再打开，授权才会生效。' };
+    return { ok: false, code: 'BLACK_FRAME', error: '画面是黑的。退出 WSift 再打开，授权才会生效。' };
   }
   return result;
 });
@@ -687,7 +687,7 @@ ipcMain.handle('settings:export', async (_e, withKeys) => {
       out.sync = { ...(out.sync || {}), webdav: { ...((out.sync && out.sync.webdav) || {}), pass: '' }, github: { ...((out.sync && out.sync.github) || {}), token: '' } };
     }
     const r = await dialog.showSaveDialog({
-      defaultPath: 'refract-settings.json',
+      defaultPath: 'wsift-settings.json',
       filters: [{ name: 'JSON', extensions: ['json'] }]
     });
     if (r.canceled || !r.filePath) return { canceled: true };

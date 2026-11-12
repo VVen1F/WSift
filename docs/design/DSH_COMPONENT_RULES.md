@@ -1,4 +1,4 @@
-# Refract 组件与交互规范
+# WSift 组件与交互规范
 
 所有组件必须有完整状态：default / hover / focus / active / selected / disabled / loading / success / error。缺状态的控件视为未完成。
 

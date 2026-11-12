@@ -2647,7 +2647,7 @@ async function bindSettingsPage(ri) {
   $('#aboutVer').textContent = 'v' + S.info.version;
   $('#aboutDir').textContent = S.info.userData || '-';
   $('#aboutDir').title = S.info.userData || '';
-  $('#btnRepo').addEventListener('click', () => window.api.openExternal('https://github.com/VVen1F/refract'));
+  $('#btnRepo').addEventListener('click', () => window.api.openExternal('https://github.com/VVen1F/WSift'));
 }
 
 /* ---------------- 更新 ---------------- */
@@ -2714,8 +2714,8 @@ function openPermModal(info) {
   const black = info && info.black;
   $('#permTitle').textContent = black ? '截图是黑的' : '需要屏幕录制权限';
   $('#permBody').textContent = (info && info.message) || (black
-    ? '画面是黑的。退出 Refract 再打开，授权才会生效。'
-    : '整屏截图和弹窗取证要读取屏幕。到系统设置勾上 Refract，回到窗口后会自动再拍一次。');
+    ? '画面是黑的。退出 WSift 再打开，授权才会生效。'
+    : '整屏截图和弹窗取证要读取屏幕。到系统设置勾上 WSift，回到窗口后会自动再拍一次。');
   $('#permGo').hidden = !!black;
   $('#permModalStatus').textContent = black ? '' : '尚未授权';
   modal.hidden = false;
@@ -2764,7 +2764,7 @@ function bindPerm() {
     go.addEventListener('click', async () => {
       await window.api.perm.open();
       await window.api.perm.request();
-      $('#permModalStatus').textContent = '到系统设置勾上 Refract，回到这里会自动再拍';
+      $('#permModalStatus').textContent = '到系统设置勾上 WSift，回到这里会自动再拍';
     });
   }
   const later = $('#permLater');

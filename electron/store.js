@@ -75,8 +75,8 @@ const DEFAULTS = {
   },
   sync: {
     kind: 'off',
-    webdav: { url: '', user: '', pass: '', path: 'refract-settings.json' },
-    github: { repo: '', branch: 'main', path: 'refract-settings.json', token: '' },
+    webdav: { url: '', user: '', pass: '', path: 'wsift-settings.json' },
+    github: { repo: '', branch: 'main', path: 'wsift-settings.json', token: '' },
     lastAt: '',
     lastResult: ''
   },

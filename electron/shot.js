@@ -60,7 +60,7 @@ async function capture({ request, response, width = 1600, out, ms }) {
       image = await win.webContents.capturePage();
     }
     if (!image || image.isEmpty()) throw new Error('截图失败：窗口未绘制');
-    const target = out || path.join(app.getPath('temp'), `refract-${Date.now()}.png`);
+    const target = out || path.join(app.getPath('temp'), `wsift-${Date.now()}.png`);
     fs.writeFileSync(target, image.toPNG());
     return { path: target, width, height: h };
   } finally {
@@ -126,12 +126,12 @@ function assertNotBlack(image, status) {
   if (status && status !== 'granted') {
     throw fail('需要屏幕录制权限', 'NO_PERM', { status });
   }
-  throw fail('画面是黑的。退出 Refract 再打开，授权才会生效。', 'BLACK_FRAME', { status: status || 'granted' });
+  throw fail('画面是黑的。退出 WSift 再打开，授权才会生效。', 'BLACK_FRAME', { status: status || 'granted' });
 }
 
 async function captureScreen(out) {
   const { execFile } = require('child_process');
-  const target = out || path.join(app.getPath('temp'), `refract-screen-${Date.now()}.png`);
+  const target = out || path.join(app.getPath('temp'), `wsift-screen-${Date.now()}.png`);
   const status = screenAccess();
   if (process.platform === 'darwin' && status !== 'granted') {
     throw fail('需要屏幕录制权限', 'NO_PERM', { status });
@@ -146,14 +146,14 @@ async function captureScreen(out) {
     } catch (e) {
       const now = screenAccess();
       if (now !== 'granted') throw fail('需要屏幕录制权限', 'NO_PERM', { status: now });
-      throw fail('画面是黑的。退出 Refract 再打开，授权才会生效。', 'BLACK_FRAME', { status: now });
+      throw fail('画面是黑的。退出 WSift 再打开，授权才会生效。', 'BLACK_FRAME', { status: now });
     }
     let size = 0;
     try { size = fs.statSync(target).size; } catch (e) { size = 0; }
     if (size < 20 * 1024) {
       const now = screenAccess();
       if (now !== 'granted') throw fail('需要屏幕录制权限', 'NO_PERM', { status: now });
-      throw fail('画面是黑的。退出 Refract 再打开，授权才会生效。', 'BLACK_FRAME', { status: now });
+      throw fail('画面是黑的。退出 WSift 再打开，授权才会生效。', 'BLACK_FRAME', { status: now });
     }
     try {
       const { nativeImage } = require('electron');
@@ -181,7 +181,7 @@ async function captureScreen(out) {
   }
   if (!image || image.isEmpty()) throw new Error('没有可截的屏幕');
   if (nativeImage && looksBlack(image)) {
-    throw fail('画面是黑的。退出 Refract 再打开，授权才会生效。', 'BLACK_FRAME');
+    throw fail('画面是黑的。退出 WSift 再打开，授权才会生效。', 'BLACK_FRAME');
   }
   fs.writeFileSync(target, image.toPNG());
   return { path: target, size: fs.statSync(target).size, scale: display.scaleFactor || 1 };

@@ -14,13 +14,13 @@ const fs = require('fs');
 const os = require('os');
 
 const ROOT = path.join(__dirname, '..');
-const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'refract-e2e-'));
+const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'wsift-e2e-'));
 
 process.env.LEISHEN_API_BASE = 'http://127.0.0.1:8199/web/v1';
 process.env.LEISHEN_ORIGIN = 'http://127.0.0.1:8199';
 process.env.LEISHEN_IMAP_HOST = '127.0.0.1';
 process.env.LEISHEN_IMAP_PORT = '9993';
-process.env.REFRACT_DATA_DIR = path.join(WORK, 'data');
+process.env.WSIFT_DATA_DIR = path.join(WORK, 'data');
 
 const mock = require('./mock-platform.js');
 const { app, BrowserWindow } = require('electron');

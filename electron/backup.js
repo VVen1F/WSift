@@ -22,7 +22,7 @@ function list(cfg) {
   const dir = dirOf(cfg);
   return fs
     .readdirSync(dir)
-    .filter((f) => /^refract-.*\.json$/.test(f))
+    .filter((f) => /^wsift-.*\.json$/.test(f))
     .map((f) => {
       const st = fs.statSync(path.join(dir, f));
       return { name: f, path: path.join(dir, f), size: st.size, mtime: st.mtimeMs };
@@ -33,7 +33,7 @@ function list(cfg) {
 function prune(dir, keep) {
   const files = fs
     .readdirSync(dir)
-    .filter((f) => /^refract-.*\.json$/.test(f))
+    .filter((f) => /^wsift-.*\.json$/.test(f))
     .map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
     .sort((a, b) => b.t - a.t);
   for (const x of files.slice(keep)) {
@@ -63,7 +63,7 @@ function snapshot(cfg, withKeys) {
       };
     }
   }
-  const base = `refract-${stamp()}`;
+  const base = `wsift-${stamp()}`;
   let file = path.join(dir, `${base}.json`);
   let n = 1;
   while (fs.existsSync(file)) file = path.join(dir, `${base}-${n++}.json`);

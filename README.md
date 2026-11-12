@@ -1,243 +1,208 @@
+<div align="center">
+
+<img src="build/icon.png" width="104" alt="WSift" />
+
 # WSift
 
-**Security Testing Workspace** · Wen + Sift
+**Find. Verify. Preserve.**
 
-本地化的漏洞复测、证据管理与报告交付工作台：把「发包 → 截图 → 写报告 → 交到平台」串成一条线。所有数据和截图都留在本机。
+A Local-First Web Security Testing Workspace
 
-![WSift](build/icon.png)
+[![release](https://img.shields.io/github/v/release/VVen1F/WSift?label=release&color=3978E8)](https://github.com/VVen1F/WSift/releases/latest)
+[![license](https://img.shields.io/badge/license-MIT-3978E8)](LICENSE)
+[![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-3978E8)](#install)
 
-![首页](docs/home.png)
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-## 功能
+</div>
 
-**新建任务**
-- 侧栏第一项。点一次就开一份空白报告，版式是标题、模板、账号密码、漏洞详情、其他要求、预览
+WSift is a desktop workbench for the part of security testing that happens *around* the findings: replaying a request, proving it worked, keeping the evidence, and turning it into a report that a program will accept.
 
-**测试**
-- 直接粘贴原始 HTTP 请求，按字节发出，不经过任何中间层
-- 支持 HTTP/2：自动协商，服务端不支持时静默回落到 1.1；也可以强制 1.1 或 2
-- 响应按 Burp 的配色渲染：头名称藏青、Cookie 值暗红、JSON 键藏青、字符串绿、数字蓝
-- 一键生成 PNG 截图，左右分栏、行号、换行与 Burp Repeater 一致
-- 截图和请求全程留在本机
+It is deliberately not a scanner and not a Burp Suite replacement. You point it at the request you already have; it helps you verify, capture and deliver.
 
-![测试与截图](docs/test.png)
+<img src="docs/home.png" alt="WSift workbench" width="100%" />
 
-**浏览器**
-- 不在侧栏里。需要拍弹窗时仍用本机 Chrome 的整屏截图，页面截图不会把窗口调到前面
+## Why WSift
 
-![浏览器](docs/browser.png)
+| The friction | What WSift does |
+|---|---|
+| The request, the screenshot and the report live in three different places | One task holds the raw HTTP, the evidence screenshots and the report draft |
+| Proving a finding means hand-cropping Burp screenshots | Replay the packet and get a Repeater-style PNG with request, response, status and latency |
+| Every program wants its own report format | Report templates (bundled, or any `.md` you import) drive the AI draft |
+| Writing the same sections again for every finding | Structured fields are parsed out of the draft, editable before export |
+| "AI wrote a vulnerability that does not exist" | The model sees your real request/response and screenshots; every field stays editable |
+| Submitting means retyping everything into the platform | 雷神众测 delivery: pick project → pick a participating account → captcha → submit or save a draft |
 
-**远程访问**
-- 启动时在 8765 端口起一个本地服务，同一局域网的其他电脑用浏览器打开 `http://<你的IP>:8765` 就是同一个界面
-- 侧栏底部一直显示这个地址，点一下复制
-- 端口可在设置里改；改完重启生效
+## Features
 
-**设置**
+### Raw HTTP workbench
 
-![设置](docs/settings.png)
+Send the request exactly as typed — no repackaging, no middleware. HTTP/1.1 and HTTP/2 with silent fallback, raw socket I/O, proxy support, and Burp-style colouring for headers, cookies, JSON keys, strings and numbers.
 
-- 侧栏底部固定「设置」，点开是上拉的菜单：常规 / 网络 / LLM / 备份 / 关于
-- 常规、网络、关于都是行式开关，改完立刻生效
-- 同步与备份：WebDAV 或 GitHub 仓库同步、导出 / 导入 JSON、
-  自动备份（1 小时 / 6 小时 / 1 天 / 1 周）、保留份数、备份文件夹、按版本恢复
+<img src="docs/test.png" alt="Request and response" width="100%" />
 
-  ![同步](docs/sync.png)
+### Evidence-grade screenshots
 
-  同步上传的内容默认不含 API Key，也不含同步凭据本身
+One click turns the current exchange into a Repeater-style PNG: split panes, line numbers, status line and latency. Rendered at 2× for Retina, width configurable, height follows the content (up to 2500 px, 5000 px for long bodies). Screenshots stay on disk, in your own folder.
 
-**报告**
+### AI-assisted reports
 
-![报告](docs/report.png)
+Bring any OpenAI-compatible provider or Anthropic. The model writes into *your* template, using the packet and screenshots you supplied; a multimodal pass can read captchas or popup screenshots. The result is plain Markdown — you review it, edit it, then export.
 
-- 侧栏一条一行，按今天、昨天分组。点开编辑，悬停删除，底部清空草稿
-- 草稿写在本机 `tasks.json`，不进云端同步。清空不删已经导出的 zip
-- 四栏：模板、账号密码、漏洞详情、其他要求；账号密码会一并交给模型当测试上下文
-- 调用你配置的大模型生成 Markdown 报告
-- 正文是纯文本，没有表格和标题。名称是「产品 接口 参数 漏洞类型」，文件夹和压缩包用同一句。截图前面是一份可以直接发送的原始请求
-- 生成结果可编辑、可复制。导出是一个 zip：`标题/report.md`，截图在 `标题/images/01.png`，正文里用相对路径 `images/01.png`
+<img src="docs/report.png" alt="Draft and preview" width="100%" />
 
-**雷神众测**
+- Export writes `report.md` plus `images/` and a zip to `~/Desktop/WSift`
+- Evidence images are placed under the packet they belong to, not piled at the end
+- Field parsing (`漏洞等级`, `自评依据`, `漏洞类型`, …) feeds the submission form directly
 
-- 设置 → 账号管理：可以加**多个账号**（平台邮箱 + 平台密码 + QQ 邮箱授权码）。每个账号单独登录：图形验证码手填一次（本机装了 `ddddocr` 就点「自动识别」），邮箱验证码工具自己去对应 QQ 邮箱取（最多等 90 秒），token 按账号存在本机
-- **选到雷神模板，报告页就多一行「提交到雷神众测」**：自动拉出可提交的项目（只列报名的），选项目后账号只剩参与这个项目的，生成完直接点提交就行
-- 报告生成完点「提交」，顺序是**先项目、后账号**：项目列表是把所有已登录账号能提交的项目并起来（只列报名/参与中的），选完项目后账号下拉只剩「能交这个项目」的那些，再按这个项目拉等级
-- 漏洞类型不用手选：报告里的「漏洞类型」自动对上平台类型树；对不上时下拉里手动选一次
-- 标题、等级、URL、描述、危害、等级自评依据、修复建议、正文都从报告里解析出来，提交前可改
-- **平台只能传图片，没有附件字段**：正文是文字（转成平台要的占位符再 base64），截图先传到平台再拼进正文，工具里不放任何 docx/附件入口
-- 支持「存草稿」。验证码错了自动换一张；token 过期会提示重新登录
-- 换账号时项目列表跟着变；等级拉不到会直接说「这个项目的等级查不到：无权操作」并提示这种项目提交大概率被拒
-- 填了项目 ID 会去平台拉这个项目**自己的漏洞等级表**和官方报告模板（有的话给下载链接），等级下拉按项目来，不再是固定四档
-- 等级真的每个项目都不一样：实测有 2 档（高危/中危）、3 档、4 档、9 档（一类系统-高危…），代码可能是 `nullM6SJ` 这种平台动态生成的。只有**参与过该项目的账号**才查得到，所以用当前账号查，查不到先用 6 小时缓存，最后才回退四档
-- 成败判定按实测契约：`0 + 成功` 才是成功；`200` 一律是失败（`无权操作`/`验证码错误`/`操作过于频繁`）；`401` 是 token 失效。提交、存草稿、上传只认 `0`，绝不把「200 + 某某成功」当成功，避免重复提交
-- 等级拉不到多半是**账号没参与这个项目**（不是网络问题），弹窗会直说；等级会缓存 6 小时，项目结束后仍可用
+### Templates
 
-**模板**
-- 安装后没有内置模板。把 `.md` 拖进模板页，或点「导入」「新建」；「雷神模板」一键载入雷神提交页要的那套字段
-- 文件名是「漏洞提交模板.md」时，用上一级文件夹名，例如「雷神众测」
-- 选了模板就按那份版式写；没选模板则是纯文本
+Bundled presets (including 雷神众测), or drop in any `.md` report template. Templates are plain text — version them, share them, diff them.
 
-**模型**
-- OpenAI 兼容与 Anthropic 兼容两种协议，可加多个服务，随时切换
-- 模型配置是一行一项：点「激活」切换当前配置，右侧是协议和 Key 尾号，点进去加账号、勾选模型
-- 右上角「新建」弹出配置表单，可先测试连接再创建
+<img src="docs/templates.png" alt="Templates" width="100%" />
 
-  ![新建模型配置](docs/newmodel.png)
+### Platform delivery (雷神众测)
 
-- 代理：`http://`、`https://`、`socks5://`，可带账号密码；走代理时改成整段返回（不流式）
-- 自定义会话头：填了名字后每个请求都带这个头，值是本进程固定的 session id（给做粘性路由/提示缓存的网关用）
-- 每秒 / 每分钟限速：服务级排队，0 表示不限
-- 上下文窗口（K）：超出就从最早的消息开始丢，系统提示保留
-- 内置 GLM 预设（Anthropic 协议，模型 `glm-4.6`），填上自己的 API Key 就能用
-- **仓库和安装包都不含任何 API Key**，谁用谁自己填，Key 只写在本机 `settings.json`
-- 支持流式输出，可测试连接、拉取模型列表并直接选
+- Multiple accounts, each with its own captcha + mailbox login
+- Projects are read from the platform per account; only projects you actually joined are listed
+- Grades are read per project, not hard-coded
+- Drafts, captcha solving (manual or optional `ddddocr`), and image upload with size checks
 
-**更新**
-- 从 GitHub Releases 检查新版本，进度条下载，macOS 上自动挂载 dmg、替换 `/Applications` 里的旧版本并重启
+<img src="docs/submit-light.png" alt="Submit dialog" width="100%" />
 
-## 开发
+### Local-first data
+
+Everything lives in the Electron `userData` directory: settings, tasks, reports, screenshots. JSON export/import, scheduled backups with retention, and optional WebDAV or GitHub-repo sync. Sync and backup redact provider keys and platform tokens by default.
+
+### Workspaces, archive and remote access
+
+Tasks are grouped into workspaces; finished ones go to an archive you can restore from. An optional LAN web server (`:8765`) serves the same UI to another machine on your network — off unless you turn it on.
+
+## Workflow
+
+```mermaid
+flowchart LR
+  A[Paste raw HTTP] --> B[Send / replay]
+  B --> C[Capture evidence]
+  C --> D[AI drafts into template]
+  D --> E[Review and edit]
+  E --> F[Export .md + images]
+  F --> G[Submit to platform]
+```
+
+## Architecture
+
+WSift is an Electron app with **no runtime dependencies** — the main process uses only Node's standard library.
+
+```
+electron/
+  main.js       window, IPC, permissions, orchestration
+  http.js       raw HTTP/1.1 client (socket, TLS, proxy)
+  http2.js      HTTP/2 with transparent fallback to 1.1
+  shot.js       Repeater-style PNG rendering (offscreen)
+  report.js     prompt assembly, template fill, bundle/export
+  llm.js        OpenAI-compatible + Anthropic clients, vision, streaming
+  templates.js  template storage and presets
+  leishen.js    雷神众测 API: login, projects, grades, upload, submit
+  store.js      settings persistence (atomic write)
+  backup.js     redacted backups, import/export
+  sync.js       WebDAV / GitHub sync
+  remote.js     LAN web server
+  updater.js    GitHub Releases auto-update
+renderer/
+  index.html    single-page UI (no framework)
+  app.js        UI state and bindings
+  style.css     DSH-derived design tokens
+  icons.js      icon set (from DeepSeek Harness, MIT)
+```
+
+- **Main process** owns network, files, screenshots and credentials.
+- **Renderer** is a classic script with a small `window.api` bridge; no bundler, no node integration.
+- **Data** is plain JSON + PNG files; nothing is uploaded unless you configure sync or submit.
+- **Secrets** (API keys, platform tokens, mailbox passwords) stay on disk in the userData directory and are redacted from backups.
+
+## Install
+
+Download from [Releases](https://github.com/VVen1F/WSift/releases/latest):
+
+| Platform | File |
+|---|---|
+| macOS (Apple Silicon) | `WSift-<version>-arm64.dmg` |
+| macOS (Intel) | `WSift-<version>-x64.dmg` |
+| Windows x64 | `WSift-<version>-x64.exe` |
+| Linux x86_64 | `WSift-<version>-x86_64.AppImage` |
+
+> Builds are **unsigned**. On macOS, right-click → Open, or run `xattr -dr com.apple.quarantine /Applications/WSift.app`. On Linux: `chmod +x WSift-*.AppImage`.
+
+### From source
 
 ```bash
+git clone https://github.com/VVen1F/WSift.git
+cd WSift
 npm install
-npm start        # 需要图形环境
-npm test          # 无界面冒烟测试
-npm run test:e2e  # 雷神整条链路：假平台 + 假 IMAP，不需要真账号
+npm start          # or: npm run dev
 ```
-
-## 打包
 
 ```bash
-npm run dist:mac     # 需要 macOS，产出 dist/*.dmg
-npm run dist:win     # 需要 Windows，产出 NSIS 安装包 dist/*.exe
-npm run dist:linux   # 可选，产出 AppImage
+npm test           # unit tests (182 assertions, no network)
+npm run test:e2e   # end-to-end against a local mock platform
+npm run dist:mac   # or dist:win / dist:linux
 ```
 
-推 `v*` 标签会触发 GitHub Actions：macOS 打出 arm64 与 x64 两个 dmg，Windows 打出 NSIS exe，一起附到同一个 Release。
+Requires Node.js 22+ and Electron 45 (installed by `npm install`).
 
-## 数据位置
+## Configuration
 
-| 内容 | 路径 |
-| --- | --- |
-| 设置、模板 | macOS `~/Library/Application Support/WSift/`，Windows `%APPDATA%\WSift\` |
-| 截图 | 同上 `shots/`，可在设置里改到别的文件夹 |
-| 报告 | `文档/WSift/<时间>-<标题>/`，旁边有同名 `.zip` |
-| 报告草稿 | 同上 `tasks.json` |
+All settings live in **Settings** (bottom of the sidebar):
 
-API Key 只写在本机 settings.json，不会上传。
+- **LLM providers** — base URL, model, API key, proxy; OpenAI-compatible or Anthropic; several providers can coexist.
+- **Network** — default protocol (auto / HTTP/1.1 / HTTP/2), proxy, LAN gateway port.
+- **Screenshots** — pixel width and output directory.
+- **Accounts** — platform accounts for delivery; credentials stay local.
+- **Backup & sync** — interval, retention, folder, WebDAV or GitHub repo, JSON export/import.
 
-## 已知限制
+> **Credentials:** API keys, platform tokens, mailbox passwords and cookies are sensitive. They are stored unencrypted in the app's data directory, excluded from sync payloads by default, and redacted in backups — but anyone with access to your machine can read them. Treat the data directory like a credential store.
 
-- 安装包未做 Apple 签名与公证。首次打开如果被拦，右键 → 打开，或在「系统设置 → 隐私与安全性」里放行。
-- Windows 安装包未签名。SmartScreen 会提示「Windows 已保护你的电脑」。点「更多信息」，再点「仍要运行」。
-- 自动更新按系统选安装包：macOS 用 dmg，Windows 用 exe。
+## Roadmap
 
-## 更新记录
+**Done**
+- Raw HTTP/1.1 + HTTP/2 workbench with proxy
+- Repeater-style evidence screenshots (2×, auto-height)
+- AI report drafting with templates, field parsing, Markdown/ZIP export
+- 雷神众测 multi-account delivery with project-scoped grades and drafts
+- Local-first storage, backups, WebDAV/GitHub sync, LAN remote UI
+- macOS / Windows / Linux builds and auto-update
 
-0.8.0：品牌迁移为 WSift（图标、名称、品牌蓝 #3978E8、仓库改名）；旧数据目录自动沿用，不丢配置和报告。
+**In progress**
+- Code signing and notarization for macOS and Windows
+- More SRC platform adapters (account model is already platform-aware)
 
-0.7.0：DSH 细节校准收尾：模型页标题行动作对齐。
+**Planned**
+- Import/annotate existing evidence (HAR) without re-sending
+- Shared workspaces for small teams
+- Configurable evidence themes beyond Repeater style
 
-0.6.99：内联图标清零（全部 DSH 资源）、弹窗内缩统一 24px。
+## Contributing
 
-0.6.98：工作区展开箭头按状态显示、设置页统一同一条内容列、图标换成 DSH 官方资源。
+Issues and pull requests are welcome.
 
-0.6.97：侧栏不再显示「已归档会话」，归档只在归档管理里恢复/删除。
+1. Fork and clone the repo, then `npm install`
+2. Keep the change focused; the main process must stay dependency-free
+3. Run `npm test` before pushing; UI changes should be checked against the design rules in [`docs/design`](docs/design)
+4. Open a PR with what changed and how you verified it (screenshots for UI changes)
 
-0.6.96：模板页左栏标题与列表对齐；DSH 设计体系验收结论（docs/design/UI_MIGRATION_REPORT.md）。
+There is no `CONTRIBUTING.md` yet — the four steps above are the whole process. Release notes live in [CHANGELOG.md](CHANGELOG.md).
 
-0.6.95：字号与控件高度扫尾（列表行 13、清空/归档按钮 28）。
+## License
 
-0.6.94：浮层边界自动翻转、账号区块不再撑出横向滚动条。
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 WenYifan.
 
-0.6.93：菜单限高可滚、侧栏列表去掉横向滚动条、浅色说明文字对比度修到 AA。
+Icon and in-app mark are the WSift brand assets; the icon set in the UI is from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (MIT).
 
-0.6.92：控件几何统一（按钮 32 高/圆角 8）+ 提交框焦点与 Escape。
+<div align="center">
 
-0.6.91：按 DSH 规范起步：设计 Token（间距/字号/控件高度）、圆角归一、4 份设计文档（docs/design/）。
+**WSift** · Find. Verify. Preserve.
 
-0.6.90：自评依据开头重复等级（「中危：…」）的问题：提示词要求不重复，预览/保存/提交三处都会自动去掉。
+[Repository](https://github.com/VVen1F/WSift) · [Releases](https://github.com/VVen1F/WSift/releases/latest) · [Design notes](docs/design)
 
-0.6.89：选雷神模板后，报告页直接给「项目 + 账号」选择，提交时沿用。
-
-0.6.88：提交顺序改成「先选项目、再筛账号」；类型按报告自动选；账号管理按平台分组（以后接别的 SRC）。
-
-0.6.87：账号管理只留账号：项目 ID、默认漏洞类型从设置里去掉（都在提交框里选）。
-
-0.6.86：设置里「雷神众测」改名「账号管理」。
-
-0.6.85：删掉附件功能：雷神只能传图片，正文＝文字＋图片。
-
-0.6.84：漏洞报告附件改成可选（默认不带，勾了才生成 docx）；修掉设置页整包回写会把账号冲掉的 bug。
-
-0.6.83：多账号审计：备份按账号逐个清密码/授权码/token；拉类型优先用当前账号的 token。
-
-0.6.82：雷神众测支持多账号：设置里加账号、逐个登录；提交时先选账号再选项目（只列参与中的），等级按项目拉。
-
-0.6.81：README 重排：开头只放功能说明，更新记录挪到最后；这一版没有功能改动。
-
-0.6.80：提交逻辑审计：失败后自动换验证码、连点只发一次、md 图片链接不再写进正文、超 5MB 图先拦、报告只让选 docx。
-
-0.6.79：登录链路审计：邮件按 MIME 拆段解码（QQ 的 multipart+base64）、发信错误透出平台原话、成败判定改成「只有 0 算成功」；新增 `test/probe.js` 用 token/cookie 直接验接口。
-
-0.6.78：项目 ID 可以从「我参与的项目」里选，不用手输。
-
-0.6.77：等级按项目拉（成功码是 0，200 是「无权操作」），加假平台端到端测试 `npm run test:e2e`。
-
-0.6.76：提交前先校验 URL 格式；正文组装拆成纯函数，字段名与平台表单逐项对齐（加回归测试）。
-
-0.6.75：选了模板就照抄模板的字段名（漏洞标题/等级/自评依据/…），提交框解析命中率更高。
-
-0.6.74：模板页加「雷神模板」一键载入（标题/等级/自评依据/类型/URL/描述/危害/详情/修复建议）。
-
-0.6.73：雷神提交框按项目拉平台真实等级表（/setHole/getHoleLevel），并显示项目名和官方报告模板。
-
-0.6.72：雷神提交按平台前端实际校验对齐：等级改成 urgent/high/middle/low，补「自评依据」，报告自动生成 docx。
-
-0.6.71：雷神登录支持自动识别图形验证码（装了 ddddocr 才启用，没装就手填）。
-
-0.6.70：接入雷神众测：登录换 token、按报告字段提交漏洞、存草稿，设置里多一个「雷神众测」。
-
-0.6.69：更新能下载真正装包了（跟 302 跳转），白屏/卡死会自动把窗口救回来。
-
-0.6.68：报告文件名优先取「漏洞名称」，不再出现「漏洞报告」这种文件夹名。
-
-0.6.67：详情里的包真的重放得通（超时按秒算），每张截图落在对应数据包下面，同名图不再互相覆盖。
-
-0.6.66：截图默认 1600×860（Retina 3200×1720），正文变长自动加高，最多 2500（5000 像素）。
-
-0.6.65：截图模板换成新版 Burp Repeater 样式，JSON 按 4 空格排版，长 cookie 整行折满再换行。
-
-0.6.18：截图模块还原成左右两栏的请求和响应。工作区、归档和 127.0.0.1 网关保留。
-
-0.6.16：页头横线和按钮拉开。模板、测试、报告、设置的间距一起收过。
-
-0.6.15：侧栏任务行和报告表单按 DSH 的字号与行高。删除要确认。
-
-0.6.14：设置行拉开间距，外观可切换。侧栏新建改成加号，任务可以右键。
-
-0.6.13：界面改成 DSH 的配色、字号、圆角和弹窗。生成时可以切去别的页面。
-
-0.6.12：打开就是报告表单。设置五项分开。没填的任务不会进侧栏，悬停可以归档。
-
-0.6.11：侧栏「新建任务」直接打开报告表单。浏览器不在侧栏里。
-
-0.6.10：各页滚动条改成 6px，深色下不再是一条白槽。
-
-0.6.9：设置里可以改截图目录，并打开已有截图的文件夹。
-
-0.6.8：安装后没有内置模板。把 .md 拖进模板页即可新建。
-
-0.6.7：报告改成纯文本。名称、文件夹和压缩包用同一句，截图前放原始请求。
-
-0.6.6：生成报告时关闭模型思考，避免思考占满长度后没有正文。
-
-0.6.5：模型菜单从按钮向下展开，只列已勾选的模型。
-
-0.6.4：首页只列出已勾选的模型；报告预览显示生成进度，可停止；浏览器开新页改用 PUT。
-
-0.6.3：报告在侧栏按条列出，可切换、删除、清空。
-
-0.6.2：内置 GLM 预设不再带厂商品牌名，新建配置按通用表单填写。
-
-0.6.1：设置分组拉开，右侧控件统一宽度。
-
-0.6.0：界面收成黑白行式，报告导出为 zip，并提供 Windows 安装包。
+</div>

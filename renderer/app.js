@@ -3455,7 +3455,10 @@ async function lsLoadProject(quiet) {
   lsPaintTemplateLink();
   if (!quiet) {
     let note = LS.projectName ? '项目：' + LS.projectName : '';
-    if (!LS.projectLevels.length) note += '查不到这个项目的等级（账号没参与这个项目，或项目已结束），先用默认四档';
+    if (!LS.projectLevels.length) {
+      note += (r.levelsError ? '等级查不到：' + r.levelsError + '（' : '查不到这个项目的等级（') +
+        '只有参与过这个项目的账号能看到档位，先用默认四档）';
+    }
     else if (r.fromCache) note += '等级来自缓存（' + LS.projectLevels.length + ' 档）';
     else note += '等级 ' + LS.projectLevels.length + ' 档' + (LS.projectTemplate ? '，有官方报告模板' : '');
     lsNote('#lsSubmitNote', note);

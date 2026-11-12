@@ -1,7 +1,7 @@
 {
   "name": "refract",
   "productName": "Refract",
-  "version": "0.6.78",
+  "version": "0.6.79",
   "description": "SRC 复测与报告工作台：发包、截图、LLM、模板、统一风格报告",
   "main": "electron/main.js",
   "author": "WenYifan",
@@ -14,7 +14,8 @@
     "dist:mac": "electron-builder --mac dmg",
     "dist:win": "electron-builder --win nsis",
     "dist:linux": "electron-builder --linux AppImage",
-    "test:e2e": "electron test/e2e-leishen.js --no-sandbox --disable-gpu --ozone-platform=headless --disable-dev-shm-usage"
+    "test:e2e": "electron test/e2e-leishen.js --no-sandbox --disable-gpu --ozone-platform=headless --disable-dev-shm-usage",
+    "probe": "node test/probe.js"
   },
   "devDependencies": {
     "electron": "^45.2.2",

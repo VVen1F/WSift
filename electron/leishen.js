@@ -43,15 +43,23 @@ function encryptPassword(plain) {
 /* ---------------- HTTP ---------------- */
 
 /**
- * 平台不是所有接口成功都回 errcode 0：查项目等级这类接口成功也回 200（errmsg「操作成功」），
- * 失败则是 200 +「无权操作」「保存漏洞失败」这种文案。所以 0 直接算成功，200 看文案。
+ * 平台的成功码是 0 +「成功」（同一秒 4 个账号对照实测过）：
+ *   0/成功 → 有数据；200/无权操作 → 没参与该项目；200/验证码错误、200/操作过于频繁 → 失败；
+ *   401/权限鉴定失败 → token 失效。
+ * 所以只有 0 算成功；只读接口额外容忍「200 + 成功」这种极端兜底，写操作（提交/存草稿/上传）绝不放宽，
+ * 宁可报错也不能把没提交成功当成成功，否则用户会重复提交。
  */
-function isOk(payload) {
+function isOk(payload, opts = {}) {
   const code = String(payload && payload.errcode);
   if (code === '0') return true;
-  if (code === '200') {
+  // 实测（同一秒、4 个账号打同一接口）：成功只有 0 + 「成功」；
+  // 200 一律是失败——无权操作 / 验证码错误 / 操作过于频繁。
+  // 只在只读接口上留一个兜底，避免哪天平台把成功码改成 200 又把功能整死；
+  // 提交、存草稿这类写操作绝不放宽，宁可报错也不重复提交。
+  if (opts.readonly && code === '200') {
     const msg = String((payload && payload.errmsg) || '');
-    return !/失败|错误|无权|异常|不能|不存在|已结束|未通过/.test(msg);
+    // 文案必须是「成功」或「操作成功」这种，不能是「提交成功」之类的宽词
+    return /^(操作)?成功$/.test(msg.trim()) && payload && payload.ret !== undefined && payload.ret !== null;
   }
   return false;
 }
@@ -90,11 +98,11 @@ async function request(method, apiPath, opts = {}) {
   }
   const code = String(payload && payload.errcode);
   const msg = String((payload && payload.errmsg) || '');
-  // 平台把「token 过期」也放在 errcode 200 里，只能看文案
+  // token 失效：401/403，或文案里带「权限鉴定失败」「登录已失效」
   if (code === '401' || code === '403' || (code !== '0' && /登录|权限|失效|未登录/.test(msg))) {
     throw new LeishenError(msg || '登录已失效', 'AUTH');
   }
-  if (!opts.allowError && !isOk(payload)) {
+  if (!opts.allowError && !isOk(payload, { readonly: method === 'GET' })) {
     throw new LeishenError(msg || '平台返回错误', 'API');
   }
   return payload;
@@ -159,7 +167,11 @@ async function sendEmailCode({ email, code, text }) {
     params: { email: email || '', photoCode: text || '', code: code || '' },
     allowError: true
   });
-  return isOk(j);
+  if (!isOk(j, { readonly: true })) {
+    // 把平台原话带出去：「图形验证码错误」「操作过于频繁」「该邮箱未注册」都不一样
+    throw new LeishenError(String((j && j.errmsg) || '发验证码失败'), 'CAPTCHA');
+  }
+  return true;
 }
 
 async function loginWithCode({ email, password, checkcode }) {
@@ -325,36 +337,122 @@ function decodeQuotedPrintable(src) {
 function decodePart(body, encoding) {
   const enc = String(encoding || '').toLowerCase();
   if (enc.includes('base64')) {
-    try { return Buffer.from(body.replace(/\s+/g, ''), 'base64').toString('utf8'); } catch (e) { return body; }
+    try {
+      const clean = String(body || '').replace(/[^A-Za-z0-9+/=]/g, '');
+      return Buffer.from(clean, 'base64').toString('utf8');
+    } catch (e) {
+      return body;
+    }
   }
   if (enc.includes('quoted-printable')) return decodeQuotedPrintable(body);
   return body;
 }
 
-function headerValue(headers, name) {
-  const m = new RegExp('^' + name + ':[ \\t]*(.*)$', 'im');
-  const hit = m.exec(headers);
-  return hit ? hit[1].trim() : '';
+/** 头部按行取，支持折行（下一行以空白开头算续行）。 */
+function headerBlock(raw) {
+  const text = String(raw || '').replace(/\r\n/g, '\n');
+  const cut = text.indexOf('\n\n');
+  return { head: cut >= 0 ? text.slice(0, cut) : text, body: cut >= 0 ? text.slice(cut + 2) : '' };
 }
 
-/** 从邮件里抠 6 位验证码：先找「验证码/校验码」附近，再退回第一个 6 位串。 */
+function headerValue(headers, name) {
+  const lines = String(headers || '').replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  let hitting = false;
+  for (const line of lines) {
+    if (/^[ \t]/.test(line) && hitting) {
+      out.push(line.trim());
+      continue;
+    }
+    hitting = false;
+    const m = new RegExp('^' + name + ':[ \\t]*(.*)$', 'i').exec(line);
+    if (m) {
+      hitting = true;
+      out.push(m[1].trim());
+    }
+  }
+  return out.join(' ').trim();
+}
+
+/** RFC2047 编码的标题/发件人（=?utf-8?B?...?=）。 */
+function decodeHeaderText(value) {
+  return String(value || '').replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (all, charset, enc, data) => {
+    try {
+      let buf;
+      if (enc.toUpperCase() === 'B') buf = Buffer.from(String(data).replace(/\s+/g, ''), 'base64');
+      else buf = Buffer.from(decodeQuotedPrintable(String(data).replace(/_/g, ' ')), 'utf8');
+      return buf.toString('utf8');
+    } catch (e) {
+      return all;
+    }
+  });
+}
+
+/** 把正文拆成 MIME 分段（multipart 递归）。QQ 邮箱经常是 multipart + base64。 */
+function mimeParts(raw, out = [], depth = 0) {
+  const { head, body } = headerBlock(raw);
+  const ctype = headerValue(head, 'Content-Type') || 'text/plain';
+  if (/^multipart\//i.test(ctype) && depth < 5) {
+    const boundary = (/boundary="?([^";]+)"?/i.exec(ctype) || [])[1];
+    if (boundary) {
+      const chunks = String(body).split('--' + boundary);
+      for (const chunk of chunks.slice(1)) {
+        if (chunk.startsWith('--')) break;
+        const part = chunk.replace(/^\r?\n/, '');
+        if (part.trim()) mimeParts(part, out, depth + 1);
+      }
+      return out;
+    }
+  }
+  out.push({ type: ctype, encoding: headerValue(head, 'Content-Transfer-Encoding'), body });
+  return out;
+}
+
+function htmlToText(html) {
+  return String(html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<(?:br|\/p|\/div|\/tr)[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(Number(n)))
+    .replace(/[ \t]+/g, ' ');
+}
+
+function pickCode(text) {
+  const flat = String(text || '');
+  const near = /(?:验证码|校验码|动态码|verification\s*code|authorization\s*code)[^0-9A-Za-z]{0,40}(\d{6})/i.exec(flat);
+  if (near) return near[1];
+  const nearAlnum = /(?:验证码|校验码|动态码|verification\s*code)[^0-9A-Za-z]{0,40}([0-9A-Za-z]{6})/i.exec(flat);
+  if (nearAlnum) return nearAlnum[1];
+  const anyDigits = /\b(\d{6})\b/.exec(flat);
+  return anyDigits ? anyDigits[1] : '';
+}
+
+/**
+ * 从邮件里抠验证码。
+ * 先按 MIME 拆段（text/plain 优先，其次 text/html），每段按自己的
+ * Content-Transfer-Encoding 解码，再找「验证码」附近或第一个 6 位数字。
+ */
 function codeFromMail(raw) {
   const text = String(raw || '');
-  const cut = text.indexOf('\r\n\r\n');
-  const head = cut >= 0 ? text.slice(0, cut) : '';
-  const bodyRaw = cut >= 0 ? text.slice(cut + 4) : text;
-  const encoding = headerValue(head, 'Content-Transfer-Encoding');
-  const decoded = decodePart(bodyRaw, encoding);
-  const flat = decoded.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  const near = /(?:验证码|校验码|verification\s*code)[^0-9A-Za-z]{0,30}([0-9A-Za-z]{6})/i.exec(flat);
-  if (near) return near[1];
-  const any = /\b([0-9A-Za-z]{6})\b/.exec(flat);
-  return any ? any[1] : '';
+  const parts = mimeParts(text);
+  const order = (t) => (/text\/plain/i.test(t) ? 0 : /text\/html/i.test(t) ? 1 : 2);
+  parts.sort((a, b) => order(a.type) - order(b.type));
+  for (const part of parts) {
+    const decoded = decodePart(part.body, part.encoding);
+    const flat = /html/i.test(part.type) ? htmlToText(decoded) : decoded;
+    const code = pickCode(flat);
+    if (code) return code;
+  }
+  return '';
 }
 
 async function fetchLatestCode(email, imapCode, opts = {}) {
   const afterUid = Number(opts.afterUid) || 0;
-  const since = Number(opts.since) || Date.now() / 1000 - 5;
   const deadline = Date.now() + (Number(opts.timeout) || 90) * 1000;
   const conn = await openInbox(email, imapCode);
   try {
@@ -367,10 +465,10 @@ async function fetchLatestCode(email, imapCode, opts = {}) {
         const raw = await conn.fetchBody(uid);
         if (!raw) continue;
         const text = raw.toString('utf8');
-        const cut = text.indexOf('\r\n\r\n');
-        const head = cut >= 0 ? text.slice(0, cut) : text;
-        const from = headerValue(head, 'From').toLowerCase();
-        if (!from.includes(MAIL_SENDER) && !from.includes('雷神')) continue;
+        const head = headerBlock(text).head;
+        const from = decodeHeaderText(headerValue(head, 'From')).toLowerCase();
+        const subject = decodeHeaderText(headerValue(head, 'Subject')).toLowerCase();
+        if (!from.includes(MAIL_SENDER) && !from.includes('雷神') && !subject.includes('雷神')) continue;
         const code = codeFromMail(text);
         if (code) return code;
       }
@@ -413,7 +511,7 @@ async function projectDetail(token, projectId) {
     params: { id: String(projectId || '').trim() },
     allowError: true
   });
-  if (!isOk(j)) throw new LeishenError(String((j && j.errmsg) || '查不到这个项目'), 'PROJECT');
+  if (!isOk(j, { readonly: true })) throw new LeishenError(String((j && j.errmsg) || '查不到这个项目'), 'PROJECT');
   const data = ((j && j.ret) || {}).data || {};
   return {
     name: String(data.projectname || ''),
@@ -437,9 +535,12 @@ async function projectLevels(token, projectId) {
     token,
     allowError: true
   });
-  // 成功可能是 errcode 0 也可能是 200（errmsg「操作成功」），一律看 ret
-  const rows = mapLevels(j && j.ret);
-  return rows;
+  if (!isOk(j, { readonly: true })) {
+    const msg = String((j && j.errmsg) || '查不到等级');
+    // 只有「已参与这个项目」的账号才查得到，这不是网络错误，要跟用户说清楚
+    throw new LeishenError(msg, /无权|权限/.test(msg) ? 'NOACCESS' : 'LEVELS');
+  }
+  return mapLevels(j && j.ret);
 }
 
 /** 我参与的项目（只能提交 apply/doing 状态的）。 */
@@ -467,7 +568,7 @@ async function myProjects(token) {
       params: { size: 50, page, projectSubType: '', projectType: '', status: '', search: '' },
       allowError: true
     });
-    if (!isOk(j)) break;
+    if (!isOk(j, { readonly: true })) break;
     const ret = (j && j.ret) || {};
     const chunk = ret.data || [];
     rows.push(...chunk);
@@ -518,9 +619,9 @@ async function upload(token, apiPath, field, filename, raw, mime, timeout = 6000
 
 function assertUploadOk(payload, fallback) {
   const code = String(payload && payload.errcode);
-  if (code === '0' || (code === '200' && isOk(payload))) return;
+  if (code === '0') return;
   const msg = String((payload && payload.errmsg) || fallback || '上传失败');
-  // 上传接口同样把登录失效放在 errcode 200 里
+  // 上传接口的登录失效也是 401 /「权限鉴定失败」，按文案兜一层
   if (code === '401' || code === '403' || /登录|权限|失效/.test(msg)) throw new LeishenError(msg, 'AUTH');
   throw new LeishenError(msg.slice(0, 200), 'UPLOAD');
 }

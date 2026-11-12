@@ -278,7 +278,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.78', pkg.version === '0.6.78');
+  ok('版本 0.6.79', pkg.version === '0.6.79');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -386,13 +386,16 @@ function ok(name, cond, extra) {
   ok('设置里有雷神默认项', store.DEFAULTS.leishen && store.DEFAULTS.leishen.token === '' && store.load().leishen && typeof store.load().leishen.projectId === 'string');
   {
     // 平台有的接口成功也回 errcode 200，靠文案区分（真机实测：等级接口 200 + 操作成功）
-    const ok200 = ls.isOk({ errcode: 200, errmsg: '操作成功' });
-    const ok0 = ls.isOk({ errcode: '0' });
-    const noAuth = ls.isOk({ errcode: 200, errmsg: '无权操作' });
-    const failed = ls.isOk({ errcode: '200', errmsg: '保存漏洞失败' });
-    const submitted = ls.isOk({ errcode: '200', errmsg: '提交成功' });
-    ok('errcode 200 + 操作成功算成功', ok200 && ok0 && submitted);
-    ok('无权操作/保存失败算失败', !noAuth && !failed);
+    // 实测：成功只有 0 +「成功」，200 一律失败（无权操作/验证码错误/操作过于频繁）
+    const ok0 = ls.isOk({ errcode: '0', errmsg: '成功', ret: [] });
+    const noAuth = ls.isOk({ errcode: 200, errmsg: '无权操作', ret: null });
+    const rate = ls.isOk({ errcode: '200', errmsg: '操作过于频繁' });
+    const captcha = ls.isOk({ errcode: '200', errmsg: '验证码错误' });
+    const submitted = ls.isOk({ errcode: '200', errmsg: '提交成功', ret: { id: 1 } });
+    ok('只有 0 算成功，200 都算失败', ok0 && !noAuth && !rate && !captcha && !submitted);
+    ok('只读接口才容忍 200 +「成功」', ls.isOk({ errcode: 200, errmsg: '操作成功', ret: [1] }, { readonly: true }) &&
+      !ls.isOk({ errcode: 200, errmsg: '提交成功', ret: { id: 1 } }, { readonly: true }));
+    ok('提交/上传绝不放宽', !ls.isOk({ errcode: 200, errmsg: '提交成功', ret: { id: 1 } }));
     const cache = store.load().leishen.grades;
     ok('等级缓存是对象', cache && typeof cache === 'object');
     const projects = ls.mapProjects([
@@ -403,6 +406,52 @@ function ok(name, cond, extra) {
       null
     ]);
     ok('项目列表只留进行中的并去重', projects.length === 1 && projects[0].id === '11665' && projects[0].name === 'A', projects);
+    // 邮箱验证码解析：QQ 真实格式是 multipart + base64，老实现会把 base64 噪声当验证码
+    const b64 = (x) => Buffer.from(x, 'utf8').toString('base64');
+    const mailA = [
+      'From: "=?utf-8?B?' + b64('雷神众测') + '?=" <auth_thorsrc@dbappsecurity.com>',
+      'Subject: =?utf-8?B?' + b64('登录验证码') + '?=',
+      'MIME-Version: 1.0',
+      'Content-Type: multipart/alternative; boundary="=_b1"',
+      '',
+      '--=_b1', 'Content-Type: text/plain; charset="utf-8"', 'Content-Transfer-Encoding: base64', '',
+      b64('您的验证码是 123456，5 分钟内有效。'),
+      '--=_b1', 'Content-Type: text/html; charset="utf-8"', 'Content-Transfer-Encoding: base64', '',
+      b64('<div>验证码：<b>123456</b></div>'),
+      '--=_b1--', ''
+    ].join('\r\n');
+    ok('multipart+base64 邮件能抠出验证码', ls.codeFromMail(mailA) === '123456', ls.codeFromMail(mailA));
+
+    const mailB = [
+      'From: auth_thorsrc@dbappsecurity.com',
+      'Content-Type: text/plain; charset="utf-8"',
+      'Content-Transfer-Encoding: quoted-printable',
+      '',
+      '=E9=AA=8C=E8=AF=81=E7=A0=81=EF=BC=9A654=\r\n321'
+    ].join('\r\n');
+    ok('QP 软换行能拼回来', ls.codeFromMail(mailB) === '654321', ls.codeFromMail(mailB));
+
+    const mailC = [
+      'From: "雷神众测" <auth_thorsrc@dbappsecurity.com>',
+      'Content-Type: text/html; charset="utf-8"',
+      '',
+      '<div>验证码：<b>987654</b>，5 分钟内有效</div>'
+    ].join('\r\n');
+    ok('纯 HTML 邮件能抠出验证码', ls.codeFromMail(mailC) === '987654', ls.codeFromMail(mailC));
+
+    const mailD = [
+      'From: auth_thorsrc@dbappsecurity.com',
+      'Content-Type: multipart/mixed; boundary="outer"',
+      '',
+      '--outer', 'Content-Type: multipart/alternative; boundary="inner"', '',
+      '--inner', 'Content-Type: text/plain; charset="utf-8"', '', '验证码：  246810', '',
+      '--inner--', '',
+      '--outer', 'Content-Type: application/pdf', 'Content-Transfer-Encoding: base64', '',
+      b64('%PDF 999999'),
+      '--outer--'
+    ].join('\r\n');
+    ok('嵌套 multipart 里的验证码优先于附件', ls.codeFromMail(mailD) === '246810', ls.codeFromMail(mailD));
+    ok('没有验证码的邮件返回空', ls.codeFromMail('From: a@b.c\r\n\r\nhello') === '');
   }
   {
     const mapped = ls.mapLevels([{ holeCode: 'urgent', holeLevelName: '紧急', holeDescription: 'd' }, { holeCode: '', holeLevelName: '空的' }, null]);

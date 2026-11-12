@@ -116,10 +116,10 @@ const server = http.createServer(async (req, res) => {
 
   if (p.startsWith('/setHole/getHoleLevel/')) {
     if (!authOk(req)) return json(res, { errcode: '200', errmsg: '权限鉴定失败' });
-    // 真平台这个接口成功也回 errcode 200 + 「操作成功」，这里照样模拟
+    // 真平台成功就是 errcode 0 +「成功」；没参与的账号会回 200 +「无权操作」
     return json(res, {
-      errcode: 200,
-      errmsg: '操作成功',
+      errcode: '0',
+      errmsg: '成功',
       ret: [
         { holeCode: 'urgent', holeLevelName: '紧急', holeDescription: 'd', holeMoney: 0, weight: 4 },
         { holeCode: 'high', holeLevelName: '高危', holeDescription: 'd', holeMoney: 0, weight: 3 },
@@ -196,17 +196,33 @@ server.listen(PORT, '127.0.0.1', () => console.log('[mock] http on ' + PORT));
 
 /* ---------------- 假 IMAP（TLS） ---------------- */
 
+// QQ 邮箱真实格式：multipart/alternative + 两段 base64（解析器要能拆段解码）
 function rawMail(mail) {
+  const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
+  const boundary = '=_mock_' + mail.uid;
   const head = [
-    'From: ' + mail.from,
+    'From: "=?utf-8?B?' + b64('雷神众测') + '?=" <' + mail.from + '>',
     'To: you@qq.com',
-    'Subject: ' + mail.subject,
+    'Subject: =?utf-8?B?' + b64(mail.subject) + '?=',
     'Date: ' + new Date().toUTCString(),
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset="utf-8"',
-    'Content-Transfer-Encoding: 8bit'
+    'Content-Type: multipart/alternative; boundary="' + boundary + '"'
   ].join('\r\n');
-  return Buffer.from(head + '\r\n\r\n' + mail.body + '\r\n', 'utf8');
+  const body = [
+    '--' + boundary,
+    'Content-Type: text/plain; charset="utf-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    b64(mail.body),
+    '--' + boundary,
+    'Content-Type: text/html; charset="utf-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    b64('<div>' + mail.body.replace(/</g, '&lt;') + '</div>'),
+    '--' + boundary + '--',
+    ''
+  ].join('\r\n');
+  return Buffer.from(head + '\r\n\r\n' + body, 'utf8');
 }
 
 const imap = tls.createServer({

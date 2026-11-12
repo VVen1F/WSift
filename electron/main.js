@@ -787,14 +787,11 @@ async function lsDoLogin(event, payload) {
   try {
     lsNote(event, '取邮箱里最新一封');
     const before = await leishen.latestUid(email, imapCode);
-    const since = Date.now() / 1000 - 5;
     lsNote(event, '提交图形验证码');
-    const sent = await leishen.sendEmailCode({ email, password, code: p.code, text: p.text });
-    if (!sent) return { ok: false, retry: true, error: '图形验证码不对，换一张再试' };
+    await leishen.sendEmailCode({ email, password, code: p.code, text: p.text });
     lsNote(event, '已发信，等邮箱验证码（最多 90 秒）');
     const mailCode = await leishen.fetchLatestCode(email, imapCode, {
       afterUid: before,
-      since,
       timeout: Number(p.timeout) || 90
     });
     lsNote(event, '换 token');
@@ -804,7 +801,7 @@ async function lsDoLogin(event, payload) {
     return { ok: true, token };
   } catch (e) {
     if (e.code === 'AUTH') lsSave({ token: '' });
-    return { ok: false, error: e.message, retry: e.code === 'LOGIN' };
+    return { ok: false, error: e.message, retry: e.code === 'LOGIN' || e.code === 'CAPTCHA' };
   }
 }
 
@@ -892,8 +889,15 @@ ipcMain.handle('leishen:project', async (_e, projectId) => {
     const fresh = cache && Date.now() - Number(cache.at || 0) < 6 * 3600 * 1000;
     let levels = fresh ? cache.rows || [] : [];
     let fromCache = levels.length > 0;
+    let levelsError = '';
     if (!levels.length) {
-      levels = await leishen.projectLevels(cfg.token, id).catch(() => []);
+      try {
+        levels = await leishen.projectLevels(cfg.token, id);
+      } catch (e) {
+        if (e.code === 'AUTH') throw e;
+        levels = [];
+        levelsError = e.message || '';
+      }
       if (levels.length) {
         const grades = Object.assign({}, cfg.grades || {}, { [id]: { rows: levels, at: Date.now() } });
         lsSave({ grades });
@@ -903,7 +907,7 @@ ipcMain.handle('leishen:project', async (_e, projectId) => {
         fromCache = true;
       }
     }
-    return { ok: true, name: detail.name, template: detail.template, levels, fromCache };
+    return { ok: true, name: detail.name, template: detail.template, levels, fromCache, levelsError };
   } catch (e) {
     if (e.code === 'AUTH') {
       lsSave({ token: '' });

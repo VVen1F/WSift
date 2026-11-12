@@ -127,6 +127,23 @@ app.whenReady().then(async () => {
   if (!targets.projects.includes('11655') || !targets.projects.includes('11665')) return fail('报告页项目不对：' + JSON.stringify(targets.projects));
   if (targets.accounts.length !== 2) return fail('报告页账号不对：' + JSON.stringify(targets.accounts));
 
+  // 1.8) 提交框：焦点落在输入框、Escape 能关
+  const dlg = await run(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    S.reportMd = ${JSON.stringify(MD)};
+    await lsOpenSubmit();
+    await sleep(1200);
+    const m = document.getElementById('lsSubmitModal');
+    const focused = (document.activeElement && document.activeElement.id) || '';
+    const opened = !m.hidden;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(200);
+    return { opened, focused, closed: m.hidden };
+  })()`);
+  if (!dlg || !dlg.opened) return fail('提交框没打开：' + JSON.stringify(dlg));
+  if (!dlg.closed) return fail('Escape 没关掉提交框');
+  if (!/^ls(Title|Account|ProjectSel|Type|Url|Basis|Describe|Danger|Repair|Detail|SubmitCode)$/.test(dlg.focused)) return fail('焦点没落在输入框：' + JSON.stringify(dlg.focused));
+
   // 2) 打开提交框：先列项目（跨账号并集），选项目后再筛账号
   const dialog = await run(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

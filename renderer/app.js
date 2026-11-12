@@ -3688,6 +3688,16 @@ function lsGuessType(typeText) {
   return loose ? loose.id : '';
 }
 
+/** 提交框打开后焦点落到第一个输入框。 */
+function lsFocusSubmit() {
+  const m = $('#lsSubmitModal');
+  if (!m || m.hidden) return;
+  const first = m.querySelector('input.inp, select.inp, textarea.inp');
+  if (first && document.activeElement !== first) {
+    try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); }
+  }
+}
+
 async function lsRefreshSubmitCap() {
   const r = await window.api.leishen.captcha();
   if (!r.ok) return lsNote('#lsSubmitNote', r.error || '取验证码失败', true);
@@ -3735,6 +3745,7 @@ async function lsOpenSubmit() {
   LS.projectTemplate = '';
   lsPaintTemplateLink();
   if ($('#lsSubmitModal')) $('#lsSubmitModal').hidden = false;
+  lsFocusSubmit();
   await lsLoadProjectsAll();
   const preProject = ($('#rLsProject') && $('#rLsProject').value) || '';
   if (preProject && LS.projects.some((p) => String(p.id) === preProject)) {
@@ -3887,6 +3898,17 @@ function bindLeishen() {
   }
   const submitModal = $('#lsSubmitModal');
   if (submitModal) submitModal.addEventListener('click', (e) => { if (e.target.id === 'lsSubmitModal') submitModal.hidden = true; });
+  // 提交框也要能用 Escape 关掉（正在提交时不许关，避免半途丢状态）
+  document.addEventListener('keydown', (e) => {
+    const m = $('#lsSubmitModal');
+    if (!m || m.hidden) return;
+    if (e.key !== 'Escape') return;
+    const busy = $('#lsSubmitBtn') && $('#lsSubmitBtn').disabled;
+    if (busy) return;
+    m.hidden = true;
+  });
+  // 打开时焦点落到第一个输入框
+  if ($('#btnSubmit')) $('#btnSubmit').addEventListener('click', () => setTimeout(lsFocusSubmit, 60));
 
   lsLoadAccounts().then((list) => {
     if (list.some((a) => a.loggedIn)) {

@@ -73,11 +73,13 @@ async function request(method, apiPath, opts = {}) {
     throw new LeishenError(`平台返回 HTTP ${res.status}（不是 JSON）`);
   }
   const code = String(payload && payload.errcode);
-  if (code === '401' || code === '403') {
-    throw new LeishenError(String((payload && payload.errmsg) || '登录已失效'), 'AUTH');
+  const msg = String((payload && payload.errmsg) || '');
+  // 平台把「token 过期」也放在 errcode 200 里，只能看文案
+  if (code === '401' || code === '403' || (code !== '0' && /登录|权限|失效|未登录/.test(msg))) {
+    throw new LeishenError(msg || '登录已失效', 'AUTH');
   }
   if (!opts.allowError && code !== '0') {
-    throw new LeishenError(String((payload && payload.errmsg) || '平台返回错误').slice(0, 200), 'API');
+    throw new LeishenError(msg || '平台返回错误', 'API');
   }
   return payload;
 }
@@ -424,15 +426,24 @@ async function upload(token, apiPath, field, filename, raw, mime, timeout = 6000
   }
 }
 
+function assertUploadOk(payload, fallback) {
+  const code = String(payload && payload.errcode);
+  if (code === '0') return;
+  const msg = String((payload && payload.errmsg) || fallback || '上传失败');
+  // 上传接口同样把登录失效放在 errcode 200 里
+  if (code === '401' || code === '403' || /登录|权限|失效/.test(msg)) throw new LeishenError(msg, 'AUTH');
+  throw new LeishenError(msg.slice(0, 200), 'UPLOAD');
+}
+
 async function uploadReport(token, filename, raw) {
   const payload = await upload(token, '/hacker/uploadHoleReport', 'file', filename, raw, mimeFor(filename));
-  if (String((payload && payload.errcode)) !== '0') throw new LeishenError(String((payload && payload.errmsg) || '报告上传失败').slice(0, 200));
+  assertUploadOk(payload, '报告上传失败');
   return String((payload && payload.ret) || '');
 }
 
 async function uploadImage(token, filename, raw) {
   const payload = await upload(token, '/portal/uploadfile', 'myFileName', filename, raw, mimeFor(filename));
-  if (String((payload && payload.errcode)) !== '0') throw new LeishenError(String((payload && payload.errmsg) || '图片上传失败').slice(0, 200));
+  assertUploadOk(payload, '图片上传失败');
   let ret = payload.ret;
   if (ret && typeof ret === 'object') ret = ret.url || ret.src || ret.path || '';
   const url = String(ret || '').trim();
@@ -452,14 +463,16 @@ function encodeHoleDetail(html) {
   return Buffer.from(text, 'utf8').toString('base64');
 }
 
-const GRADES = { serious: '严重', high: '高危', middle: '中危', low: '低危' };
-const GRADE_BY_TEXT = { 严重: 'serious', 高危: 'high', 中危: 'middle', 低危: 'low' };
+// 平台前端只有这四档（见提交页的等级表），没有 serious
+const GRADES = { urgent: '紧急', high: '高危', middle: '中危', low: '低危' };
+const GRADE_BY_TEXT = { 紧急: 'urgent', 严重: 'urgent', 高危: 'high', 中危: 'middle', 低危: 'low' };
 
 function gradeKey(text) {
   const t = String(text || '').trim();
   if (GRADE_BY_TEXT[t]) return GRADE_BY_TEXT[t];
   const low = t.toLowerCase();
-  if (['serious', 'high', 'middle', 'low'].includes(low)) return low;
+  if (low === 'serious') return 'urgent';
+  if (['urgent', 'high', 'middle', 'low'].includes(low)) return low;
   return 'high';
 }
 
@@ -502,7 +515,10 @@ async function buildDetail(token, fields, images, opts = {}) {
   }
   for (const url of urls) parts.push(`<p><img src="${url}"></p>`);
   const payload = Object.assign({}, fields, { holedetail: encodeHoleDetail(parts.join('')) });
-  if (opts.reportFile && fs.existsSync(opts.reportFile)) {
+  if (opts.reportBytes && opts.reportName) {
+    // 平台只收 .docx，这里传主进程刚生成的那份
+    payload.holeReport = await uploadReport(token, opts.reportName, opts.reportBytes);
+  } else if (opts.reportFile && fs.existsSync(opts.reportFile)) {
     const name = path.basename(opts.reportFile);
     payload.holeReport = await uploadReport(token, name, fs.readFileSync(opts.reportFile));
   }
@@ -650,6 +666,7 @@ module.exports = {
   BASE,
   ORIGIN,
   GRADES,
+  GRADES_TEXT: GRADE_BY_TEXT,
   gradeKey,
   encryptPassword,
   request,

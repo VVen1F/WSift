@@ -16,6 +16,7 @@ const backup = require('./backup');
 const sync = require('./sync');
 const tasks = require('./tasks');
 const leishen = require('./leishen');
+const docx = require('./docx');
 
 let mainWindow = null;
 let remoteInfo = null;
@@ -888,8 +889,24 @@ ipcMain.handle('leishen:submit', async (event, payload) => {
   if (!fields.projectid) return { ok: false, error: '没填项目 ID' };
   if (!p.captcha || !p.captcha.text || !p.captcha.code) return { ok: false, retry: true, error: '验证码没填' };
   try {
+    // 平台要求必须带 .docx 报告：没手动选就按当前报告现生成一份
+    let reportBytes = null;
+    let reportName = '';
+    if (p.reportFile && !fs.existsSync(p.reportFile)) return { ok: false, error: '报告文件不见了，重新选一次' };
+    if (p.reportFile && fs.existsSync(p.reportFile)) {
+      reportName = path.basename(p.reportFile);
+      if (!/\.docx$/i.test(reportName)) return { ok: false, error: '平台只收 .docx 报告，选一个 docx 或者留空自动生成' };
+      reportBytes = fs.readFileSync(p.reportFile);
+    } else if (String(p.reportMarkdown || '').trim()) {
+      lsNote(event, '生成 docx 报告');
+      const built = docx.build({ markdown: p.reportMarkdown, title: fields.holetitle, images: p.images || [] });
+      reportBytes = built.buffer;
+      reportName = (fields.holetitle || '漏洞报告').replace(/[\\/:*?"<>|]/g, '').slice(0, 60) + '.docx';
+    } else {
+      return { ok: false, error: '没有报告正文，先生成报告再提交' };
+    }
     lsNote(event, (p.draft ? '存草稿' : '提交') + '：上传正文图片');
-    const body = await leishen.buildDetail(cfg.token, fields, p.images || [], { reportFile: p.reportFile || '' });
+    const body = await leishen.buildDetail(cfg.token, fields, p.images || [], { reportBytes, reportName });
     body.checkCode = String(p.captcha.text);
     body.code = String(p.captcha.code);
     lsNote(event, p.draft ? '存草稿中' : '提交中');

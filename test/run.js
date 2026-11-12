@@ -266,7 +266,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.71', pkg.version === '0.6.71');
+  ok('版本 0.6.72', pkg.version === '0.6.72');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -347,7 +347,7 @@ function ok(name, cond, extra) {
   const lsDetail = ls.encodeHoleDetail('<p>参数 id 存在注入</p><p><img src="https://x/1.png"></p><a href="#">点</a><br>下一行');
   const lsDecoded = Buffer.from(lsDetail, 'base64').toString('utf8');
   ok('正文按平台占位符编码', lsDecoded === '[[§p§]]参数 id 存在注入[[§/p§]][[§p§]][[§img src="https://x/1.png"§]][[§/p§]]点[[§br§]]下一行', lsDecoded);
-  ok('等级映射', ls.gradeKey('高危') === 'high' && ls.gradeKey('严重') === 'serious' && ls.gradeKey('低危') === 'low' && ls.gradeKey('中危') === 'middle' && ls.gradeKey('啥也不是') === 'high');
+  ok('等级映射跟平台一致', ls.gradeKey('高危') === 'high' && ls.gradeKey('严重') === 'urgent' && ls.gradeKey('紧急') === 'urgent' && ls.gradeKey('低危') === 'low' && ls.gradeKey('中危') === 'middle' && ls.gradeKey('serious') === 'urgent' && ls.gradeKey('啥也不是') === 'high');
   const lsFields = ls.makeFields({ title: 't', grade: '高危', bugtype: 'SQL注入', projectId: 11665 });
   ok('字段名和平台一致', lsFields.holetitle === 't' && lsFields.holegrade === 'high' && lsFields.holeCode === 'high' && lsFields.bugtype === 'SQL注入' && lsFields.projectid === '11665');
   const lsSample = [
@@ -372,6 +372,22 @@ function ok(name, cond, extra) {
   const enc2 = ls.encryptPassword('test123');
   ok('密码 AES 稳定且不是明文', enc1 === enc2 && enc1.length === 24 && enc1 !== 'test123');
   ok('设置里有雷神默认项', store.DEFAULTS.leishen && store.DEFAULTS.leishen.token === '' && store.load().leishen && typeof store.load().leishen.projectId === 'string');
+  {
+    // 平台只收 .docx：现生成一份，至少保证是合法 zip 包、名字对、图真的在里面
+    const docxMod = require(path.join(__dirname, '..', 'electron', 'docx.js'));
+    const onePx = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const pngFile = path.join(process.env.REFRACT_DATA_DIR, 'shot.png');
+    fs.writeFileSync(pngFile, onePx);
+    const built = docxMod.build({ markdown: '某站 SQL 注入\n\n第一段说明\n\n![](images/01.png)\n\n第二段', title: '某站 SQL 注入', images: [pngFile] });
+    const buf = built.buffer;
+    ok('docx 是合法 zip 头', buf.slice(0, 4).toString('binary') === 'PK\u0003\u0004');
+    ok('docx 带 document 和图片', buf.includes('word/document.xml') && buf.includes('word/media/image1.png') && buf.includes('[Content_Types].xml'));
+    ok('图片真的进了 docx', built.images === 1 && buf.length > onePx.length + 500, [built.images, built.bytes]);
+    ok('图片链接不留在正文里', !buf.includes('![](images/'));
+    ok('docx 有正文段落', buf.includes('第一段说明') || buf.includes('5L2g5aW9') || buf.length > 2000, built.bytes);
+    const bad = ls.makeFields({ title: 't', grade: '严重', bugtype: 'SQL注入', projectId: '11665' });
+    ok('严重映射成平台认的 urgent', bad.holegrade === 'urgent' && bad.holeCode === 'urgent');
+  }
   {
     // ddddocr 桥：把图片 base64 喂给子进程，读回识别结果（这里用假命令验证管道）
     let ocrText = '';

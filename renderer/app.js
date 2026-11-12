@@ -3380,6 +3380,7 @@ async function lsOpenSubmit() {
   if ($('#lsTitle')) $('#lsTitle').value = f.title || '';
   if ($('#lsGrade')) $('#lsGrade').value = f.grade || 'high';
   if ($('#lsUrl')) $('#lsUrl').value = f.url || '';
+  if ($('#lsBasis')) $('#lsBasis').value = f.judgeBasis || '';
   if ($('#lsDescribe')) $('#lsDescribe').value = f.describe || '';
   if ($('#lsDanger')) $('#lsDanger').value = f.danger || '';
   if ($('#lsRepair')) $('#lsRepair').value = f.repair || '';
@@ -3403,12 +3404,15 @@ async function lsSendSubmit(draft) {
   if (!title) return lsNote('#lsSubmitNote', '标题不能为空', true);
   if (!bugtype) return lsNote('#lsSubmitNote', '先选漏洞类型', true);
   if (!projectId) return lsNote('#lsSubmitNote', '填项目 ID', true);
+  const basis = ($('#lsBasis') && $('#lsBasis').value || '').trim();
+  if (!basis) return lsNote('#lsSubmitNote', '平台必填「漏洞等级自评依据」，从判断标准里复制一项填上', true);
   if (!text) return lsNote('#lsSubmitNote', '填验证码', true);
   if (!LS.submitCap) return lsRefreshSubmitCap();
   const images = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
   const payload = {
     draft: !!draft,
     reportFile: LS.reportFile || '',
+    reportMarkdown: S.reportMd || '',
     images,
     captcha: { code: LS.submitCap.code, text },
     fields: {
@@ -3417,6 +3421,7 @@ async function lsSendSubmit(draft) {
       bugtype,
       projectId,
       url: ($('#lsUrl') && $('#lsUrl').value || '').trim(),
+      judgeBasis: ($('#lsBasis') && $('#lsBasis').value || '').trim(),
       describe: ($('#lsDescribe') && $('#lsDescribe').value || '').trim(),
       danger: ($('#lsDanger') && $('#lsDanger').value || '').trim(),
       repair: ($('#lsRepair') && $('#lsRepair').value || '').trim(),

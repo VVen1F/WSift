@@ -461,7 +461,7 @@
       <div class="row ls-three">
         <label class="f">等级
           <select class="inp" id="lsGrade">
-            <option value="serious">严重</option>
+            <option value="urgent">紧急</option>
             <option value="high">高危</option>
             <option value="middle">中危</option>
             <option value="low">低危</option>
@@ -471,12 +471,15 @@
         <label class="f">项目 ID<input class="inp" id="lsProjectId" placeholder="11665" /></label>
       </div>
       <label class="f">漏洞 URL<input class="inp" id="lsUrl" spellcheck="false" /></label>
+      <label class="f">漏洞等级自评依据<span class="f-hint">平台必填，从《漏洞等级判断标准》里复制对应项原文</span>
+        <textarea class="inp" id="lsBasis" rows="2" placeholder="例：可直接获取大量敏感数据，符合高危项"></textarea>
+      </label>
       <label class="f">漏洞描述<textarea class="inp" id="lsDescribe" rows="2"></textarea></label>
       <label class="f">危害说明<textarea class="inp" id="lsDanger" rows="2"></textarea></label>
       <label class="f">修复建议<textarea class="inp" id="lsRepair" rows="2"></textarea></label>
       <label class="f">正文<textarea class="inp" id="lsDetail" rows="6"></textarea></label>
       <div class="row ls-attach">
-        <div class="klabel">附报告文件<small id="lsAttachText">不附带</small></div>
+        <div class="klabel">漏洞报告<small id="lsAttachText">留空则按当前报告自动生成 docx（平台只收 docx）</small></div>
         <button class="btn" id="lsPickReport" type="button">选择…</button>
         <button class="btn" id="lsClearReport" type="button">清除</button>
         <span class="spacer"></span>

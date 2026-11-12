@@ -166,6 +166,8 @@ button { cursor: default; }
 .nav:hover { background: var(--hover); }
 .nav.on { background: var(--hover); font-weight: 500; }
 .nav svg { width: 16px; height: 16px; opacity: .8; flex: 0 0 16px; }
+.nav-ic { width: 16px; height: 16px; flex: 0 0 16px; display: inline-flex; align-items: center; justify-content: center; opacity: .8; }
+.nav-ic svg { width: 16px; height: 16px; }
 
 .sidebar .ver { padding: 6px 10px 0; color: var(--muted); font-size: 11px; }
 
@@ -428,11 +430,10 @@ textarea.inp {
   margin: 0 auto;
 }
 .settings { padding: 8px 4px 40px; display: flex; flex-direction: column; gap: 0; }
-.sect { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 40px 0 0; border: 0; }
+.sect { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; border: 0; }
 .sect[hidden] { display: none !important; }
 #page-settings .sect { padding-top: 0; }
-.sect:first-child { padding-top: 0; }
-.sect h3 { margin: 20px 0 4px; font-size: 14px; line-height: 22px; color: var(--text); font-weight: 500; letter-spacing: 0; }
+.sect h3 { margin: 0 0 12px; font-size: 14px; line-height: 22px; color: var(--text); font-weight: 500; letter-spacing: 0; }
 .sect.flash { background: var(--hover); }
 
 .klist { display: flex; flex-direction: column; }
@@ -454,7 +455,7 @@ textarea.inp {
   border-radius: var(--dsw-radius-sm);
   padding: 0 10px;
 }
-.theme-group { display: flex; flex-direction: column; gap: 8px; padding: 16px 0; border-bottom: 0.5px solid var(--line); }
+.theme-group { display: flex; flex-direction: column; gap: 8px; padding: 18px 0; border-bottom: 0.5px solid var(--line); }
 .theme-title { font-size: 14px; font-weight: 400; line-height: 22px; }
 .theme-row { display: flex; align-items: stretch; gap: 8px; }
 .theme-cube {
@@ -805,7 +806,7 @@ textarea.inp {
 .composer, .composer * { scrollbar-width: none; }
 .composer textarea::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
-.llm-head { display: flex; align-items: center; gap: 10px; margin: 0 0 2px; }
+.llm-head { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; }
 .llm-head h3 { margin: 0; }
 .llm-grid { display: flex; flex-direction: column; }
 .llm-card {
@@ -1084,9 +1085,19 @@ textarea.inp {
   color: var(--text); font-size: 14px; line-height: 20px;
 }
 .ws:hover, .ws.on { background: var(--hover); }
-.ws > svg { width: 14px; height: 14px; flex: none; color: var(--caption); }
+.ws > svg { width: 16px; height: 16px; flex: none; color: var(--caption); }
 .ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ws-chev { width: 12px; flex: none; color: var(--caption); font-size: 11px; }
+.ws-chev {
+  width: 12px; height: 12px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--caption); opacity: 0;
+  transform: rotate(-90deg);
+  transition: opacity var(--ds-transition-duration-fast) var(--ds-ease-in-out), transform var(--ds-transition-duration-fast) var(--ds-ease-in-out);
+}
+.ws-chev svg { width: 12px; height: 12px; }
+.ws-chev.open { transform: rotate(0deg); }
+.ws-chev.none { visibility: hidden; }
+.ws:hover .ws-chev, .ws.on .ws-chev, .ws:focus-within .ws-chev { opacity: 1; }
 .ws-add { opacity: 0; }
 .ws:hover .ws-add, .ws.on .ws-add, .ws:focus-within .ws-add { opacity: 1; }
 .name-body { padding: 0 24px; }
@@ -1323,8 +1334,6 @@ textarea.inp {
 .prov-add:hover { color: var(--text); border-color: var(--muted); }
 
 /* 组间多留白、组内少留白（DSH 节奏） */
-.sect h3 { margin: 32px 0 6px; }
-.sect:first-child h3 { margin-top: 0; }
 .krow { padding: 16px 0; }
 
 /* 补齐缺少的 hover 反馈 */
@@ -1346,9 +1355,8 @@ textarea.inp {
 .pop-sep { height: 1px; margin: 6px 8px; background: var(--line); }
 
 /* 设置内容：单列，间距按 DSH 的设置行规格 */
-#page-settings .settings { padding: 28px 40px 48px; max-width: 780px; }
-.sect h3 { margin: 32px 0 8px; font-size: 14px; line-height: 22px; font-weight: 500; }
-.sect:first-child h3 { margin-top: 0; }
+/* 设置与报告页共用同一条内容列：同样的 760 宽、同样的左右 8px、同样的顶部 4px */
+#page-settings .settings { padding: 4px 8px 40px; max-width: none; }
 .krow { padding: 12px 0; }
 .krow .klabel { font-size: 13px; font-weight: 500; }
 .krow .khint { font-size: 12px; color: var(--caption); margin-top: 2px; }

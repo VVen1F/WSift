@@ -1174,6 +1174,18 @@ function relTime(ts) {
   return Math.floor(hour / 24) + '天';
 }
 
+/** 把 [data-icon] 占位填成 DSH 图标（icons.js 里那份 artwork）。 */
+function paintIcons(root) {
+  const scope = root || document;
+  if (typeof icon !== 'function') return;
+  scope.querySelectorAll('[data-icon]').forEach((el) => {
+    if (el.dataset.iconDone === '1') return;
+    const size = Number(el.dataset.size) || 16;
+    el.innerHTML = icon(el.dataset.icon, size);
+    el.dataset.iconDone = '1';
+  });
+}
+
 function ensureWorkspaces() {
   if (!Array.isArray(TASKS.workspaces)) TASKS.workspaces = [];
   if (!TASKS.workspaces.length) {
@@ -1185,13 +1197,18 @@ function ensureWorkspaces() {
 
 function workspaceHtml() {
   ensureWorkspaces();
-  const folder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 7.5h5.2l1.8 2H21v9.2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7.5z"/></svg>';
+  const folderOpen = typeof icon === 'function' ? icon('folder-open', 16) : '';
+  const folderShut = typeof icon === 'function' ? icon('folder-close', 16) : '';
   return TASKS.workspaces.map((w) => {
     const mine = activeTasks().filter((t) => (t.workspaceId || 'ws-default') === w.id);
     const open = w.open !== false;
+    // 展开指示器只在选中/hover/有子项时出现；位置始终占着，避免文字左右跳
+    const chev = `<span class="ws-chev${open ? ' open' : ''}${mine.length ? '' : ' none'}" aria-hidden="true">` +
+      `${typeof icon === 'function' ? icon('chevron-down-outline', 12) : ''}</span>`;
+    const folder = open ? folderOpen : folderShut;
     let block = `<div class="ws${w.id === TASKS.wsId ? ' on' : ''}" data-ws="${esc(w.id)}" role="button" tabindex="0">` +
-      `<span class="ws-chev">${open ? '▾' : '▸'}</span>${folder}<span class="ws-name">${esc(w.name)}</span>` +
-      `<button class="icon-btn ws-add" type="button" data-ws-new="${esc(w.id)}" aria-label="新建任务"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>`;
+      `${chev}${folder}<span class="ws-name">${esc(w.name)}</span>` +
+      `<button class="icon-btn ws-add" type="button" data-ws-new="${esc(w.id)}" aria-label="新建任务">${typeof icon === 'function' ? icon('plus-outline', 16) : ''}</button></div>`;
     if (open) block += mine.map((t) => taskRow(t, false)).join('');
     return block;
   }).join('');
@@ -3947,6 +3964,7 @@ async function boot() {
   $('#res').innerHTML = '<div class="empty">发送后显示响应</div>';
   $('#scheme').value = 'https';
 
+  paintIcons();
   renderProviders();
   renderTplList();
   fillTemplateSelect();

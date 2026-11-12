@@ -201,6 +201,7 @@ main {
   box-shadow: none;
 }
 
+.sheet.side .pane-h { padding-left: 10px; }
 .pane-h {
   min-height: 56px;
   height: auto;

@@ -535,6 +535,24 @@ function makeFields(f = {}) {
  * 正文里先传图拿到平台地址，再把图拼进 HTML、编码成平台要的形态。
  * images: [{ path }]，返回上传后的地址数组。
  */
+/**
+ * 纯组装：把正文段落和平台上的图片地址拼成平台要的 holedetail（编码后）。
+ * 单独拆出来是为了能脱离网络断言字段。
+ */
+function composePayload(fields, imageUrls, reportValue) {
+  const parts = [];
+  const blocks = String(fields.holedetail || '').split(/\n{2,}/);
+  for (const block of blocks) {
+    const text = block.trim().split(/\n/).map((l) => l.replace(/^#+\s*/, '')).join('\n').trim();
+    if (!text) continue;
+    parts.push('<p>' + escapeHtml(text).replace(/\n/g, '<br>') + '</p>');
+  }
+  for (const url of imageUrls || []) parts.push(`<p><img src="${url}"></p>`);
+  const payload = Object.assign({}, fields, { holedetail: encodeHoleDetail(parts.join('')) });
+  if (reportValue) payload.holeReport = reportValue;
+  return payload;
+}
+
 async function buildDetail(token, fields, images, opts = {}) {
   const urls = [];
   for (const item of images || []) {
@@ -543,23 +561,14 @@ async function buildDetail(token, fields, images, opts = {}) {
     const url = await uploadImage(token, path.basename(file), fs.readFileSync(file));
     urls.push(url);
   }
-  const parts = [];
-  const blocks = String(fields.holedetail || '').split(/\n{2,}/);
-  for (const block of blocks) {
-    const text = block.trim().split(/\n/).map((l) => l.replace(/^#+\s*/, '')).join('\n').trim();
-    if (!text) continue;
-    parts.push('<p>' + escapeHtml(text).replace(/\n/g, '<br>') + '</p>');
-  }
-  for (const url of urls) parts.push(`<p><img src="${url}"></p>`);
-  const payload = Object.assign({}, fields, { holedetail: encodeHoleDetail(parts.join('')) });
+  let reportValue = '';
   if (opts.reportBytes && opts.reportName) {
     // 平台只收 .docx，这里传主进程刚生成的那份
-    payload.holeReport = await uploadReport(token, opts.reportName, opts.reportBytes);
+    reportValue = await uploadReport(token, opts.reportName, opts.reportBytes);
   } else if (opts.reportFile && fs.existsSync(opts.reportFile)) {
-    const name = path.basename(opts.reportFile);
-    payload.holeReport = await uploadReport(token, name, fs.readFileSync(opts.reportFile));
+    reportValue = await uploadReport(token, path.basename(opts.reportFile), fs.readFileSync(opts.reportFile));
   }
-  return payload;
+  return composePayload(fields, urls, reportValue);
 }
 
 function escapeHtml(s) {
@@ -723,6 +732,7 @@ module.exports = {
   uploadImage,
   encodeHoleDetail,
   makeFields,
+  composePayload,
   buildDetail,
   submit,
   parseReport,

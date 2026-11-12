@@ -278,7 +278,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.75', pkg.version === '0.6.75');
+  ok('版本 0.6.76', pkg.version === '0.6.76');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -405,6 +405,11 @@ function ok(name, cond, extra) {
     ok('docx 有正文段落', buf.includes('第一段说明') || buf.includes('5L2g5aW9') || buf.length > 2000, built.bytes);
     const bad = ls.makeFields({ title: 't', grade: '严重', bugtype: 'SQL注入', projectId: '11665' });
     ok('严重映射成平台认的 urgent', bad.holegrade === 'urgent' && bad.holeCode === 'urgent');
+    const composed = ls.composePayload(ls.makeFields({ title: 't', grade: '高危', bugtype: 'SQL注入', projectId: '11665', detailHtml: '第一段\n\n第二段' }), ['https://cdn/1.png'], 'r.docx');
+    const wantKeys = ['POC', 'bugtype', 'holeCode', 'holeReport', 'holedanger', 'holedescribe', 'holedetail', 'holegrade', 'holetitle', 'holeurl', 'judgeBasis', 'projectid', 'repairpropose'];
+    ok('提交字段和平台表单一一对应', JSON.stringify(Object.keys(composed).sort()) === JSON.stringify(wantKeys), Object.keys(composed).sort());
+    const decoded = Buffer.from(composed.holedetail, 'base64').toString('utf8');
+    ok('正文用平台占位符并带图', decoded.startsWith('[[§p§]]第一段[[§/p§]]') && decoded.includes('[[§img src="https://cdn/1.png"§]]'), decoded.slice(0, 80));
   }
   {
     // ddddocr 桥：把图片 base64 喂给子进程，读回识别结果（这里用假命令验证管道）

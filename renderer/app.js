@@ -3483,6 +3483,8 @@ async function lsSendSubmit(draft) {
   if (!title) return lsNote('#lsSubmitNote', '标题不能为空', true);
   if (!bugtype) return lsNote('#lsSubmitNote', '先选漏洞类型', true);
   if (!projectId) return lsNote('#lsSubmitNote', '填项目 ID', true);
+  const url = ($('#lsUrl') && $('#lsUrl').value || '').trim();
+  if (!/^https?:\/\/\S+/i.test(url)) return lsNote('#lsSubmitNote', '漏洞 URL 要带 http(s)://，平台会校验格式', true);
   const basis = ($('#lsBasis') && $('#lsBasis').value || '').trim();
   if (!basis) return lsNote('#lsSubmitNote', '平台必填「漏洞等级自评依据」，从判断标准里复制一项填上', true);
   if (!text) return lsNote('#lsSubmitNote', '填验证码', true);

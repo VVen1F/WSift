@@ -43,6 +43,14 @@
   --scroll: #d5d5d5;
   --scroll-hover: #d4d4d4;
   --danger: #ec1313;
+  /* 间距尺：4 的倍数，页面/模块/组件内部三档起步 */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px;
+  /* 字号尺：11/12/13/14/16/20/32，只有这七档 */
+  --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px;
+  --fs-16: 16px; --fs-20: 20px; --fs-32: 32px;
+  /* 控件高度 */
+  --h-ctl: 28px; --h-ctl-lg: 32px; --h-row: 22px;
   color-scheme: light;
 }
 
@@ -403,12 +411,12 @@ textarea.inp {
 .md h3 { font-size: 13px; margin: 14px 0 6px; }
 .md p { margin: 0 0 10px; }
 .md ul, .md ol { margin: 0 0 10px; padding-left: 20px; }
-.md code { font-family: var(--mono); font-size: 12px; background: var(--hover); padding: 1px 5px; border-radius: 4px; }
-.md pre { background: var(--code-bg); border: 0.5px solid var(--line); border-radius: 10px; padding: 10px 12px; overflow: auto; }
+.md code { font-family: var(--mono); font-size: 12px; background: var(--hover); padding: 1px 5px; border-radius: var(--dsw-radius-xs); }
+.md pre { background: var(--code-bg); border: 0.5px solid var(--line); border-radius: var(--dsw-radius-sm); padding: 10px 12px; overflow: auto; }
 .md pre code { background: none; padding: 0; }
 .md table { border-collapse: collapse; margin: 0 0 12px; width: 100%; }
 .md th, .md td { border: 0.5px solid var(--line); padding: 5px 9px; font-size: 12px; }
-.md img { max-width: 100%; border-radius: 10px; border: 0.5px solid var(--line); }
+.md img { max-width: 100%; border-radius: var(--dsw-radius-sm); border: 0.5px solid var(--line); }
 
 .narrow {
   flex: 1;
@@ -433,7 +441,7 @@ textarea.inp {
   border-bottom: 0.5px solid var(--line);
 }
 .krow:last-child { border-bottom: 0; }
-.klabel { flex: 1; display: flex; flex-direction: column; gap: 4px; padding-right: 48px; font-size: 14px; font-weight: 400; line-height: 22px; min-width: 0; }
+.klabel { flex: 1; display: flex; flex-direction: column; gap: 4px; padding-right: 24px; font-size: 14px; font-weight: 400; line-height: 22px; min-width: 0; }
 .klabel small { font-size: 12px; line-height: 18px; font-weight: 400; color: var(--caption); }
 .krow > .btn,
 .krow > select.inp,
@@ -514,7 +522,7 @@ textarea.inp {
 @keyframes modalLeave { to { opacity: 0; } }
 .modal.out, .modal.out .modal-card { animation: modalLeave 160ms var(--ds-ease-in-out) forwards; }
 .kval {
-  color: var(--muted); font-size: 12px; max-width: 240px;
+  color: var(--muted); font-size: 12px; min-width: 0; max-width: 42%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-align: right;
 }
@@ -650,7 +658,7 @@ textarea.inp {
   display: block;
   background: var(--bg);
   border: 0.5px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-md);
   padding: 12px 12px 10px;
   box-shadow: none;
   transition: border-color var(--dur) var(--ease);
@@ -667,14 +675,14 @@ textarea.inp {
 .c-bottom .spacer, .quick .spacer, .llm-head .spacer { flex: 1; }
 
 .c-btn, .send {
-  width: 30px; height: 30px; border-radius: 10px;
+  width: 30px; height: 30px; border-radius: var(--dsw-radius-sm);
   border: 0.5px solid var(--line-strong); background: transparent;
   display: grid; place-items: center; color: var(--text); padding: 0;
   transition: background var(--dur) var(--ease), opacity var(--dur) var(--ease);
 }
 .c-btn:hover { background: var(--hover); }
 .c-btn svg, .send svg { width: 15px; height: 15px; }
-.send { background: var(--accent); border-color: var(--accent); color: var(--on-accent); border-radius: 10px; }
+.send { background: var(--accent); border-color: var(--accent); color: var(--on-accent); border-radius: var(--dsw-radius-sm); }
 .send:hover:not(:disabled) { background: var(--accent-hover); }
 .send:disabled { opacity: .22; }
 
@@ -706,7 +714,7 @@ textarea.inp {
   padding: 6px;
   background: var(--bg);
   border: 0.5px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-md);
   overflow: hidden;
   z-index: 80;
   box-shadow: none;
@@ -727,7 +735,7 @@ textarea.inp {
   margin: 2px 2px 4px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-sm);
   background: var(--hover);
   outline: none;
   font-size: 13px;
@@ -739,7 +747,7 @@ textarea.inp {
   display: flex; align-items: center; gap: 8px;
   min-height: 32px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-sm);
   font-size: 13px;
   transition: background .15s var(--ease);
 }
@@ -752,7 +760,7 @@ textarea.inp {
   margin-top: 4px;
   padding: 8px 10px;
   border-top: 0.5px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-sm);
   font-size: 13px;
   color: var(--text);
   transition: background .15s var(--ease);
@@ -763,7 +771,7 @@ textarea.inp {
 @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .msg.user { align-items: flex-end; }
 .msg.user .bubble {
-  background: var(--hover); border-radius: 12px; padding: 9px 14px;
+  background: var(--hover); border-radius: var(--dsw-radius-md); padding: 9px 14px;
   max-width: 80%; white-space: pre-wrap; font-size: 13px; user-select: text;
 }
 .msg.ai .bubble { width: 100%; font-size: 13px; line-height: 1.7; user-select: text; }
@@ -784,7 +792,7 @@ textarea.inp {
 
 .chip {
   display: inline-flex; align-items: center; gap: 7px;
-  background: var(--hover); border-radius: 10px; padding: 5px 8px; font-size: 12px;
+  background: var(--hover); border-radius: var(--dsw-radius-sm); padding: 5px 8px; font-size: 12px;
 }
 .chip b { font-weight: 500; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip i { font-style: normal; opacity: .5; padding: 0 2px; }
@@ -815,7 +823,7 @@ textarea.inp {
 .star.on { color: var(--text); }
 .badge {
   font-size: 11px; letter-spacing: .4px;
-  border: 0.5px solid var(--line-strong); border-radius: 6px; padding: 1px 5px; color: var(--muted);
+  border: 0.5px solid var(--line-strong); border-radius: var(--dsw-radius-xs); padding: 1px 5px; color: var(--muted);
 }
 .lc-state { font-size: 11px; color: var(--text); }
 .lc-state.off { color: var(--muted); }
@@ -835,7 +843,7 @@ textarea.inp {
   flex: 1; min-height: 0; overflow: auto; padding: 12px 2px;
   display: flex; justify-content: center; align-items: flex-start;
 }
-.bw-body img { max-width: 100%; border-radius: 10px; border: 0.5px solid var(--line); }
+.bw-body img { max-width: 100%; border-radius: var(--dsw-radius-sm); border: 0.5px solid var(--line); }
 
 .side-foot { position: relative; flex-shrink: 0; padding: 12px 0 8px; border-top: 0.5px solid var(--line); }
 .side-foot .nav { width: 100%; }
@@ -867,7 +875,7 @@ textarea.inp {
 
 .gateway {
   display: flex; align-items: center; gap: 7px;
-  padding: 7px 10px; border-radius: 10px;
+  padding: 7px 10px; border-radius: var(--dsw-radius-sm);
   font-size: 11px; color: var(--muted);
 }
 .gateway:hover { background: var(--hover); color: var(--text); }
@@ -907,7 +915,7 @@ textarea.inp {
 .modal .row.actions, .modal-card .row.actions { padding: 0 24px; margin-top: 20px; justify-content: flex-end; }
 .modal-x {
   border: 0; background: none; font-size: 18px; line-height: 1; color: var(--muted);
-  padding: 2px 6px; border-radius: 8px;
+  padding: 2px 6px; border-radius: var(--dsw-radius-sm);
 }
 .modal-x:hover { background: var(--hover); color: var(--text); }
 .modal-sub { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
@@ -934,7 +942,7 @@ textarea.inp {
   padding: 0 24px;
 }
 .pm-card label.f { font-size: 13px; font-weight: 560; }
-.pm-card .inp, .pm-card select.inp { height: 36px; border-radius: 10px; padding: 0 12px; font-weight: 400; }
+.pm-card .inp, .pm-card select.inp { height: 36px; border-radius: var(--dsw-radius-sm); padding: 0 12px; font-weight: 400; }
 .pm-card label.f small, .pm-card .pm-hint {
   font-weight: 400; color: var(--muted); font-size: 12px; line-height: 1.55;
 }
@@ -943,7 +951,7 @@ textarea.inp {
 .pm-model { display: flex; gap: 8px; align-items: center; }
 .pm-model .inp { flex: 1; min-width: 0; }
 .pm-refresh {
-  width: 36px; height: 36px; padding: 0; border-radius: 10px;
+  width: 36px; height: 36px; padding: 0; border-radius: var(--dsw-radius-sm);
   display: grid; place-items: center; flex: 0 0 38px;
 }
 .pm-refresh svg { width: 16px; height: 16px; }
@@ -952,7 +960,7 @@ textarea.inp {
 .pm-card input[type="number"]::-webkit-inner-spin-button,
 .pm-card input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .pm-actions { gap: 10px; }
-.pm-actions .btn { height: 36px; border-radius: 10px; }
+.pm-actions .btn { height: 36px; border-radius: var(--dsw-radius-sm); }
 .pm-actions #pmTest { padding: 0 14px; }
 .pm-actions #pmTest svg { width: 14px; height: 14px; }
 .pm-actions #pmCreate { flex: 1; }
@@ -998,7 +1006,7 @@ textarea.inp {
   color: var(--muted);
 }
 .task-sec-label:hover { color: var(--text); }
-.btn.sm { height: 26px; padding: 0 8px; font-size: 12px; border-radius: 8px; }
+.btn.sm { height: 26px; padding: 0 8px; font-size: 12px; border-radius: var(--dsw-radius-sm); }
 .task-scroll {
   flex: 0 1 auto;
   min-height: 0;
@@ -1049,7 +1057,7 @@ textarea.inp {
   text-align: left;
   color: var(--muted);
   font-size: 12px;
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-sm);
 }
 .task-arch-head:hover { background: var(--hover); color: var(--text); }
 .task-time {
@@ -1141,7 +1149,7 @@ textarea.inp {
   color: var(--muted);
   font-size: 12px;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-sm);
   transition: background .15s var(--ease), color .15s var(--ease);
 }
 .task-clear:hover { background: var(--hover); color: var(--text); }
@@ -1323,7 +1331,7 @@ textarea.inp {
 .pop { min-width: 168px; padding: 6px; }
 .pop button {
   display: block; width: 100%; height: 34px; padding: 0 10px;
-  border: 0; border-radius: 8px; background: none; text-align: left;
+  border: 0; border-radius: var(--dsw-radius-sm); background: none; text-align: left;
   font-size: 13px; color: var(--text); cursor: pointer;
 }
 .pop button:hover { background: var(--hover); }
@@ -1346,7 +1354,7 @@ textarea.inp {
 }
 .ls-cap img {
   height: 34px; width: auto; min-width: 78px; padding: 0 4px;
-  border: 0.5px solid var(--line); border-radius: 6px; background: #fff; object-fit: contain;
+  border: 0.5px solid var(--line); border-radius: var(--dsw-radius-xs); background: #fff; object-fit: contain;
 }
 .ls-cap .inp { width: 140px; }
 .ls-form { padding: 0 24px; }

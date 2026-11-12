@@ -328,11 +328,6 @@
                   <button class="btn ghost" id="btnLsAddCancel" type="button" hidden>取消</button>
                 </div>
               </div>
-              <div class="krow">
-                <div class="klabel">默认漏洞类型<small>提交时自动选中，提交框里还能改</small></div>
-                <select class="inp kin wide" id="lsBugtype"><option value="">登录后拉取</option></select>
-                <button class="btn" id="btnLsTypes" type="button">刷新</button>
-              </div>
             </div>
           </div>
 
@@ -462,7 +457,12 @@
         </select></label>
       </div>
       <div class="row ls-two">
-        <label class="f">漏洞类型<select class="inp" id="lsType"><option value="">先拉取类型</option></select></label>
+        <label class="f">漏洞类型
+          <span class="ls-inline">
+            <select class="inp" id="lsType"><option value="">先拉取类型</option></select>
+            <button class="btn ghost" id="btnLsTypes" type="button">刷新</button>
+          </span>
+        </label>
         <label class="f">项目 ID<input class="inp" id="lsProjectId" readonly placeholder="选项目后自动带出" /></label>
       </div>
       <label class="f">漏洞 URL<input class="inp" id="lsUrl" spellcheck="false" /></label>

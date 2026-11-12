@@ -1384,3 +1384,5 @@ textarea.inp {
 .ls-two { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .ls-check { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; }
 .ls-check input { margin: 0; }
+.ls-inline { display: flex; align-items: center; gap: 8px; }
+.ls-inline .inp { flex: 1; min-width: 0; }

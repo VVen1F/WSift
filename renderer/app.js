@@ -3379,8 +3379,7 @@ function lsFillTypes(force) {
   return window.api.leishen.types({ force: !!force, accountId: LS.accountId }).then((r) => {
     if (!r || !r.ok) return false;
     LS.types = r.list || [];
-    const preset = (S.settings && S.settings.leishenBugtype) || (LS.cfg && LS.cfg.bugtype) || '';
-    lsFillSelect($('#lsBugtype'), '不指定', LS.types, preset);
+    const preset = (LS.cfg && LS.cfg.bugtype) || '';
     lsFillSelect($('#lsType'), '选择类型', LS.types, preset);
     return true;
   }).catch(() => false);
@@ -3739,11 +3738,6 @@ function bindLeishen() {
       if (act === 'login') lsOpenLogin(id);
       else if (act === 'edit') lsEditAccount(id);
       else if (act === 'del') lsDeleteAccount(id);
-    });
-  }
-  if ($('#lsBugtype')) {
-    $('#lsBugtype').addEventListener('change', () => {
-      window.api.leishen.save({ bugtype: $('#lsBugtype').value });
     });
   }
   if ($('#btnLsTypes')) {

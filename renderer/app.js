@@ -335,6 +335,58 @@ function fillTemplateSelect() {
   if (prev && Array.from(sel.options).some((o) => o.value === prev)) sel.value = prev;
 }
 
+/**
+ * 选到雷神众测模板时，报告页直接给出「提交到哪个项目 / 用哪个账号」，
+ * 生成完点提交就不用再挑一遍了。
+ */
+function lsIsLeishenTemplate() {
+  const sel = $('#rTemplate');
+  if (!sel || !sel.value) return false;
+  const t = (S.templates || []).find((x) => x.id === sel.value);
+  if (!t) return false;
+  return t.id === 'preset-leishen' || /雷神/.test(t.name || '') || /雷神/.test(t.platform || '');
+}
+
+async function lsRefreshReportTargets() {
+  const row = $('#rLsRow');
+  if (!row) return;
+  const on = lsIsLeishenTemplate();
+  row.hidden = !on;
+  if (!on) return;
+  await lsLoadAccounts();
+  if (!LS.accounts.some((a) => a.loggedIn)) {
+    if ($('#rLsProject')) $('#rLsProject').innerHTML = '<option value="">先到设置里登录雷神账号</option>';
+    if ($('#rLsAccount')) $('#rLsAccount').innerHTML = '<option value="">—</option>';
+    return;
+  }
+  const projects = await lsLoadProjectsAll();
+  const pSel = $('#rLsProject');
+  if (pSel) {
+    pSel.innerHTML = projects.length
+      ? projects.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('')
+      : '<option value="">没有可提交的项目</option>';
+    const last = (LS.cfg && LS.cfg.projectId) || '';
+    const pick = projects.find((p) => String(p.id) === String(last)) || projects[0];
+    if (pick) { pSel.value = pick.id; LS.projectId = String(pick.id); LS.projectName = pick.name || ''; }
+  }
+  lsFillReportAccounts();
+}
+
+function lsFillReportAccounts() {
+  const sel = $('#rLsAccount');
+  if (!sel) return;
+  const p = LS.projects.find((x) => String(x.id) === String($('#rLsProject') ? $('#rLsProject').value : ''));
+  const ids = (p && p.accounts) || [];
+  const list = LS.accounts.filter((a) => ids.includes(a.id));
+  sel.innerHTML = list.length
+    ? list.map((a) => '<option value="' + esc(a.id) + '">' + esc(a.email) + (a.loggedIn ? '' : '（未登录）') + '</option>').join('')
+    : '<option value="">这个项目没有可用的账号</option>';
+  if (list.length) {
+    const prefer = list.find((a) => a.id === LS.accountId) || list[0];
+    sel.value = prefer.id;
+  }
+}
+
 function deriveMeta(material) {
   const host = /^\s*host:\s*(\S+)/im.exec(material || '');
   const url = /https?:\/\/[^\s'"<>`]+/.exec(material || '');
@@ -1005,6 +1057,7 @@ function applyTask(t) {
   if (sel && t.templateId && Array.from(sel.options).some((o) => o.value === t.templateId)) {
     sel.value = t.templateId;
   }
+  if (typeof lsRefreshReportTargets === 'function') lsRefreshReportTargets();
   $('#rCred').value = t.cred || '';
   $('#rDetail').value = t.detail || '';
   $('#rExtra').value = t.extra || '';
@@ -3681,7 +3734,16 @@ async function lsOpenSubmit() {
   lsPaintTemplateLink();
   if ($('#lsSubmitModal')) $('#lsSubmitModal').hidden = false;
   await lsLoadProjectsAll();
-  lsFillAccountsForProject();
+  const preProject = ($('#rLsProject') && $('#rLsProject').value) || '';
+  if (preProject && LS.projects.some((p) => String(p.id) === preProject)) {
+    LS.projectId = preProject;
+    if ($('#lsProjectSel')) $('#lsProjectSel').value = preProject;
+  }
+  const usable = lsFillAccountsForProject();
+  if ($('#rLsAccount') && $('#rLsAccount').value && usable.some((a) => a.id === $('#rLsAccount').value)) {
+    LS.accountId = $('#rLsAccount').value;
+    if ($('#lsAccount')) $('#lsAccount').value = LS.accountId;
+  }
   await lsLoadProject(true);
   await lsRefreshSubmitCap();
 }
@@ -3798,6 +3860,9 @@ function bindLeishen() {
   if ($('#lsSubmitRefresh')) $('#lsSubmitRefresh').addEventListener('click', () => lsRefreshSubmitCap());
   if ($('#lsSubmitBtn')) $('#lsSubmitBtn').addEventListener('click', () => lsSendSubmit(false));
   if ($('#lsDraftBtn')) $('#lsDraftBtn').addEventListener('click', () => lsSendSubmit(true));
+  if ($('#rTemplate')) $('#rTemplate').addEventListener('change', () => lsRefreshReportTargets());
+  if ($('#rLsProject')) $('#rLsProject').addEventListener('change', () => lsFillReportAccounts());
+  if ($('#rLsReload')) $('#rLsReload').addEventListener('click', () => lsRefreshReportTargets());
   if ($('#lsAccount')) {
     $('#lsAccount').addEventListener('change', async () => {
       LS.accountId = $('#lsAccount').value;

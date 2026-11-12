@@ -103,6 +103,13 @@
         </div>
         <div class="form">
           <label class="f">模板<select class="inp" id="rTemplate"></select></label>
+          <label class="f" id="rLsRow" hidden>提交到雷神众测
+            <span class="ls-inline">
+              <select class="inp" id="rLsProject"><option value="">读取项目…</option></select>
+              <select class="inp" id="rLsAccount"><option value="">用哪个账号</option></select>
+              <button class="btn ghost" id="rLsReload" type="button">刷新</button>
+            </span>
+          </label>
           <label class="f">账号密码
             <textarea class="inp" id="rCred" placeholder="测试账号、口令，没有就留空"></textarea>
           </label>

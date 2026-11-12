@@ -100,6 +100,33 @@ app.whenReady().then(async () => {
   if (login.accounts !== 2 || login.rows !== 2) return fail('账号列表：' + JSON.stringify(login));
   if (login.before !== 2 || login.after !== 2) return fail('persist 把账号冲掉了：' + JSON.stringify(login));
 
+  // 1.5) 选雷神模板后，报告页自动拉出项目和账号
+  const targets = await run(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const presets = await window.api.templates.presets();
+    const p = presets[0];
+    await window.api.templates.upsert({ id: p.id, name: p.name, platform: p.platform, body: p.body });
+    S.templates = await window.api.templates.list();
+    fillTemplateSelect();
+    const sel = document.getElementById('rTemplate');
+    sel.value = p.id;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    for (let i = 0; i < 60; i++) { await sleep(250); const row = document.getElementById('rLsRow'); if (row && !row.hidden && document.getElementById('rLsProject').options.length > 1) break; }
+    await sleep(800);
+    const opts = (id) => Array.from(document.getElementById(id).options).map((o) => o.value).filter(Boolean);
+    return {
+      rowHidden: document.getElementById('rLsRow').hidden,
+      projects: opts('rLsProject'),
+      accounts: opts('rLsAccount'),
+      accountEmail: (document.getElementById('rLsAccount').selectedOptions[0] || {}).textContent,
+      selected: document.getElementById('rLsProject').value,
+      selectedAccount: document.getElementById('rLsAccount').value
+    };
+  })()`);
+  if (!targets || targets.rowHidden) return fail('选模板后没出现提交目标行：' + JSON.stringify(targets));
+  if (!targets.projects.includes('11655') || !targets.projects.includes('11665')) return fail('报告页项目不对：' + JSON.stringify(targets.projects));
+  if (targets.accounts.length !== 2) return fail('报告页账号不对：' + JSON.stringify(targets.accounts));
+
   // 2) 打开提交框：先列项目（跨账号并集），选项目后再筛账号
   const dialog = await run(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -110,6 +137,7 @@ app.whenReady().then(async () => {
     if (document.getElementById('lsSubmitModal').hidden) return { error: '提交框没打开：' + document.getElementById('lsSubmitNote').textContent };
     await sleep(1200);
     const opts = (sel) => Array.from(document.getElementById(sel).options).map((o) => o.value).filter(Boolean);
+    const initial = { project: document.getElementById('lsProjectSel').value, account: document.getElementById('lsAccount').value };
     const projects = opts('lsProjectSel');
     const pick = async (pid) => {
       const s = document.getElementById('lsProjectSel');
@@ -128,7 +156,7 @@ app.whenReady().then(async () => {
     accSel.dispatchEvent(new Event('change', { bubbles: true }));
     await sleep(1200);
     const gradesForB = opts('lsGrade');
-    return { projects, accFor11655, accFor11665, grades11655, gradesForB, typeVal: document.getElementById('lsType').value, note: document.getElementById('lsSubmitNote').textContent };
+    return { initial, projects, accFor11655, accFor11665, grades11655, gradesForB, typeVal: document.getElementById('lsType').value, note: document.getElementById('lsSubmitNote').textContent };
   })()`);
   if (!dialog || dialog.error) return fail('提交框：' + JSON.stringify(dialog));
   if (!dialog.projects.includes('11665') || !dialog.projects.includes('11655')) return fail('项目列表不对：' + JSON.stringify(dialog.projects));
@@ -137,6 +165,7 @@ app.whenReady().then(async () => {
   if (dialog.accFor11665.length !== 2) return fail('11665 该有 A、B 两个账号：' + JSON.stringify(dialog.accFor11665));
   if (dialog.grades11655.length < 2 || dialog.gradesForB.length < 2) return fail('等级没拉出来：' + JSON.stringify(dialog));
   if (dialog.typeVal !== 'SQL注入') return fail('类型没按报告自动选中：' + JSON.stringify(dialog.typeVal));
+  if (dialog.initial.project !== targets.selected) return fail('提交框没沿用报告页的项目：' + JSON.stringify({ got: dialog.initial.project, want: targets.selected }));
 
   // 3) 连点两下只能发一次
   const race = await run(`(async () => {

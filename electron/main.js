@@ -759,6 +759,8 @@ function lsNote(event, note) {
 function lsAccounts() {
   const cfg = lsCfg();
   let list = Array.isArray(cfg.accounts) ? cfg.accounts.filter((a) => a && a.email) : [];
+  // 账号是分平台的：目前只有雷神，字段先留着给以后的 SRC 平台
+  list = list.map((a) => (a.platform ? a : Object.assign({}, a, { platform: 'leishen' })));
   if (!list.length && cfg.email) {
     list = [{
       id: 'acc-legacy',
@@ -802,6 +804,7 @@ function lsUpdateAccount(id, patch) {
 function lsPublic(acc) {
   return {
     id: acc.id,
+    platform: acc.platform || 'leishen',
     email: acc.email,
     imapCode: acc.imapCode || '',
     password: acc.password || '',
@@ -830,7 +833,7 @@ ipcMain.handle('leishen:account:save', (_e, payload) => {
     return { ok: true, id: exist.id, updated: true };
   }
   const id = 'acc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  list.push({ id, email, password: String(p.password || ''), imapCode: String(p.imapCode || ''), token: '', tokenAt: '', grades: {} });
+  list.push({ id, platform: String(p.platform || 'leishen'), email, password: String(p.password || ''), imapCode: String(p.imapCode || ''), token: '', tokenAt: '', grades: {} });
   lsSave({ accounts: list, lastAccountId: id });
   return { ok: true, id, created: true };
 });
@@ -975,6 +978,34 @@ ipcMain.handle('leishen:projects', async (_e, accountId) => {
     }
     return { ok: false, error: e.message };
   }
+});
+
+/**
+ * 所有登录账号能提交的项目（并集），每个项目带上「哪些账号在这个项目里」。
+ * 这就是提交框第一步要选的列表：只列报名/参与中的项目。
+ */
+ipcMain.handle('leishen:projectsAll', async () => {
+  const list = lsAccounts().filter((a) => a.token);
+  if (!list.length) return { ok: false, auth: true, error: '还没有登录的账号' };
+  const byProject = new Map();
+  const failed = [];
+  for (const acc of list) {
+    let projects = [];
+    try {
+      projects = await leishen.myProjects(acc.token);
+    } catch (e) {
+      if (e.code === 'AUTH') lsUpdateAccount(acc.id, { token: '', tokenAt: '' });
+      failed.push(acc.email);
+      continue;
+    }
+    for (const p of projects) {
+      const id = String(p.id);
+      if (!byProject.has(id)) byProject.set(id, { id, name: p.name, states: p.states, accounts: [] });
+      byProject.get(id).accounts.push(acc.id);
+    }
+  }
+  const rows = Array.from(byProject.values()).sort((a, b) => Number(b.id) - Number(a.id));
+  return { ok: true, list: rows, failed };
 });
 
 ipcMain.handle('leishen:project', async (_e, payload) => {

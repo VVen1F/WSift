@@ -3264,6 +3264,9 @@ function lsCurrentAccount() {
 
 /* ---- 账号 ---- */
 
+// 账号按平台分组，后面接别的 SRC 平台只要往这里加一项
+const LS_PLATFORMS = [{ id: 'leishen', name: '雷神众测' }];
+
 function lsRenderAccounts() {
   const box = $('#lsAccounts');
   if (!box) return;
@@ -3271,17 +3274,24 @@ function lsRenderAccounts() {
     box.innerHTML = '<div class="ls-empty">还没有账号，先加一个</div>';
     return;
   }
-  box.innerHTML = LS.accounts.map((a) => {
-    const stamp = a.tokenAt ? String(a.tokenAt).slice(5, 16).replace('T', ' ') : '';
-    const state = a.loggedIn ? '已登录' + (stamp ? ' · ' + esc(stamp) : '') : '未登录';
-    return '<div class="ls-acc" data-id="' + esc(a.id) + '">' +
-      '<span class="ls-acc-mail">' + esc(a.email) + '</span>' +
-      '<span class="ls-acc-state' + (a.loggedIn ? ' on' : '') + '">' + state + '</span>' +
-      '<span class="spacer"></span>' +
-      '<button class="btn ghost" data-act="login" type="button">' + (a.loggedIn ? '重新登录' : '登录') + '</button>' +
-      '<button class="btn ghost" data-act="edit" type="button">编辑</button>' +
-      '<button class="btn ghost" data-act="del" type="button">删除</button>' +
-      '</div>';
+  const groups = LS_PLATFORMS.map((p) => ({
+    name: p.name,
+    rows: LS.accounts.filter((a) => (a.platform || 'leishen') === p.id)
+  })).filter((g) => g.rows.length);
+  box.innerHTML = groups.map((g) => {
+    const rows = g.rows.map((a) => {
+      const stamp = a.tokenAt ? String(a.tokenAt).slice(5, 16).replace('T', ' ') : '';
+      const state = a.loggedIn ? '已登录' + (stamp ? ' · ' + esc(stamp) : '') : '未登录';
+      return '<div class="ls-acc" data-id="' + esc(a.id) + '">' +
+        '<span class="ls-acc-mail">' + esc(a.email) + '</span>' +
+        '<span class="ls-acc-state' + (a.loggedIn ? ' on' : '') + '">' + state + '</span>' +
+        '<span class="spacer"></span>' +
+        '<button class="btn ghost" data-act="login" type="button">' + (a.loggedIn ? '重新登录' : '登录') + '</button>' +
+        '<button class="btn ghost" data-act="edit" type="button">编辑</button>' +
+        '<button class="btn ghost" data-act="del" type="button">删除</button>' +
+        '</div>';
+    }).join('');
+    return '<div class="ls-group"><div class="ls-group-h">' + esc(g.name) + '</div>' + rows + '</div>';
   }).join('');
 }
 
@@ -3379,8 +3389,7 @@ function lsFillTypes(force) {
   return window.api.leishen.types({ force: !!force, accountId: LS.accountId }).then((r) => {
     if (!r || !r.ok) return false;
     LS.types = r.list || [];
-    const preset = (LS.cfg && LS.cfg.bugtype) || '';
-    lsFillSelect($('#lsType'), '选择类型', LS.types, preset);
+    lsFillSelect($('#lsType'), '选择类型', LS.types, ($('#lsType') || {}).value || '');
     return true;
   }).catch(() => false);
 }
@@ -3450,7 +3459,6 @@ async function lsDoLogin() {
     await lsLoadAccounts();
     lsFillAccountSelect();
     await lsFillTypes(false);
-    await lsLoadProjects(LS.accountId);
     return;
   }
   lsNote('#lsLoginNote', (r && r.error) || '登录失败', true);
@@ -3476,7 +3484,6 @@ async function lsDoLoginAuto() {
     await lsLoadAccounts();
     lsFillAccountSelect();
     await lsFillTypes(false);
-    await lsLoadProjects(LS.accountId);
     return;
   }
   lsNote('#lsLoginNote', (r && r.error) || '自动登录失败', true);
@@ -3485,20 +3492,18 @@ async function lsDoLoginAuto() {
 
 /* ---- 项目与等级 ---- */
 
-/** 只列这个账号参与中（apply/doing）的项目。 */
-async function lsLoadProjects(accountId) {
+/**
+ * 提交框第一步：列出所有登录账号能提交的项目（并集），
+ * 每个项目记住「哪些账号能交」，选完项目再过滤账号。
+ */
+async function lsLoadProjectsAll() {
   const sel = $('#lsProjectSel');
-  const id = accountId || LS.accountId;
-  if (sel) sel.innerHTML = '<option value="">读取中…</option>';
+  if (sel) sel.innerHTML = '<option value="">读取项目…</option>';
   LS.projects = [];
   LS.projectId = '';
-  if (!id) {
-    if (sel) sel.innerHTML = '<option value="">先选账号</option>';
-    return [];
-  }
   let r = null;
   try {
-    r = await window.api.leishen.projects(id);
+    r = await window.api.leishen.projectsAll();
   } catch (e) {
     r = { ok: false, error: e.message };
   }
@@ -3506,7 +3511,7 @@ async function lsLoadProjects(accountId) {
   if (sel) {
     sel.innerHTML = LS.projects.length
       ? '<option value="">选项目</option>' + LS.projects.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('')
-      : '<option value="">' + esc((r && r.error) || '没有参与中的项目') + '</option>';
+      : '<option value="">' + esc((r && r.error) || '没有可提交的项目（先登录账号）') + '</option>';
   }
   const last = (LS.cfg && LS.cfg.projectId) || '';
   const pick = LS.projects.find((p) => String(p.id) === String(last)) || LS.projects[0];
@@ -3516,6 +3521,25 @@ async function lsLoadProjects(accountId) {
     if (sel) sel.value = pick.id;
   }
   return LS.projects;
+}
+
+/** 选完项目后，账号下拉只留能交这个项目的账号。 */
+function lsFillAccountsForProject() {
+  const sel = $('#lsAccount');
+  const p = LS.projects.find((x) => String(x.id) === String(LS.projectId));
+  const ids = (p && p.accounts) || [];
+  const list = LS.accounts.filter((a) => ids.includes(a.id));
+  if (sel) {
+    sel.innerHTML = list.length
+      ? list.map((a) => '<option value="' + esc(a.id) + '">' + esc(a.email) + (a.loggedIn ? '' : '（未登录）') + '</option>').join('')
+      : '<option value="">这个项目没有可用的账号</option>';
+    if (list.length) {
+      const prefer = list.find((a) => a.id === LS.accountId) || list[0];
+      sel.value = prefer.id;
+      LS.accountId = prefer.id;
+    }
+  }
+  return list;
 }
 
 const LS_FALLBACK_LEVELS = [
@@ -3598,6 +3622,17 @@ async function lsLoadProject(quiet) {
 
 /* ---- 提交 ---- */
 
+/** 报告里写了一串类型文字，尽量在平台类型树里找到对应项。 */
+function lsGuessType(typeText) {
+  const text = String(typeText || '').trim();
+  if (!text) return '';
+  const list = LS.types || [];
+  const hit = list.find((t) => t.id === text || t.name === text || (t.path || '') === text);
+  if (hit) return hit.id;
+  const loose = list.find((t) => text.includes(t.name) || (t.path || '').includes(text) || text.includes(t.path || '')) ;
+  return loose ? loose.id : '';
+}
+
 async function lsRefreshSubmitCap() {
   const r = await window.api.leishen.captcha();
   if (!r.ok) return lsNote('#lsSubmitNote', r.error || '取验证码失败', true);
@@ -3637,7 +3672,7 @@ async function lsOpenSubmit() {
   if ($('#lsDanger')) $('#lsDanger').value = f.danger || '';
   if ($('#lsRepair')) $('#lsRepair').value = f.repair || '';
   if ($('#lsDetail')) $('#lsDetail').value = f.detail || '';
-  lsFillSelect($('#lsType'), '选择类型', LS.types, f.guess || (LS.cfg && LS.cfg.bugtype) || '');
+  lsFillSelect($('#lsType'), '选择类型', LS.types, f.guess || lsGuessType(f.typeText));
   lsFillGrades(null, f.grade, f.gradeText);
   const imgs = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
   if ($('#lsImageCount')) $('#lsImageCount').textContent = imgs.length ? imgs.length + ' 张截图会一起上传' : '没有截图';
@@ -3645,8 +3680,8 @@ async function lsOpenSubmit() {
   LS.projectTemplate = '';
   lsPaintTemplateLink();
   if ($('#lsSubmitModal')) $('#lsSubmitModal').hidden = false;
-  lsFillAccountSelect();
-  await lsLoadProjects(LS.accountId);
+  await lsLoadProjectsAll();
+  lsFillAccountsForProject();
   await lsLoadProject(true);
   await lsRefreshSubmitCap();
 }
@@ -3767,14 +3802,14 @@ function bindLeishen() {
     $('#lsAccount').addEventListener('change', async () => {
       LS.accountId = $('#lsAccount').value;
       window.api.leishen.save({ lastAccountId: LS.accountId });
-      await lsLoadProjects(LS.accountId);
       await lsLoadProject(false);
     });
   }
   if ($('#lsProjectSel')) {
-    $('#lsProjectSel').addEventListener('change', () => {
+    $('#lsProjectSel').addEventListener('change', async () => {
       LS.projectId = $('#lsProjectSel').value;
-      lsLoadProject(false);
+      lsFillAccountsForProject();
+      await lsLoadProject(false);
     });
   }
   if ($('#lsTemplateLink')) {

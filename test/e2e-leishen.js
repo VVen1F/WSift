@@ -100,38 +100,43 @@ app.whenReady().then(async () => {
   if (login.accounts !== 2 || login.rows !== 2) return fail('账号列表：' + JSON.stringify(login));
   if (login.before !== 2 || login.after !== 2) return fail('persist 把账号冲掉了：' + JSON.stringify(login));
 
-  // 2) 打开提交框：账号 A 的项目只能是它参与的
+  // 2) 打开提交框：先列项目（跨账号并集），选项目后再筛账号
   const dialog = await run(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     S.reportMd = ${JSON.stringify(MD)};
     S.images = ${JSON.stringify(images)};
-    window.__lsdbg = { accounts: (typeof LS !== 'undefined' ? LS.accounts.length : -1), accountId: (typeof LS !== 'undefined' ? LS.accountId : '?'), hasBtn: !!document.getElementById('btnSubmit') };
     await lsOpenSubmit();
-
     for (let i = 0; i < 100; i++) { await sleep(200); const m = document.getElementById('lsSubmitModal'); if (m && !m.hidden) break; }
-    if (document.getElementById('lsSubmitModal').hidden) return { error: '提交框没打开：' + document.getElementById('lsSubmitNote').textContent, dbg: window.__lsdbg, err: window.__err };
-    await sleep(800);
+    if (document.getElementById('lsSubmitModal').hidden) return { error: '提交框没打开：' + document.getElementById('lsSubmitNote').textContent };
+    await sleep(1200);
     const opts = (sel) => Array.from(document.getElementById(sel).options).map((o) => o.value).filter(Boolean);
-    const pick = async (id) => {
-      document.getElementById('lsAccount').value = id;
-      document.getElementById('lsAccount').dispatchEvent(new Event('change', { bubbles: true }));
+    const projects = opts('lsProjectSel');
+    const pick = async (pid) => {
+      const s = document.getElementById('lsProjectSel');
+      s.value = pid;
+      s.dispatchEvent(new Event('change', { bubbles: true }));
       await sleep(1500);
     };
-    const ids = Array.from(document.getElementById('lsAccount').options).map((o) => o.value).filter(Boolean);
-    await pick(ids[0]);
-    const aProjects = opts('lsProjectSel');
-    const aGrades = opts('lsGrade');
-    await pick(ids[1]);
-    const bProjects = opts('lsProjectSel');
-    await pick(ids[0]);
-    return { aProjects, bProjects, aGrades, currentProject: document.getElementById('lsProjectSel').value, note: document.getElementById('lsSubmitNote').textContent };
+    await pick('11655');
+    const accFor11655 = opts('lsAccount');
+    const grades11655 = opts('lsGrade');
+    await pick('11665');
+    const accFor11665 = opts('lsAccount');
+    // 换成第二个账号（B）看等级能不能拉
+    const accSel = document.getElementById('lsAccount');
+    accSel.value = accSel.options[1] ? accSel.options[1].value : accSel.value;
+    accSel.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(1200);
+    const gradesForB = opts('lsGrade');
+    return { projects, accFor11655, accFor11665, grades11655, gradesForB, typeVal: document.getElementById('lsType').value, note: document.getElementById('lsSubmitNote').textContent };
   })()`);
   if (!dialog || dialog.error) return fail('提交框：' + JSON.stringify(dialog));
-  if (!dialog.aProjects.includes('11665') || !dialog.aProjects.includes('11655')) return fail('A 的项目不对：' + JSON.stringify(dialog.aProjects));
-  if (dialog.aProjects.includes('11653')) return fail('已结束的项目不该出现：' + JSON.stringify(dialog.aProjects));
-  if (dialog.bProjects.includes('11655')) return fail('B 不该看到 11655：' + JSON.stringify(dialog.bProjects));
-  if (!dialog.bProjects.includes('11665')) return fail('B 看不到 11665：' + JSON.stringify(dialog.bProjects));
-  if (dialog.aGrades.length < 2) return fail('A 的等级没拉到：' + JSON.stringify(dialog.aGrades));
+  if (!dialog.projects.includes('11665') || !dialog.projects.includes('11655')) return fail('项目列表不对：' + JSON.stringify(dialog.projects));
+  if (dialog.projects.includes('11653')) return fail('已结束的项目不该出现：' + JSON.stringify(dialog.projects));
+  if (dialog.accFor11655.length !== 1) return fail('11655 只该有 A 一个账号：' + JSON.stringify(dialog.accFor11655));
+  if (dialog.accFor11665.length !== 2) return fail('11665 该有 A、B 两个账号：' + JSON.stringify(dialog.accFor11665));
+  if (dialog.grades11655.length < 2 || dialog.gradesForB.length < 2) return fail('等级没拉出来：' + JSON.stringify(dialog));
+  if (dialog.typeVal !== 'SQL注入') return fail('类型没按报告自动选中：' + JSON.stringify(dialog.typeVal));
 
   // 3) 连点两下只能发一次
   const race = await run(`(async () => {
@@ -156,9 +161,13 @@ app.whenReady().then(async () => {
   // 4) 正常提交
   const submit = await run(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    document.getElementById('lsProjectSel').value = '11665';
-    document.getElementById('lsProjectSel').dispatchEvent(new Event('change', { bubbles: true }));
-    await sleep(800);
+    const ps = document.getElementById('lsProjectSel');
+    ps.value = '11665';
+    ps.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(1500);
+    const accSel = document.getElementById('lsAccount');
+    if (accSel.options.length) { accSel.value = accSel.options[0].value; accSel.dispatchEvent(new Event('change', { bubbles: true })); }
+    await sleep(1200);
     document.getElementById('lsSubmitCode').value = ${JSON.stringify(mock.CAPTCHA_TEXT)};
     document.getElementById('lsSubmitBtn').click();
     let note = '';
@@ -187,8 +196,8 @@ app.whenReady().then(async () => {
   if (String(sent.projectid) !== '11665') problems.push('项目 id 不对：' + sent.projectid);
   if (problems.length) return fail(problems.join('；'));
 
-  console.log('E2E 通过：两个账号 → A 登录 → A 项目 ' + dialog.aProjects.join('/') +
-    ' → B 项目 ' + dialog.bProjects.join('/') + ' → 等级 ' + dialog.aGrades.join('/') +
+  console.log('E2E 通过：两个账号 → 项目 ' + dialog.projects.join('/') + ' → 11655 账号 ' + dialog.accFor11655.length +
+    ' → 11665 账号 ' + dialog.accFor11665.length + ' → 等级 ' + dialog.grades11655.join('/') +
     ' → 传图 2 张 → 提交成功（正文文字 + 图片，无附件）');
   app.exit(0);
 });

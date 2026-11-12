@@ -809,6 +809,8 @@ textarea.inp {
 .composer textarea::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
 .llm-head { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; }
+/* 标题行右侧的操作按钮压到 28 高，和 22 行高的标题视觉中心只差 3px */
+.llm-head .btn { height: 28px; }
 .llm-head h3 { margin: 0; }
 .llm-grid { display: flex; flex-direction: column; }
 .llm-card {

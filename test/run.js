@@ -75,6 +75,12 @@ function ok(name, cond, extra) {
   ok('自定义名称保留', kept.name === '我的线路');
   ok('settings 含统计', typeof store.load().stats === 'object');
   ok('安装后没有内置模板', templates.list().length === 0);
+  {
+    const preset = (templates.PRESETS || [])[0];
+    const need = ['漏洞标题', '漏洞等级', '漏洞等级自评依据', '漏洞类型', '漏洞URL', '漏洞描述', '漏洞危害', '漏洞详情', '修复建议'];
+    ok('雷神预置模板字段齐', !!preset && preset.id === 'preset-leishen' && need.every((k) => preset.body.includes(k)), preset && preset.id);
+    ok('预置模板不自动装进列表', templates.list().length === 0);
+  }
   fs.writeFileSync(templates.file(), JSON.stringify([
     { id: 'general', name: '通用', builtin: true, body: 'x' },
     { id: 'mine', name: '雷神众测', platform: '雷神众测', builtin: false, body: 'y' }
@@ -266,7 +272,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.73', pkg.version === '0.6.73');
+  ok('版本 0.6.74', pkg.version === '0.6.74');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');

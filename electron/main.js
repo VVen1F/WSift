@@ -708,6 +708,7 @@ ipcMain.handle('settings:import', async () => {
 
 ipcMain.handle('templates:check', (_e, body) => templates.checkVars(body));
 ipcMain.handle('templates:list', () => templates.list());
+ipcMain.handle('templates:presets', () => templates.PRESETS);
 ipcMain.handle('templates:upsert', (_e, t) => templates.upsert(t));
 ipcMain.handle('templates:remove', (_e, id) => templates.remove(id));
 ipcMain.handle('templates:reset', () => templates.reset());

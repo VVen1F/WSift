@@ -1788,6 +1788,18 @@ $('#btnTplNew').addEventListener('click', () => {
   renderTplList();
   $('#tplName').focus();
 });
+$('#btnTplPreset').addEventListener('click', async () => {
+  if (!window.api.templates.presets) return;
+  const list = await window.api.templates.presets();
+  const preset = (list || []).find((t) => t.id === 'preset-leishen') || (list || [])[0];
+  if (!preset) return toast('没有可用的预置模板', true);
+  const saved = await window.api.templates.upsert({ id: preset.id, name: preset.name, platform: preset.platform, body: preset.body });
+  S.templates = await window.api.templates.list();
+  fillTemplateSelect();
+  selectTpl((saved && saved.id) || preset.id);
+  toast('已载入「' + preset.name + '」模板');
+});
+
 $('#btnTplImport').addEventListener('click', () => $('#tplFile').click());
 $('#tplFile').addEventListener('change', (e) => {
   importTemplateFiles(e.target.files);

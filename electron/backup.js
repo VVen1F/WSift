@@ -49,6 +49,10 @@ function snapshot(cfg, withKeys) {
       ...p,
       accounts: (p.accounts || []).map((a) => ({ ...a, apiKey: '' }))
     }));
+    // 雷神众测的密码、邮箱授权码和 token 也不能进导出的备份
+    if (out.leishen) {
+      out.leishen = { ...out.leishen, password: '', imapCode: '', token: '' };
+    }
   }
   const base = `refract-${stamp()}`;
   let file = path.join(dir, `${base}.json`);

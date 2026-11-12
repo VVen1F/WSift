@@ -43,6 +43,7 @@
         <button data-sec="general">通用</button>
         <button data-sec="network">网络</button>
         <button data-sec="llm">模型</button>
+        <button data-sec="leishen">雷神众测</button>
         <button data-sec="backup">备份</button>
         <button data-sec="archive">归档管理</button>
         <button data-sec="about">关于</button>
@@ -95,6 +96,7 @@
         <div class="report-top">
           <input class="title-input" id="rTitle" placeholder="标题" autocomplete="off" spellcheck="false" />
           <div class="btns">
+            <button class="btn" id="btnSubmit" type="button">提交</button>
             <button class="btn" id="btnSave" type="button">导出</button>
             <button class="btn primary" id="btnGen" type="button">生成</button>
           </div>
@@ -308,6 +310,39 @@
             <div id="archList" class="arch-list"></div>
           </div>
 
+          <div class="sect" id="sect-leishen" hidden>
+            <h3>雷神众测</h3>
+            <div class="klist">
+              <div class="krow">
+                <div class="klabel">平台账号<small>bountyteam.com 的登录邮箱</small></div>
+                <input class="inp kin wide" id="lsEmail" placeholder="you@qq.com" spellcheck="false" autocomplete="off" />
+              </div>
+              <div class="krow">
+                <div class="klabel">平台密码</div>
+                <input class="inp kin wide" id="lsPassword" type="password" autocomplete="off" />
+              </div>
+              <div class="krow">
+                <div class="klabel">QQ 邮箱授权码<small>QQ 邮箱 → 设置 → 账户 → 开启 IMAP 后生成，不是 QQ 密码</small></div>
+                <input class="inp kin wide" id="lsImap" type="password" autocomplete="off" />
+              </div>
+              <div class="krow">
+                <div class="klabel">登录状态<small id="lsTokenAt">没登录时提交会失败</small></div>
+                <div class="kval" id="lsState">未登录</div>
+                <button class="btn primary" id="btnLsLogin" type="button">登录</button>
+                <button class="btn" id="btnLsLogout" type="button">退出</button>
+              </div>
+              <div class="krow">
+                <div class="klabel">项目 ID<small>提交漏洞时的 projectid</small></div>
+                <input class="inp kin" id="lsProject" placeholder="11665" spellcheck="false" />
+              </div>
+              <div class="krow">
+                <div class="klabel">默认漏洞类型<small>提交时自动选中，提交框里还能改</small></div>
+                <select class="inp kin wide" id="lsBugtype"><option value="">登录后拉取</option></select>
+                <button class="btn" id="btnLsTypes" type="button">刷新</button>
+              </div>
+            </div>
+          </div>
+
           <div class="sect" id="sect-about" hidden>
             <h3>关于</h3>
             <div class="klist">
@@ -390,6 +425,75 @@
       <button class="btn primary" id="pmCreate" type="button">创建</button>
     </div>
     <div class="form-note" id="pmStatus"></div>
+  </div>
+</div>
+
+<div class="modal" id="lsLoginModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <b>登录雷神众测</b>
+      <button class="modal-x" id="lsLoginClose" aria-label="关闭">×</button>
+    </div>
+    <p class="modal-sub" id="lsLoginSub">填图形验证码，平台会把邮箱验证码发到你 QQ 邮箱，工具自己去取（最多等 90 秒）。</p>
+    <div class="ls-cap">
+      <img id="lsLoginCap" alt="验证码" />
+      <button class="btn" id="lsLoginRefresh" type="button">换一张</button>
+      <input class="inp" id="lsLoginCode" placeholder="验证码" maxlength="6" autocomplete="off" spellcheck="false" />
+    </div>
+    <div class="form-note" id="lsLoginNote"></div>
+    <div class="row actions">
+      <button class="btn" id="lsLoginCancel" type="button">取消</button>
+      <button class="btn primary" id="lsLoginGo" type="button">登录</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="lsSubmitModal" hidden>
+  <div class="modal-card wide ls-card">
+    <div class="modal-head">
+      <b>提交到雷神众测</b>
+      <button class="modal-x" id="lsSubmitClose" aria-label="关闭">×</button>
+    </div>
+    <p class="modal-sub">字段从生成的报告里解析，提交前可以改。正文里的图片会先传到平台再拼进去。</p>
+    <div class="form ls-form">
+      <label class="f">标题<input class="inp" id="lsTitle" spellcheck="false" /></label>
+      <div class="row ls-three">
+        <label class="f">等级
+          <select class="inp" id="lsGrade">
+            <option value="serious">严重</option>
+            <option value="high">高危</option>
+            <option value="middle">中危</option>
+            <option value="low">低危</option>
+          </select>
+        </label>
+        <label class="f">漏洞类型<select class="inp" id="lsType"><option value="">先拉取类型</option></select></label>
+        <label class="f">项目 ID<input class="inp" id="lsProjectId" placeholder="11665" /></label>
+      </div>
+      <label class="f">漏洞 URL<input class="inp" id="lsUrl" spellcheck="false" /></label>
+      <label class="f">漏洞描述<textarea class="inp" id="lsDescribe" rows="2"></textarea></label>
+      <label class="f">危害说明<textarea class="inp" id="lsDanger" rows="2"></textarea></label>
+      <label class="f">修复建议<textarea class="inp" id="lsRepair" rows="2"></textarea></label>
+      <label class="f">正文<textarea class="inp" id="lsDetail" rows="6"></textarea></label>
+      <div class="row ls-attach">
+        <div class="klabel">附报告文件<small id="lsAttachText">不附带</small></div>
+        <button class="btn" id="lsPickReport" type="button">选择…</button>
+        <button class="btn" id="lsClearReport" type="button">清除</button>
+        <span class="spacer"></span>
+        <span class="kval" id="lsImageCount"></span>
+      </div>
+    </div>
+    <div class="ls-gate">
+      <div class="ls-cap">
+        <img id="lsSubmitCap" alt="验证码" />
+        <button class="btn" id="lsSubmitRefresh" type="button">换一张</button>
+        <input class="inp" id="lsSubmitCode" placeholder="验证码" maxlength="6" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="form-note" id="lsSubmitNote"></div>
+    </div>
+    <div class="row actions">
+      <button class="btn" id="lsDraftBtn" type="button">存草稿</button>
+      <button class="btn primary" id="lsSubmitBtn" type="button">提交</button>
+    </div>
   </div>
 </div>
 

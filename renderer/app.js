@@ -2851,7 +2851,7 @@ function bindTheme() {
 }
 
 function showSettingsSection(key) {
-  const keys = ['general', 'network', 'llm', 'backup', 'archive', 'about'];
+  const keys = ['general', 'network', 'llm', 'leishen', 'backup', 'archive', 'about'];
   if (keys.indexOf(key) < 0) key = 'general';
   keys.forEach((k) => {
     const sec = document.getElementById('sect-' + k);
@@ -2862,6 +2862,7 @@ function showSettingsSection(key) {
   });
   if (key === 'llm' && typeof renderLLM === 'function') renderLLM();
   if (key === 'archive' && typeof renderArchive === 'function') renderArchive();
+  if (key === 'leishen' && typeof lsLoadCfg === 'function') lsLoadCfg().then(() => { if (LS.cfg && LS.cfg.token) lsLoadTypes(false); });
   document.querySelectorAll('#settingsNav button[data-sec]').forEach((b) => {
     b.classList.toggle('on', b.dataset.sec === key);
   });
@@ -3215,6 +3216,282 @@ function renderStats() {
 
 /* ---------------- 启动 ---------------- */
 
+
+/* ---------------- 雷神众测 ---------------- */
+
+const LS = { cfg: null, types: [], loginCap: null, submitCap: null, reportFile: '' };
+
+function lsNote(el, text, isErr) {
+  const box = typeof el === 'string' ? $(el) : el;
+  if (!box) return;
+  box.textContent = text || '';
+  box.classList.toggle('err', !!isErr);
+}
+
+function lsPaint() {
+  const c = LS.cfg || {};
+  const on = !!c.token;
+  if ($('#lsState')) $('#lsState').textContent = on ? '已登录' : '未登录';
+  if ($('#lsTokenAt')) {
+    $('#lsTokenAt').textContent = on && c.tokenAt
+      ? '上次登录 ' + String(c.tokenAt).slice(0, 19).replace('T', ' ')
+      : '没登录时提交会失败';
+  }
+}
+
+async function lsLoadCfg() {
+  if (!window.api || !window.api.leishen) return null;
+  const c = await window.api.leishen.cfg();
+  LS.cfg = c || {};
+  if ($('#lsEmail')) $('#lsEmail').value = c.email || '';
+  if ($('#lsPassword')) $('#lsPassword').value = c.password || '';
+  if ($('#lsImap')) $('#lsImap').value = c.imapCode || '';
+  if ($('#lsProject')) $('#lsProject').value = c.projectId || '';
+  lsPaint();
+  return LS.cfg;
+}
+
+function lsFillSelect(sel, placeholder, list, value) {
+  if (!sel) return;
+  const rows = ['<option value="">' + esc(placeholder) + '</option>'];
+  for (const t of list || []) {
+    rows.push('<option value="' + esc(t.id) + '">' + esc(t.path || t.name || t.id) + '</option>');
+  }
+  sel.innerHTML = rows.join('');
+  if (value && Array.from(sel.options).some((o) => o.value === value)) sel.value = value;
+}
+
+async function lsLoadTypes(force) {
+  if (!window.api || !window.api.leishen) return false;
+  const r = await window.api.leishen.types({ force: !!force });
+  if (!r.ok) {
+    if (r.auth) {
+      LS.cfg = Object.assign({}, LS.cfg, { token: '' });
+      lsPaint();
+    }
+    return false;
+  }
+  LS.types = r.list || [];
+  const preset = (LS.cfg && LS.cfg.bugtype) || '';
+  lsFillSelect($('#lsBugtype'), '不指定', LS.types, preset);
+  lsFillSelect($('#lsType'), '选择类型', LS.types, preset);
+  return true;
+}
+
+/* ---- 登录 ---- */
+
+async function lsRefreshLoginCap() {
+  const r = await window.api.leishen.captcha();
+  if (!r.ok) return lsNote('#lsLoginNote', r.error || '取验证码失败', true);
+  LS.loginCap = { code: r.code, image: r.image };
+  if ($('#lsLoginCap')) $('#lsLoginCap').src = r.image || '';
+  if ($('#lsLoginCode')) $('#lsLoginCode').value = '';
+}
+
+async function lsOpenLogin() {
+  const modal = $('#lsLoginModal');
+  if (!modal) return;
+  await lsLoadCfg();
+  const c = LS.cfg || {};
+  if (!c.email || !c.password) return toast('先在设置里填平台账号和密码', true);
+  if (!c.imapCode) return toast('还要填 QQ 邮箱授权码（在 QQ 邮箱设置里生成）', true);
+  modal.hidden = false;
+  lsNote('#lsLoginNote', '');
+  await lsRefreshLoginCap();
+  setTimeout(() => { if ($('#lsLoginCode')) $('#lsLoginCode').focus(); }, 60);
+}
+
+async function lsDoLogin() {
+  const text = ($('#lsLoginCode') && $('#lsLoginCode').value || '').trim();
+  if (!text) return lsNote('#lsLoginNote', '先填图形验证码', true);
+  if (!LS.loginCap) return lsRefreshLoginCap();
+  if ($('#lsLoginGo')) $('#lsLoginGo').disabled = true;
+  lsNote('#lsLoginNote', '登录中…');
+  let r = null;
+  try {
+    r = await window.api.leishen.login({ code: LS.loginCap.code, text }, (note) => lsNote('#lsLoginNote', note || ''));
+  } catch (e) {
+    r = { ok: false, error: e.message };
+  }
+  if ($('#lsLoginGo')) $('#lsLoginGo').disabled = false;
+  if (r && r.ok) {
+    if ($('#lsLoginModal')) $('#lsLoginModal').hidden = true;
+    toast('已登录雷神众测');
+    await lsLoadCfg();
+    await lsLoadTypes(false);
+    return;
+  }
+  lsNote('#lsLoginNote', (r && r.error) || '登录失败', true);
+  if (r && r.retry) await lsRefreshLoginCap();
+}
+
+/* ---- 提交 ---- */
+
+function lsPaintAttach() {
+  if ($('#lsAttachText')) $('#lsAttachText').textContent = LS.reportFile ? LS.reportFile.split('/').pop() : '不附带';
+}
+
+async function lsRefreshSubmitCap() {
+  const r = await window.api.leishen.captcha();
+  if (!r.ok) return lsNote('#lsSubmitNote', r.error || '取验证码失败', true);
+  LS.submitCap = { code: r.code, image: r.image };
+  if ($('#lsSubmitCap')) $('#lsSubmitCap').src = r.image || '';
+  if ($('#lsSubmitCode')) $('#lsSubmitCode').value = '';
+}
+
+async function lsOpenSubmit() {
+  if (!S.reportMd) return toast('先生成报告', true);
+  await lsLoadCfg();
+  if (!LS.cfg || !LS.cfg.token) {
+    toast('先登录雷神众测', true);
+    return lsOpenLogin();
+  }
+  const okTypes = await lsLoadTypes(false);
+  // token 过期时 lsLoadTypes 会把登录态清掉，这里直接引导重新登录
+  if (!okTypes && (!LS.cfg || !LS.cfg.token)) {
+    toast('登录已失效，重新登录', true);
+    return lsOpenLogin();
+  }
+  const r = await window.api.leishen.parse(S.reportMd, LS.types);
+  const f = (r && r.ok && r.fields) || {};
+  if ($('#lsTitle')) $('#lsTitle').value = f.title || '';
+  if ($('#lsGrade')) $('#lsGrade').value = f.grade || 'high';
+  if ($('#lsUrl')) $('#lsUrl').value = f.url || '';
+  if ($('#lsDescribe')) $('#lsDescribe').value = f.describe || '';
+  if ($('#lsDanger')) $('#lsDanger').value = f.danger || '';
+  if ($('#lsRepair')) $('#lsRepair').value = f.repair || '';
+  if ($('#lsDetail')) $('#lsDetail').value = f.detail || '';
+  if ($('#lsProjectId')) $('#lsProjectId').value = (LS.cfg && LS.cfg.projectId) || '';
+  lsFillSelect($('#lsType'), '选择类型', LS.types, f.guess || (LS.cfg && LS.cfg.bugtype) || '');
+  LS.reportFile = '';
+  lsPaintAttach();
+  const imgs = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
+  if ($('#lsImageCount')) $('#lsImageCount').textContent = imgs.length ? imgs.length + ' 张截图会一起上传' : '没有截图';
+  lsNote('#lsSubmitNote', '');
+  if ($('#lsSubmitModal')) $('#lsSubmitModal').hidden = false;
+  await lsRefreshSubmitCap();
+}
+
+async function lsSendSubmit(draft) {
+  const title = ($('#lsTitle') && $('#lsTitle').value || '').trim();
+  const bugtype = ($('#lsType') && $('#lsType').value || '').trim();
+  const projectId = ($('#lsProjectId') && $('#lsProjectId').value || '').trim();
+  const text = ($('#lsSubmitCode') && $('#lsSubmitCode').value || '').trim();
+  if (!title) return lsNote('#lsSubmitNote', '标题不能为空', true);
+  if (!bugtype) return lsNote('#lsSubmitNote', '先选漏洞类型', true);
+  if (!projectId) return lsNote('#lsSubmitNote', '填项目 ID', true);
+  if (!text) return lsNote('#lsSubmitNote', '填验证码', true);
+  if (!LS.submitCap) return lsRefreshSubmitCap();
+  const images = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
+  const payload = {
+    draft: !!draft,
+    reportFile: LS.reportFile || '',
+    images,
+    captcha: { code: LS.submitCap.code, text },
+    fields: {
+      title,
+      grade: ($('#lsGrade') && $('#lsGrade').value) || 'high',
+      bugtype,
+      projectId,
+      url: ($('#lsUrl') && $('#lsUrl').value || '').trim(),
+      describe: ($('#lsDescribe') && $('#lsDescribe').value || '').trim(),
+      danger: ($('#lsDanger') && $('#lsDanger').value || '').trim(),
+      repair: ($('#lsRepair') && $('#lsRepair').value || '').trim(),
+      detailHtml: ($('#lsDetail') && $('#lsDetail').value) || ''
+    }
+  };
+  if ($('#lsSubmitBtn')) $('#lsSubmitBtn').disabled = true;
+  if ($('#lsDraftBtn')) $('#lsDraftBtn').disabled = true;
+  lsNote('#lsSubmitNote', draft ? '存草稿中…' : '提交中…');
+  let r = null;
+  try {
+    r = await window.api.leishen.submit(payload, (note) => lsNote('#lsSubmitNote', note || ''));
+  } catch (e) {
+    r = { ok: false, error: e.message };
+  }
+  if ($('#lsSubmitBtn')) $('#lsSubmitBtn').disabled = false;
+  if ($('#lsDraftBtn')) $('#lsDraftBtn').disabled = false;
+  if (r && r.ok) {
+    if ($('#lsSubmitModal')) $('#lsSubmitModal').hidden = true;
+    toast(r.draft ? '已存草稿' : '已提交到雷神众测');
+    S.settings.stats = S.settings.stats || {};
+    S.settings.stats.leishen = (S.settings.stats.leishen || 0) + 1;
+    persist();
+    renderStats();
+    return;
+  }
+  lsNote('#lsSubmitNote', (r && r.error) || '提交失败', true);
+  if (r && r.auth) {
+    LS.cfg = Object.assign({}, LS.cfg, { token: '' });
+    lsPaint();
+    toast('登录已失效，重新登录', true);
+  }
+  if (r && r.retry) await lsRefreshSubmitCap();
+}
+
+function bindLeishen() {
+  if (!window.api || !window.api.leishen) return;
+  const saveSoon = debounce(() => {
+    window.api.leishen.save({
+      email: ($('#lsEmail') && $('#lsEmail').value || '').trim(),
+      password: $('#lsPassword') ? $('#lsPassword').value : '',
+      imapCode: $('#lsImap') ? $('#lsImap').value : '',
+      projectId: ($('#lsProject') && $('#lsProject').value || '').trim()
+    }).then(() => lsLoadCfg());
+  }, 500);
+  ['lsEmail', 'lsPassword', 'lsImap', 'lsProject'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', saveSoon);
+  });
+  if ($('#lsBugtype')) {
+    $('#lsBugtype').addEventListener('change', () => {
+      window.api.leishen.save({ bugtype: $('#lsBugtype').value });
+    });
+  }
+  if ($('#btnLsLogin')) $('#btnLsLogin').addEventListener('click', () => lsOpenLogin());
+  if ($('#btnLsLogout')) {
+    $('#btnLsLogout').addEventListener('click', async () => {
+      await window.api.leishen.logout();
+      await lsLoadCfg();
+      toast('已退出雷神众测');
+    });
+  }
+  if ($('#btnLsTypes')) {
+    $('#btnLsTypes').addEventListener('click', async () => {
+      if (!LS.cfg || !LS.cfg.token) return toast('先登录', true);
+      const ok = await lsLoadTypes(true);
+      toast(ok ? '类型已刷新（' + LS.types.length + ' 个）' : '拉取类型失败', !ok);
+    });
+  }
+
+  if ($('#lsLoginClose')) $('#lsLoginClose').addEventListener('click', () => { $('#lsLoginModal').hidden = true; });
+  if ($('#lsLoginCancel')) $('#lsLoginCancel').addEventListener('click', () => { $('#lsLoginModal').hidden = true; });
+  if ($('#lsLoginRefresh')) $('#lsLoginRefresh').addEventListener('click', () => lsRefreshLoginCap());
+  if ($('#lsLoginGo')) $('#lsLoginGo').addEventListener('click', () => lsDoLogin());
+  if ($('#lsLoginCode')) {
+    $('#lsLoginCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') lsDoLogin(); });
+  }
+  const loginModal = $('#lsLoginModal');
+  if (loginModal) loginModal.addEventListener('click', (e) => { if (e.target.id === 'lsLoginModal') loginModal.hidden = true; });
+
+  if ($('#btnSubmit')) $('#btnSubmit').addEventListener('click', () => lsOpenSubmit());
+  if ($('#lsSubmitClose')) $('#lsSubmitClose').addEventListener('click', () => { $('#lsSubmitModal').hidden = true; });
+  if ($('#lsSubmitRefresh')) $('#lsSubmitRefresh').addEventListener('click', () => lsRefreshSubmitCap());
+  if ($('#lsSubmitBtn')) $('#lsSubmitBtn').addEventListener('click', () => lsSendSubmit(false));
+  if ($('#lsDraftBtn')) $('#lsDraftBtn').addEventListener('click', () => lsSendSubmit(true));
+  if ($('#lsPickReport')) {
+    $('#lsPickReport').addEventListener('click', async () => {
+      const r = await window.api.leishen.pickReport();
+      if (r && r.ok) { LS.reportFile = r.file; lsPaintAttach(); }
+    });
+  }
+  if ($('#lsClearReport')) $('#lsClearReport').addEventListener('click', () => { LS.reportFile = ''; lsPaintAttach(); });
+  const submitModal = $('#lsSubmitModal');
+  if (submitModal) submitModal.addEventListener('click', (e) => { if (e.target.id === 'lsSubmitModal') submitModal.hidden = true; });
+
+  lsLoadCfg().then(() => { if (LS.cfg && LS.cfg.token) lsLoadTypes(false); });
+}
+
 async function boot() {
   S.info = await window.api.info();
   const ver = $('#ver');
@@ -3248,6 +3525,7 @@ async function boot() {
     persist();
   });
   bindBrowser();
+  bindLeishen();
   renderStats();
 }
 

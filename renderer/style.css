@@ -1337,3 +1337,30 @@ textarea.inp {
 .krow { padding: 12px 0; }
 .krow .klabel { font-size: 13px; font-weight: 500; }
 .krow .khint { font-size: 12px; color: var(--caption); margin-top: 2px; }
+
+/* ---------------- 雷神众测 ---------------- */
+
+.ls-cap {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 24px; margin-top: 12px;
+}
+.ls-cap img {
+  height: 34px; width: auto; min-width: 78px; padding: 0 4px;
+  border: 0.5px solid var(--line); border-radius: 6px; background: #fff; object-fit: contain;
+}
+.ls-cap .inp { width: 140px; }
+.ls-form { padding: 0 24px; }
+.ls-three { display: grid; grid-template-columns: 1fr 1.8fr 1fr; gap: 10px; }
+.ls-attach { align-items: center; gap: 8px; margin: 10px 0 2px; }
+.ls-card .modal-sub { margin-bottom: 10px; }
+.ls-card textarea.inp { resize: vertical; }
+/* 弹窗太高时只滚表单，底部按钮始终可见 */
+.ls-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  max-height: calc(100vh - 40px);
+}
+.ls-card .ls-form { flex: 1 1 auto; overflow: auto; min-height: 0; }
+.ls-card .row.actions { padding-top: 12px; padding-bottom: 2px; }
+.ls-gate { padding: 0 24px; margin-top: 12px; }
+.ls-gate .ls-cap { padding: 0; margin-top: 0; }
+.ls-gate .form-note { margin-top: 8px; min-height: 16px; }

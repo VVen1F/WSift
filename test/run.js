@@ -150,6 +150,11 @@ function ok(name, cond, extra) {
   ok('保留份数生效', bkList.length === 2, `实际 ${bkList.length}`);
   const bkJson = JSON.parse(fs.readFileSync(bkList[0].path, 'utf8'));
   ok('默认不含 Key', bkJson.providers.every((p) => (p.accounts || []).every((a) => !a.apiKey)));
+  const bkLs = store.load();
+  bkLs.leishen = { email: 'a@b.c', password: 'pw-secret', imapCode: 'imap-secret', token: 'tok-secret' };
+  const bkLsFile = backup.snapshot(bkLs, false);
+  const bkLsText = fs.readFileSync(bkLsFile, 'utf8');
+  ok('备份不带雷神密码和 token', !bkLsText.includes('pw-secret') && !bkLsText.includes('tok-secret') && !bkLsText.includes('imap-secret'));
   ok('能读回来', Array.isArray(backup.restore(bkList[0].path).providers));
   ok('到期判断', backup.due({ backup: { auto: '1h', lastAt: new Date().toISOString() } }) === false);
 
@@ -261,7 +266,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.69', pkg.version === '0.6.69');
+  ok('版本 0.6.70', pkg.version === '0.6.70');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -336,6 +341,37 @@ function ok(name, cond, extra) {
   const placed = reportMod.placeImages('前情\n\nGET /a HTTP/1.1\nHost: x\nConnection: close\n\n说明一\n\nPOST /b HTTP/1.1\nHost: x\n\n{"a":1}\n\n说明二\n', ['01.png', '02.png']);
   ok('每张图跟在对应数据包后面', placed.indexOf('Connection: close') < placed.indexOf('images/01.png') && placed.indexOf('images/01.png') < placed.indexOf('说明一') && placed.indexOf('{"a":1}') < placed.indexOf('images/02.png') && (placed.match(/!\[\]\(images\//g) || []).length === 2);
   ok('包不够时图排文末', reportMod.placeImages('GET /a HTTP/1.1\nHost: x\n', ['01.png', '02.png']).trim().endsWith('![](images/02.png)'));
+
+  console.log('\n[雷神众测]');
+  const ls = require(path.join(__dirname, '..', 'electron', 'leishen.js'));
+  const lsDetail = ls.encodeHoleDetail('<p>参数 id 存在注入</p><p><img src="https://x/1.png"></p><a href="#">点</a><br>下一行');
+  const lsDecoded = Buffer.from(lsDetail, 'base64').toString('utf8');
+  ok('正文按平台占位符编码', lsDecoded === '[[§p§]]参数 id 存在注入[[§/p§]][[§p§]][[§img src="https://x/1.png"§]][[§/p§]]点[[§br§]]下一行', lsDecoded);
+  ok('等级映射', ls.gradeKey('高危') === 'high' && ls.gradeKey('严重') === 'serious' && ls.gradeKey('低危') === 'low' && ls.gradeKey('中危') === 'middle' && ls.gradeKey('啥也不是') === 'high');
+  const lsFields = ls.makeFields({ title: 't', grade: '高危', bugtype: 'SQL注入', projectId: 11665 });
+  ok('字段名和平台一致', lsFields.holetitle === 't' && lsFields.holegrade === 'high' && lsFields.holeCode === 'high' && lsFields.bugtype === 'SQL注入' && lsFields.projectid === '11665');
+  const lsSample = [
+    '某商城 order 接口 id 参数存在 SQL 注入', '',
+    '漏洞标题', '某商城 order 接口 id 参数存在 SQL 注入', '',
+    '漏洞等级', '高危', '',
+    '漏洞等级自评依据', '可直接读取全库订单，符合高危。', '',
+    '漏洞类型', 'SQL注入', '',
+    '漏洞URL', 'https://shop.example.com/api/order?id=1', '',
+    '漏洞描述', 'id 参数未过滤。', '',
+    '漏洞危害', '可拖库。', '',
+    '漏洞详情', '##POC：', 'GET /api/order?id=1 HTTP/1.1', 'Host: shop.example.com', '',
+    '修复建议', '参数化查询。'
+  ].join('\n');
+  const lsParsed = ls.parseReport(lsSample);
+  ok('解析标题/等级/类型/URL', lsParsed.title === '某商城 order 接口 id 参数存在 SQL 注入' && lsParsed.grade === 'high' && lsParsed.typeText === 'SQL注入' && lsParsed.url === 'https://shop.example.com/api/order?id=1', lsParsed);
+  ok('解析描述/危害/修复/自评', lsParsed.describe === 'id 参数未过滤。' && lsParsed.danger === '可拖库。' && lsParsed.repair === '参数化查询。' && /可直接读取全库订单/.test(lsParsed.judgeBasis), lsParsed);
+  ok('正文带 POC', /GET \/api\/order/.test(lsParsed.detail));
+  const lsTypes = [{ id: 'SQL注入', name: 'SQL注入', path: 'Web漏洞 / SQL注入' }, { id: '越权', name: '越权', path: 'Web漏洞 / 越权' }];
+  ok('漏洞类型能猜到', ls.guessBugType('SQL注入', lsTypes) === 'SQL注入' && ls.guessBugType('某处未授权访问', lsTypes) === '越权' && ls.guessBugType('', lsTypes) === '');
+  const enc1 = ls.encryptPassword('test123');
+  const enc2 = ls.encryptPassword('test123');
+  ok('密码 AES 稳定且不是明文', enc1 === enc2 && enc1.length === 24 && enc1 !== 'test123');
+  ok('设置里有雷神默认项', store.DEFAULTS.leishen && store.DEFAULTS.leishen.token === '' && store.load().leishen && typeof store.load().leishen.projectId === 'string');
   ok('网络设置能填代理', ui.includes('id="setProxy"'));
   const netMod = require(path.join(__dirname, '..', 'electron', 'net.js'));
   ok('更新走带代理的客户端', typeof netMod.fetchJSON === 'function' && typeof netMod.download === 'function');

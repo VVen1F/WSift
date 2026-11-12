@@ -15,6 +15,7 @@ const remote = require('./remote');
 const backup = require('./backup');
 const sync = require('./sync');
 const tasks = require('./tasks');
+const leishen = require('./leishen');
 
 let mainWindow = null;
 let remoteInfo = null;
@@ -716,6 +717,162 @@ ipcMain.handle('tasks:save', (_e, list) => tasks.saveAll(list));
 ipcMain.handle('report:save', (_e, payload) => report.save(payload));
 ipcMain.handle('report:compose', (_e, payload) => report.buildMessages(payload));
 ipcMain.handle('report:chat', (_e, payload) => report.buildChatMessages(payload));
+
+/* ---------------- 雷神众测 ---------------- */
+
+const LS_PROGRESS = 'leishen:progress';
+let lsTypesCache = { at: 0, token: '', list: [] };
+
+function lsCfg() {
+  return store.load().leishen || {};
+}
+
+function lsSave(patch) {
+  const cfg = store.load();
+  cfg.leishen = Object.assign({}, cfg.leishen, patch || {});
+  store.save(cfg);
+  return cfg.leishen;
+}
+
+function lsNote(event, note) {
+  if (event && !event.sender.isDestroyed()) event.sender.send(LS_PROGRESS, { note });
+}
+
+ipcMain.handle('leishen:cfg', () => {
+  const c = lsCfg();
+  return {
+    ok: true,
+    email: c.email || '',
+    password: c.password || '',
+    imapCode: c.imapCode || '',
+    token: c.token || '',
+    tokenAt: c.tokenAt || '',
+    projectId: c.projectId || '',
+    bugtype: c.bugtype || '',
+    loggedIn: !!c.token
+  };
+});
+
+ipcMain.handle('leishen:save', (_e, patch) => {
+  lsSave(patch);
+  return { ok: true };
+});
+
+ipcMain.handle('leishen:logout', () => {
+  lsSave({ token: '', tokenAt: '' });
+  lsTypesCache = { at: 0, token: '', list: [] };
+  return { ok: true };
+});
+
+ipcMain.handle('leishen:captcha', async () => {
+  try {
+    const r = await leishen.imageCode();
+    return { ok: true, code: r.code, image: r.image };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('leishen:login', async (event, payload) => {
+  const p = payload || {};
+  const cfg = lsCfg();
+  const email = String(p.email || cfg.email || '').trim();
+  const password = String(p.password || cfg.password || '');
+  const imapCode = String(p.imapCode || cfg.imapCode || '');
+  if (!email || !password) return { ok: false, error: '先在设置里填平台账号和密码' };
+  if (!imapCode) return { ok: false, error: '还要填 QQ 邮箱授权码（邮箱设置里生成）' };
+  if (!p.code || !p.text) return { ok: false, retry: true, error: '图形验证码没填' };
+  try {
+    lsNote(event, '取邮箱里最新一封');
+    const before = await leishen.latestUid(email, imapCode);
+    const since = Date.now() / 1000 - 5;
+    lsNote(event, '提交图形验证码');
+    const sent = await leishen.sendEmailCode({ email, password, code: p.code, text: p.text });
+    if (!sent) return { ok: false, retry: true, error: '图形验证码不对，换一张再试' };
+    lsNote(event, '已发信，等邮箱验证码（最多 90 秒）');
+    const mailCode = await leishen.fetchLatestCode(email, imapCode, {
+      afterUid: before,
+      since,
+      timeout: Number(p.timeout) || 90
+    });
+    lsNote(event, '换 token');
+    const token = await leishen.loginWithCode({ email, password, checkcode: mailCode });
+    lsSave({ email, password, imapCode, token, tokenAt: new Date().toISOString() });
+    lsNote(event, '登录成功');
+    return { ok: true, token };
+  } catch (e) {
+    if (e.code === 'AUTH') lsSave({ token: '' });
+    return { ok: false, error: e.message, retry: e.code === 'LOGIN' };
+  }
+});
+
+ipcMain.handle('leishen:types', async (_e, opts) => {
+  const force = !!(opts && opts.force);
+  const cfg = lsCfg();
+  if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };
+  if (!force && lsTypesCache.list.length && Date.now() - lsTypesCache.at < 10 * 60 * 1000) {
+    return { ok: true, list: lsTypesCache.list, cached: true };
+  }
+  try {
+    const list = await leishen.bugTypes(cfg.token);
+    lsTypesCache = { at: Date.now(), token: cfg.token, list };
+    return { ok: true, list };
+  } catch (e) {
+    if (e.code === 'AUTH') {
+      lsSave({ token: '' });
+      return { ok: false, auth: true, error: '登录已失效，重新登录' };
+    }
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('leishen:parse', (_e, md, types) => {
+  try {
+    const fields = leishen.parseReport(md);
+    fields.guess = leishen.guessBugType(fields.typeText, types || []);
+    return { ok: true, fields };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('leishen:pickReport', async () => {
+  const r = await dialog.showOpenDialog(mainWindow, {
+    title: '选择要一并提交的报告',
+    properties: ['openFile'],
+    filters: [{ name: '报告', extensions: ['docx', 'pdf', 'doc'] }]
+  });
+  if (r.canceled || !r.filePaths.length) return { ok: false, canceled: true };
+  return { ok: true, file: r.filePaths[0] };
+});
+
+ipcMain.handle('leishen:submit', async (event, payload) => {
+  const p = payload || {};
+  const cfg = lsCfg();
+  if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };
+  const fields = leishen.makeFields(p.fields || {});
+  if (!fields.holetitle) return { ok: false, error: '标题不能为空' };
+  if (!fields.bugtype) return { ok: false, error: '没选漏洞类型' };
+  if (!fields.projectid) return { ok: false, error: '没填项目 ID' };
+  if (!p.captcha || !p.captcha.text || !p.captcha.code) return { ok: false, retry: true, error: '验证码没填' };
+  try {
+    lsNote(event, (p.draft ? '存草稿' : '提交') + '：上传正文图片');
+    const body = await leishen.buildDetail(cfg.token, fields, p.images || [], { reportFile: p.reportFile || '' });
+    body.checkCode = String(p.captcha.text);
+    body.code = String(p.captcha.code);
+    lsNote(event, p.draft ? '存草稿中' : '提交中');
+    const res = await leishen.submit(cfg.token, body, !!p.draft);
+    lsSave({ projectId: fields.projectid, bugtype: fields.bugtype });
+    return { ok: true, draft: !!p.draft, payload: { errcode: res.errcode, errmsg: res.errmsg } };
+  } catch (e) {
+    if (e.code === 'AUTH') {
+      lsSave({ token: '' });
+      return { ok: false, auth: true, error: '登录已失效，重新登录' };
+    }
+    const msg = String(e.message || '提交失败');
+    return { ok: false, error: msg, retry: /验证码/.test(msg) };
+  }
+});
 
 ipcMain.handle('llm:models', async (_e, provider) => {
   try {

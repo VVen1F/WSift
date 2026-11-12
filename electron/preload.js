@@ -39,6 +39,26 @@ contextBridge.exposeInMainWorld('api', {
 
   models: (provider) => ipcRenderer.invoke('llm:models', provider),
 
+  leishen: {
+    cfg: () => ipcRenderer.invoke('leishen:cfg'),
+    save: (patch) => ipcRenderer.invoke('leishen:save', patch),
+    logout: () => ipcRenderer.invoke('leishen:logout'),
+    captcha: () => ipcRenderer.invoke('leishen:captcha'),
+    login: (payload, onNote) => {
+      const h = (_e, p) => onNote && onNote(p && p.note);
+      ipcRenderer.on('leishen:progress', h);
+      return ipcRenderer.invoke('leishen:login', payload).finally(() => ipcRenderer.off('leishen:progress', h));
+    },
+    types: (opts) => ipcRenderer.invoke('leishen:types', opts),
+    parse: (md, types) => ipcRenderer.invoke('leishen:parse', md, types),
+    pickReport: () => ipcRenderer.invoke('leishen:pickReport'),
+    submit: (payload, onNote) => {
+      const h = (_e, p) => onNote && onNote(p && p.note);
+      ipcRenderer.on('leishen:progress', h);
+      return ipcRenderer.invoke('leishen:submit', payload).finally(() => ipcRenderer.off('leishen:progress', h));
+    }
+  },
+
   chat({ provider, messages, onDelta, onNote, onDone, onError }) {
     const id = 'c' + ++seq;
     const d = (_e, p) => p.id === id && onDelta && onDelta(p.delta);

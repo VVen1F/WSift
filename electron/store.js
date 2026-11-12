@@ -40,6 +40,16 @@ const DEFAULTS = {
   ],
   activeProviderId: 'glm',
   report: { author: '', platform: '通用', language: 'zh' },
+  // 雷神众测：登录态 + 提交默认值（token 会过期，登录后自动写回）
+  leishen: {
+    email: '',
+    password: '',
+    imapCode: '',
+    token: '',
+    tokenAt: '',
+    projectId: '',
+    bugtype: ''
+  },
   ui: {
     theme: 'system',
     shotWidth: 1600,
@@ -134,6 +144,7 @@ function load() {
     ...DEFAULTS,
     ...raw,
     report: { ...DEFAULTS.report, ...(raw.report || {}) },
+    leishen: { ...DEFAULTS.leishen, ...(raw.leishen || {}) },
     ui: { ...DEFAULTS.ui, ...(raw.ui || {}) },
     backup: { ...DEFAULTS.backup, ...(raw.backup || {}) },
     sync: {

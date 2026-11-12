@@ -89,6 +89,7 @@ app.whenReady().then(async () => {
     for (let i = 0; i < 80; i++) { await sleep(200); const m = document.getElementById('lsSubmitModal'); if (m && !m.hidden) break; }
     if (document.getElementById('lsSubmitModal').hidden) return { error: '提交框没打开：' + document.getElementById('lsSubmitNote').textContent };
     const grades = Array.from(document.getElementById('lsGrade').options).map((o) => o.value);
+    const projectOptions = Array.from(document.querySelectorAll('#lsProjectOptions option')).map((o) => ({ id: o.value, name: o.textContent }));
     const types = Array.from(document.getElementById('lsType').options).map((o) => o.value).filter(Boolean);
     document.getElementById('lsSubmitCode').value = ${JSON.stringify(mock.CAPTCHA_TEXT)};
     document.getElementById('lsSubmitBtn').click();
@@ -96,7 +97,7 @@ app.whenReady().then(async () => {
     for (let i = 0; i < 120; i++) {
       await sleep(500);
       note = document.getElementById('lsSubmitNote').textContent;
-      if (document.getElementById('lsSubmitModal').hidden) return { ok: true, grades, types };
+      if (document.getElementById('lsSubmitModal').hidden) return { ok: true, grades, types, projectOptions };
       if (note && !/提交中|上传|生成 docx/.test(note)) return { ok: false, error: note, grades, types };
     }
     return { ok: false, error: '超时：' + note, grades, types };
@@ -114,6 +115,9 @@ app.whenReady().then(async () => {
   if (!detail.startsWith('[[\u00a7p\u00a7]]')) problems.push('正文编码不对');
   if (!detail.includes('[[\u00a7img src=')) problems.push('正文里没有图片');
   if (!sent.judgeBasis) problems.push('没有自评依据');
+  const picked = (submit.projectOptions || []).map((x) => x.id);
+  if (!picked.includes('11665')) problems.push('项目候选里没有 11665：' + picked.join(','));
+  if (picked.includes('11653')) problems.push('已结束的项目不该出现在候选里');
   if (!sent.checkCode) problems.push('没有验证码');
   if (problems.length) return fail(problems.join('；'));
 

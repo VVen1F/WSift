@@ -278,7 +278,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.77', pkg.version === '0.6.77');
+  ok('版本 0.6.78', pkg.version === '0.6.78');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -395,6 +395,14 @@ function ok(name, cond, extra) {
     ok('无权操作/保存失败算失败', !noAuth && !failed);
     const cache = store.load().leishen.grades;
     ok('等级缓存是对象', cache && typeof cache === 'object');
+    const projects = ls.mapProjects([
+      { id: '11665', name: 'A', states: 'doing' },
+      { id: '11653', name: 'B', states: 'finish' },
+      { id: '11665', name: 'A2', states: 'apply' },
+      { id: '', name: 'C', states: 'doing' },
+      null
+    ]);
+    ok('项目列表只留进行中的并去重', projects.length === 1 && projects[0].id === '11665' && projects[0].name === 'A', projects);
   }
   {
     const mapped = ls.mapLevels([{ holeCode: 'urgent', holeLevelName: '紧急', holeDescription: 'd' }, { holeCode: '', holeLevelName: '空的' }, null]);

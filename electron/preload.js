@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld('api', {
     },
     types: (opts) => ipcRenderer.invoke('leishen:types', opts),
     project: (projectId) => ipcRenderer.invoke('leishen:project', projectId),
+    projects: () => ipcRenderer.invoke('leishen:projects'),
     parse: (md, types) => ipcRenderer.invoke('leishen:parse', md, types),
     pickReport: () => ipcRenderer.invoke('leishen:pickReport'),
     submit: (payload, onNote) => {

@@ -334,7 +334,8 @@
               </div>
               <div class="krow">
                 <div class="klabel">项目 ID<small>提交漏洞时的 projectid</small></div>
-                <input class="inp kin" id="lsProject" placeholder="11665" spellcheck="false" />
+                <input class="inp kin" id="lsProject" placeholder="11665" spellcheck="false" list="lsProjectOptions" />
+                <datalist id="lsProjectOptions"></datalist>
               </div>
               <div class="krow">
                 <div class="klabel">默认漏洞类型<small>提交时自动选中，提交框里还能改</small></div>
@@ -469,7 +470,7 @@
           </select>
         </label>
         <label class="f">漏洞类型<select class="inp" id="lsType"><option value="">先拉取类型</option></select></label>
-        <label class="f">项目 ID<input class="inp" id="lsProjectId" placeholder="11665" /></label>
+        <label class="f">项目 ID<input class="inp" id="lsProjectId" placeholder="11665" list="lsProjectOptions" /></label>
       </div>
       <label class="f">漏洞 URL<input class="inp" id="lsUrl" spellcheck="false" /></label>
       <label class="f">漏洞等级自评依据<span class="f-hint">平台必填，从《漏洞等级判断标准》里复制对应项原文</span>

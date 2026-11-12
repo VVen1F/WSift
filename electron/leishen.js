@@ -442,6 +442,41 @@ async function projectLevels(token, projectId) {
   return rows;
 }
 
+/** 我参与的项目（只能提交 apply/doing 状态的）。 */
+function mapProjects(rows) {
+  const out = [];
+  const seen = new Set();
+  for (const item of Array.isArray(rows) ? rows : []) {
+    if (!item || typeof item !== 'object') continue;
+    const id = String(item.id || '').slice(0, 40);
+    const name = String(item.name || '').trim().slice(0, 120);
+    const states = String(item.states || '');
+    if (!id || !name || !['apply', 'doing'].includes(states)) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name, states });
+  }
+  return out;
+}
+
+async function myProjects(token) {
+  const rows = [];
+  for (let page = 1; page <= 8; page++) {
+    const j = await request('GET', '/project/getpersonalprojectList', {
+      token,
+      params: { size: 50, page, projectSubType: '', projectType: '', status: '', search: '' },
+      allowError: true
+    });
+    if (!isOk(j)) break;
+    const ret = (j && j.ret) || {};
+    const chunk = ret.data || [];
+    rows.push(...chunk);
+    const total = Number(ret.total || 0);
+    if (!chunk.length || page * 50 >= total) break;
+  }
+  return mapProjects(rows);
+}
+
 /* ---------------- 上传 ---------------- */
 
 function mimeFor(name) {
@@ -746,6 +781,8 @@ module.exports = {
   bugTypes,
   projectDetail,
   projectLevels,
+  mapProjects,
+  myProjects,
   mapLevels,
   uploadReport,
   uploadImage,

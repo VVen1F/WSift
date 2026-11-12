@@ -3331,6 +3331,7 @@ async function lsDoLogin() {
     toast('已登录雷神众测');
     await lsLoadCfg();
     await lsLoadTypes(false);
+    await lsLoadProjects();
     return;
   }
   lsNote('#lsLoginNote', (r && r.error) || '登录失败', true);
@@ -3354,6 +3355,7 @@ async function lsDoLoginAuto() {
     toast('已登录雷神众测');
     await lsLoadCfg();
     await lsLoadTypes(false);
+    await lsLoadProjects();
     return;
   }
   lsNote('#lsLoginNote', (r && r.error) || '自动登录失败', true);
@@ -3411,6 +3413,26 @@ function lsPaintTemplateLink() {
 }
 
 /** 输入项目 ID 后拉项目名、平台官方的等级表和报告模板。 */
+/** 登录后拉「我参与的项目」，填到两个项目 ID 输入框的候选里。 */
+async function lsLoadProjects() {
+  if (!window.api || !window.api.leishen || !window.api.leishen.projects) return 0;
+  let r = null;
+  try {
+    r = await window.api.leishen.projects();
+  } catch (e) {
+    return 0;
+  }
+  if (!r || !r.ok) return 0;
+  LS.projects = r.list || [];
+  const dl = $('#lsProjectOptions');
+  if (dl) {
+    dl.innerHTML = LS.projects
+      .map((p) => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>')
+      .join('');
+  }
+  return LS.projects.length;
+}
+
 async function lsLoadProject(quiet) {
   const id = ($('#lsProjectId') && $('#lsProjectId').value || '').trim();
   if (!id) return false;
@@ -3449,6 +3471,7 @@ async function lsOpenSubmit() {
     return lsOpenLogin();
   }
   const okTypes = await lsLoadTypes(false);
+  await lsLoadProjects();
   // token 过期时 lsLoadTypes 会把登录态清掉，这里直接引导重新登录
   if (!okTypes && (!LS.cfg || !LS.cfg.token)) {
     toast('登录已失效，重新登录', true);

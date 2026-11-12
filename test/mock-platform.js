@@ -128,6 +128,20 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  if (p === '/project/getpersonalprojectList') {
+    if (!authOk(req)) return json(res, { errcode: '200', errmsg: '权限鉴定失败' });
+    return json(res, {
+      errcode: '0',
+      ret: {
+        total: 2,
+        data: [
+          { id: '11665', name: '测试项目（进行中）', states: 'doing' },
+          { id: '11653', name: '已结束的项目', states: 'finish' }
+        ]
+      }
+    });
+  }
+
   if (p === '/project/getProjectdetail') {
     if (!authOk(req)) return json(res, { errcode: '200', errmsg: '权限鉴定失败' });
     return json(res, { errcode: '0', ret: { data: { projectname: '测试项目', holeReportTemplate: 'https://cdn.test/tpl.docx' } } });

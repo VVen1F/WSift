@@ -860,6 +860,21 @@ ipcMain.handle('leishen:types', async (_e, opts) => {
   }
 });
 
+ipcMain.handle('leishen:projects', async () => {
+  const cfg = lsCfg();
+  if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };
+  try {
+    const list = await leishen.myProjects(cfg.token).catch(() => []);
+    return { ok: true, list };
+  } catch (e) {
+    if (e.code === 'AUTH') {
+      lsSave({ token: '' });
+      return { ok: false, auth: true, error: '登录已失效，重新登录' };
+    }
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle('leishen:project', async (_e, projectId) => {
   const cfg = lsCfg();
   if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };

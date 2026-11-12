@@ -37,6 +37,7 @@
   --brand-subtle: #eaf1ff;
   --brand-focus: #75a7ff;
   --brand-foreground: #ffffff;
+  --sel-bg: var(--brand-subtle);
   --accent: var(--brand-primary);
   --accent-hover: var(--brand-hover);
   --on-accent: #ffffff;
@@ -80,6 +81,7 @@ html[data-ds-dark-theme] {
     --brand-subtle: rgba(57, 120, 232, 0.18);
     --brand-focus: #8fb4ff;
     --brand-foreground: #ffffff;
+    --sel-bg: rgba(91, 141, 246, 0.16);
     --accent: var(--brand-primary);
     --accent-hover: var(--brand-hover);
     --on-accent: #ffffff;
@@ -178,7 +180,8 @@ button { cursor: default; }
   transition: background var(--ds-transition-duration-fast) var(--ds-ease-in-out);
 }
 .nav:hover { background: var(--hover); }
-.nav.on { background: var(--hover); font-weight: 500; }
+.nav.on { background: var(--sel-bg); font-weight: 500; }
+.nav.on .nav-ic { color: var(--brand-primary); opacity: 1; }
 .nav svg { width: 16px; height: 16px; opacity: .8; flex: 0 0 16px; }
 .nav-ic { width: 16px; height: 16px; flex: 0 0 16px; display: inline-flex; align-items: center; justify-content: center; opacity: .8; }
 .nav-ic svg { width: 16px; height: 16px; }
@@ -1059,7 +1062,7 @@ textarea.inp {
   transition: background var(--ds-transition-duration-fast) var(--ds-ease-in-out);
 }
 .task:hover { background: var(--hover); }
-.task.on, .task.on:hover { background: var(--hover); }
+.task.on, .task.on:hover { background: var(--sel-bg); }
 .task:focus-visible { outline: 0.5px solid var(--line-strong); outline-offset: -1px; }
 .task-title {
   flex: 1;
@@ -1093,6 +1096,7 @@ textarea.inp {
   color: var(--caption);
 }
 .task.in-ws { margin-left: 16px; }
+.ws.open + .task.in-ws { margin-top: 6px; }
 .ws-head {
   display: flex; align-items: center; height: 36px;
   padding: 0 4px 0 12px; color: var(--muted); font-size: 13px; line-height: 20px;
@@ -1104,8 +1108,11 @@ textarea.inp {
   border-radius: var(--dsw-radius-md);
   color: var(--text); font-size: 14px; line-height: 20px;
 }
-.ws:hover, .ws.on { background: var(--hover); }
-.ws > svg { width: 16px; height: 16px; flex: none; color: var(--caption); }
+.ws:hover { background: var(--hover); }
+.ws.sel, .ws.sel:hover { background: var(--sel-bg); }
+.ws > svg { width: 16px; height: 16px; flex: none; color: var(--muted); transition: color var(--ds-transition-duration-fast) var(--ds-ease-in-out); }
+.ws:hover > svg { color: var(--text); }
+.ws.open > svg, .ws.sel > svg { color: var(--brand-primary); }
 .ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-chev {
   width: 12px; height: 12px; flex: none;
@@ -1117,9 +1124,9 @@ textarea.inp {
 .ws-chev svg { width: 12px; height: 12px; }
 .ws-chev.open { transform: rotate(0deg); }
 .ws-chev.none { visibility: hidden; }
-.ws:hover .ws-chev, .ws.on .ws-chev, .ws:focus-within .ws-chev { opacity: 1; }
+.ws:hover .ws-chev, .ws.sel .ws-chev, .ws.open .ws-chev, .ws:focus-within .ws-chev { opacity: 1; }
 .ws-add { opacity: 0; }
-.ws:hover .ws-add, .ws.on .ws-add, .ws:focus-within .ws-add { opacity: 1; }
+.ws:hover .ws-add, .ws.sel .ws-add, .ws:focus-within .ws-add { opacity: 1; }
 .name-body { padding: 0 24px; }
 .task-arch {
   position: static;

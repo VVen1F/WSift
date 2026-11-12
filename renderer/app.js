@@ -17,7 +17,7 @@ const S = {
   info: null
 };
 
-const TASKS = { list: [], workspaces: [], wsId: null, id: null, busyId: null, showArchived: false };
+const TASKS = { list: [], workspaces: [], wsId: null, id: null, busyId: null, showArchived: false, focus: 'task' };
 let clearArmed = false;
 let clearTimer = 0;
 let saveChain = Promise.resolve();
@@ -1152,7 +1152,7 @@ const ARCH_ICON = typeof icon === 'function' ? icon('archive-outline', 16) : '';
 
 function taskRow(t, archivedRow) {
   const onPage = document.getElementById('page-report').classList.contains('on');
-  const on = onPage && t.id === TASKS.id;
+  const on = onPage && t.id === TASKS.id && TASKS.focus !== 'ws';
   const busy = TASKS.busyId === t.id;
   let actions = '<span class="task-meta">生成中</span>';
   if (!busy && archivedRow) {
@@ -1206,7 +1206,9 @@ function workspaceHtml() {
     const chev = `<span class="ws-chev${open ? ' open' : ''}${mine.length ? '' : ' none'}" aria-hidden="true">` +
       `${typeof icon === 'function' ? icon('chevron-down-outline', 12) : ''}</span>`;
     const folder = open ? folderOpen : folderShut;
-    let block = `<div class="ws${w.id === TASKS.wsId ? ' on' : ''}" data-ws="${esc(w.id)}" role="button" tabindex="0">` +
+    // 选中和展开是两个状态：sel 只代表文件夹自己被选中，open 只代表展开
+    const sel = TASKS.focus === 'ws' && w.id === TASKS.wsId;
+    let block = `<div class="ws${sel ? ' sel' : ''}${open ? ' open' : ''}" data-ws="${esc(w.id)}" role="button" tabindex="0">` +
       `${chev}${folder}<span class="ws-name">${esc(w.name)}</span>` +
       `<button class="icon-btn ws-add" type="button" data-ws-new="${esc(w.id)}" aria-label="新建任务">${typeof icon === 'function' ? icon('plus-outline', 16) : ''}</button></div>`;
     if (open) block += mine.map((t) => taskRow(t, false)).join('');
@@ -1272,6 +1274,7 @@ function onTaskEdit() {
     };
     TASKS.list.unshift(t);
     TASKS.id = t.id;
+  TASKS.focus = 'task';
   }
   readFormInto(t);
   t.updatedAt = Date.now();
@@ -1302,6 +1305,7 @@ function flushDraft() {
 
 function selectTask(id) {
   if (!id) return;
+  TASKS.focus = 'task';
   const page = document.getElementById('page-report');
   const wasReport = page && page.classList.contains('on');
   if (TASKS.id === id && wasReport) return;
@@ -1318,6 +1322,7 @@ function selectTask(id) {
 
 function requestNewTask() {
   flushDraft();
+  TASKS.focus = 'task';
   const page = document.getElementById('page-report');
   const wasReport = page && page.classList.contains('on');
   blankForm({ focus: true });
@@ -1611,6 +1616,7 @@ function bindTasks() {
     if (ws) {
       const space = TASKS.workspaces.find((w) => w.id === ws.dataset.ws);
       if (!space) return;
+      TASKS.focus = 'ws';
       if (TASKS.wsId === space.id) space.open = space.open === false;
       else {
         TASKS.wsId = space.id;

@@ -178,7 +178,7 @@ const server = http.createServer(async (req, res) => {
     if (!authOk(req)) return json(res, { errcode: '200', errmsg: '权限鉴定失败' });
     let data = {};
     try { data = JSON.parse(body.toString('utf8') || '{}'); } catch (e) { data = {}; }
-    const need = ['holetitle', 'holegrade', 'judgeBasis', 'bugtype', 'holeurl', 'holedescribe', 'holedanger', 'holedetail', 'repairpropose', 'holeReport', 'checkCode'];
+    const need = ['holetitle', 'holegrade', 'judgeBasis', 'bugtype', 'holeurl', 'holedescribe', 'holedanger', 'holedetail', 'repairpropose', 'checkCode'];
     const missing = need.filter((k) => !String(data[k] || '').trim());
     if (missing.length) return json(res, { errcode: '200', errmsg: '保存漏洞失败（缺 ' + missing.join(',') + '）' });
     if (data.holeCode !== data.holegrade) return json(res, { errcode: '200', errmsg: '保存漏洞失败（holeCode 不一致）' });

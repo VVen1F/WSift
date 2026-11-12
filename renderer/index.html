@@ -474,7 +474,8 @@
       <label class="f">修复建议<textarea class="inp" id="lsRepair" rows="2"></textarea></label>
       <label class="f">正文<textarea class="inp" id="lsDetail" rows="6"></textarea></label>
       <div class="row ls-attach">
-        <div class="klabel">漏洞报告<small id="lsAttachText">留空则按当前报告自动生成 docx（平台只收 docx）</small></div>
+        <div class="klabel">漏洞报告<small id="lsAttachText">默认不传；勾上会按当前报告生成 docx 一起交</small></div>
+        <label class="ls-check" title="平台网页端必填且只收 .docx，接口侧一般不校验"><input type="checkbox" id="lsAttachDocx" />附带 docx</label>
         <button class="btn" id="lsPickReport" type="button">选择…</button>
         <button class="btn" id="lsClearReport" type="button">清除</button>
         <a class="ls-link" id="lsTemplateLink" href="#" hidden>下载项目报告模板</a>

@@ -660,7 +660,21 @@ ipcMain.handle('browser:close', () => {
 });
 
 ipcMain.handle('settings:get', () => store.load());
-ipcMain.handle('settings:set', (_e, s) => store.save(s));
+/**
+ * 渲染进程的 persist() 会把启动时那份整包配置回写。整包覆盖会踩到一个坑：
+ * 它手里的是旧快照，账号/任务/模板这些后来改过的东西会被退回去（丢数据）。
+ * 所以这里只接受渲染进程真正负责的几块，其余按磁盘上的来。
+ */
+ipcMain.handle('settings:set', (_e, patch) => {
+  const cfg = store.load();
+  const next = { ...cfg };
+  const p = patch || {};
+  if (p.settings) next.settings = { ...(cfg.settings || {}), ...p.settings };
+  if (p.ui) next.ui = { ...(cfg.ui || {}), ...p.ui };
+  if (Array.isArray(p.providers)) next.providers = p.providers;
+  store.save(next);
+  return next;
+});
 
 ipcMain.handle('settings:export', async (_e, withKeys) => {
   try {
@@ -1047,19 +1061,23 @@ ipcMain.handle('leishen:submit', async (event, payload) => {
   lsSubmitting = true;
   try {
     // 平台要求必须带 .docx 报告：没手动选就按当前报告现生成一份
+    // 报告附件是可选的：网页端必填，但接口侧不校验（你们面板提交时就没带）。
+    // 默认不生成 docx，勾了「附带报告」才生成 / 才用选中的文件。
     let reportBytes = null;
     let reportName = '';
+    const wantReport = p.attachReport !== false;
     if (p.reportFile && !fs.existsSync(p.reportFile)) return { ok: false, error: '报告文件不见了，重新选一次' };
     if (p.reportFile && fs.existsSync(p.reportFile)) {
       reportName = path.basename(p.reportFile);
       if (!/\.docx$/i.test(reportName)) return { ok: false, error: '平台只收 .docx 报告，选一个 docx 或者留空自动生成' };
       reportBytes = fs.readFileSync(p.reportFile);
-    } else if (String(p.reportMarkdown || '').trim()) {
+    } else if (wantReport) {
+      if (!String(p.reportMarkdown || '').trim()) return { ok: false, error: '没有报告正文，先生成报告再提交' };
       lsNote(event, '生成 docx 报告');
       const built = docx.build({ markdown: p.reportMarkdown, title: fields.holetitle, images: p.images || [] });
       reportBytes = built.buffer;
       reportName = (fields.holetitle || '漏洞报告').replace(/[\\/:*?"<>|]/g, '').slice(0, 60) + '.docx';
-    } else {
+    } else if (!String(fields.holedetail || '').trim()) {
       return { ok: false, error: '没有报告正文，先生成报告再提交' };
     }
     lsNote(event, (p.draft ? '存草稿' : '提交') + '：上传正文图片');

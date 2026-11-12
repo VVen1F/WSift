@@ -3601,7 +3601,12 @@ async function lsLoadProject(quiet) {
 /* ---- 提交 ---- */
 
 function lsPaintAttach() {
-  if ($('#lsAttachText')) $('#lsAttachText').textContent = LS.reportFile ? LS.reportFile.split('/').pop() : '留空则按当前报告自动生成 docx（平台只收 docx）';
+  const on = !!($('#lsAttachDocx') && $('#lsAttachDocx').checked);
+  if ($('#lsAttachText')) {
+    $('#lsAttachText').textContent = LS.reportFile
+      ? LS.reportFile.split('/').pop()
+      : (on ? '勾了：按当前报告自动生成 docx' : '默认不传；勾上会按当前报告生成 docx 一起交');
+  }
 }
 
 async function lsRefreshSubmitCap() {
@@ -3646,6 +3651,7 @@ async function lsOpenSubmit() {
   lsFillSelect($('#lsType'), '选择类型', LS.types, f.guess || (LS.cfg && LS.cfg.bugtype) || '');
   lsFillGrades(null, f.grade, f.gradeText);
   LS.reportFile = '';
+  if ($('#lsAttachDocx')) $('#lsAttachDocx').checked = false;
   lsPaintAttach();
   const imgs = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
   if ($('#lsImageCount')) $('#lsImageCount').textContent = imgs.length ? imgs.length + ' 张截图会一起上传' : '没有截图';
@@ -3679,6 +3685,7 @@ async function lsSendSubmit(draft) {
   const payload = {
     draft: !!draft,
     accountId,
+    attachReport: !!($('#lsAttachDocx') && $('#lsAttachDocx').checked),
     reportFile: LS.reportFile || '',
     reportMarkdown: S.reportMd || '',
     images,
@@ -3778,6 +3785,7 @@ function bindLeishen() {
   if ($('#lsSubmitRefresh')) $('#lsSubmitRefresh').addEventListener('click', () => lsRefreshSubmitCap());
   if ($('#lsSubmitBtn')) $('#lsSubmitBtn').addEventListener('click', () => lsSendSubmit(false));
   if ($('#lsDraftBtn')) $('#lsDraftBtn').addEventListener('click', () => lsSendSubmit(true));
+  if ($('#lsAttachDocx')) $('#lsAttachDocx').addEventListener('change', () => lsPaintAttach());
   if ($('#lsPickReport')) {
     $('#lsPickReport').addEventListener('click', async () => {
       const r = await window.api.leishen.pickReport();

@@ -282,7 +282,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('名字和 appId 未改', pkg.productName === 'Refract' && pkg.build.productName === 'Refract' && pkg.build.appId === 'com.wenyifan.refract');
-  ok('版本 0.6.89', pkg.version === '0.6.89');
+  ok('版本 0.6.90', pkg.version === '0.6.90');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -555,6 +555,7 @@ function ok(name, cond, extra) {
   const out = mdFn(piped);
   ok('管道续行不死循环', out.includes('python3') && out.includes('段落'));
   ok('普通表格仍能渲染', mdFn('| a | b |\n| --- | --- |\n| 1 | 2 |').includes('<table>'));
+  ok('自评依据开头的等级被去掉', report.toPlain('漏洞等级\n中危\n\n漏洞等级自评依据\n中危：影响有限。').includes('漏洞等级自评依据\n影响有限。'));
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

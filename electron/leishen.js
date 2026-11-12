@@ -804,7 +804,8 @@ function parseReport(md) {
   let describe = pick('漏洞描述') || '';
   let danger = pick('漏洞危害', '危害分析', '危害说明') || '';
   const repair = pick('修复建议', '修复方案') || '';
-  const judgeBasis = pick('漏洞等级自评依据', '自评依据') || '';
+  // 有的报告会把等级重复写在自评依据开头（「中危：…」），提交时去掉
+  const judgeBasis = (pick('漏洞等级自评依据', '自评依据') || '').replace(/^(紧急|严重|高危|中危|低危)[\s]*[:：][\s]*/, '');
 
   // 老模板没有「描述/危害」两段时，用正文兜底：描述取第一个数据包之前的段落
   const bodyText = String(pick('漏洞详情', '漏洞证明', '复现步骤') || text);

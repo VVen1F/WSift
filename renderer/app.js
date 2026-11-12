@@ -444,14 +444,16 @@ function safeDom(fn) {
 
 /** 模型偶尔把思考过程写进正文，开头一段英文要切掉。 */
 function cleanModelText(md) {
-  const text = String(md || '');
+  let text = String(md || '');
   if (!/[\u4e00-\u9fa5]/.test(text)) return text;
   const head = text.slice(0, 160);
   const latin = (head.match(/[A-Za-z]/g) || []).length;
   if (latin > 40 && !/HTTP\//.test(head)) {
     const i = text.search(/[\u4e00-\u9fa5]/);
-    if (i > 0) return text.slice(i).trim();
+    if (i > 0) text = text.slice(i).trim();
   }
+  // 自评依据开头再写一遍等级（「中危：…」）跟上面的等级行重复，去掉
+  text = text.replace(/((?:漏洞)?等级自评依据\s*[:：]?[ \t]*\n?[ \t]*)(紧急|严重|高危|中危|低危)[ \t]*[:：][ \t]*/g, '$1');
   return text;
 }
 

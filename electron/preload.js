@@ -43,7 +43,10 @@ contextBridge.exposeInMainWorld('api', {
   leishen: {
     cfg: () => ipcRenderer.invoke('leishen:cfg'),
     save: (patch) => ipcRenderer.invoke('leishen:save', patch),
-    logout: () => ipcRenderer.invoke('leishen:logout'),
+    accounts: () => ipcRenderer.invoke('leishen:accounts'),
+    accountSave: (payload) => ipcRenderer.invoke('leishen:account:save', payload),
+    accountRemove: (id) => ipcRenderer.invoke('leishen:account:remove', id),
+    logout: (accountId) => ipcRenderer.invoke('leishen:logout', accountId),
     captcha: () => ipcRenderer.invoke('leishen:captcha'),
     login: (payload, onNote) => {
       const h = (_e, p) => onNote && onNote(p && p.note);
@@ -56,8 +59,8 @@ contextBridge.exposeInMainWorld('api', {
       return ipcRenderer.invoke('leishen:loginAuto', payload).finally(() => ipcRenderer.off('leishen:progress', h));
     },
     types: (opts) => ipcRenderer.invoke('leishen:types', opts),
-    project: (projectId) => ipcRenderer.invoke('leishen:project', projectId),
-    projects: () => ipcRenderer.invoke('leishen:projects'),
+    project: (payload) => ipcRenderer.invoke('leishen:project', payload),
+    projects: (accountId) => ipcRenderer.invoke('leishen:projects', accountId),
     parse: (md, types) => ipcRenderer.invoke('leishen:parse', md, types),
     pickReport: () => ipcRenderer.invoke('leishen:pickReport'),
     submit: (payload, onNote) => {

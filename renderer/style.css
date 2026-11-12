@@ -1367,3 +1367,18 @@ textarea.inp {
 .ls-gate .form-note { margin-top: 8px; min-height: 16px; }
 .ls-link { font-size: 12px; color: var(--accent, #3f69f6); text-decoration: none; }
 .ls-link:hover { text-decoration: underline; }
+
+/* 雷神账号列表 */
+#sect-leishen .krow.top .klabel { flex: 0 0 210px; padding-right: 24px; }
+#sect-leishen .krow.top { justify-content: flex-start; }
+.ls-accounts { display: flex; flex-direction: column; gap: 0; width: 500px; min-width: 500px; }
+.ls-acc { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid var(--line); }
+.ls-acc:last-child { border-bottom: 0; }
+.ls-acc-mail { font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-acc-state { font-size: 12px; color: var(--muted); }
+.ls-acc-state.on { color: #2f9e44; }
+.ls-empty { font-size: 12px; color: var(--muted); padding: 6px 0; }
+.ls-add { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
+.ls-add .inp { width: 132px; min-width: 132px; flex: 0 0 132px; }
+.krow.top { align-items: flex-start; }
+.ls-two { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }

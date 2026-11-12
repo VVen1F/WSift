@@ -4,9 +4,10 @@
  *
  *   npm run test:e2e
  *
- * 起一个假平台（test/mock-platform.js，按前端 bundle 的真实约定回包），
- * 然后驱动真窗口走：填账号 → 图形码 → 邮箱验证码（假 IMAP）→ 换 token →
- * 拉类型/项目等级 → 生成 docx → 传图 + 传报告 → 提交。
+ * 起一个假平台（test/mock-platform.js，按实测契约回包），驱动真窗口走：
+ * 加两个账号 → 选 A 登录（图形码 + 假 IMAP 收邮箱码）→ 换 token →
+ * 拉类型 → 选账号/项目/等级 → 生成 docx → 传图 → 提交；
+ * 中途切到 B 账号，确认项目列表跟着变、只列参与中的项目。
  */
 const path = require('path');
 const fs = require('fs');
@@ -57,34 +58,80 @@ app.whenReady().then(async () => {
 
   const run = (code) => win.webContents.executeJavaScript(code, true).catch((e) => ({ error: String(e.message || e) }));
 
+  // 1) 加两个账号，分别登录
   const login = await run(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    await window.api.leishen.save({ email: 'me@qq.com', password: ${JSON.stringify(mock.PASSWORD)}, imapCode: 'imapcode', projectId: '11665' });
+    const a = await window.api.leishen.accountSave({ email: 'a@qq.com', password: ${JSON.stringify(mock.PASSWORD)}, imapCode: 'imapcode' });
+    const b = await window.api.leishen.accountSave({ email: 'b@qq.com', password: ${JSON.stringify(mock.PASSWORD)}, imapCode: 'imapcode' });
+    await lsLoadAccounts();
     document.querySelector('#navSettings').click();
     await sleep(300);
     document.querySelector('#settingsPop [data-sec="leishen"]').click();
     await sleep(500);
-    document.getElementById('btnLsLogin').click();
-    for (let i = 0; i < 50; i++) { await sleep(200); const img = document.getElementById('lsLoginCap'); if (img && img.src.startsWith('data:image')) break; }
-    document.getElementById('lsLoginCode').value = ${JSON.stringify(mock.CAPTCHA_TEXT)};
-    document.getElementById('lsLoginGo').click();
-    let token = '';
-    for (let i = 0; i < 200; i++) {
-      await sleep(500);
-      const c = await window.api.leishen.cfg();
-      if (c.token) { token = c.token; break; }
-      const note = document.getElementById('lsLoginNote').textContent;
-      if (/失败|错误|超时/.test(note) && i > 6) return { error: note };
-    }
-    await sleep(1200);
-    return { gotToken: !!token && token === ${JSON.stringify(mock.TOKEN)}, note: document.getElementById('lsLoginNote').textContent, types: (typeof LS !== 'undefined' && LS.types ? LS.types.length : -1) };
-  })()`);
-  if (!login || login.error || !login.gotToken) return fail('登录：' + JSON.stringify(login));
 
-  // 连点两下只能发一次：两个并发提交，必须一个成功一个被挡
+    const doLogin = async (id) => {
+      lsOpenLogin(id);
+      for (let i = 0; i < 60; i++) { await sleep(200); const img = document.getElementById('lsLoginCap'); if (img && img.src.startsWith('data:image')) break; }
+      document.getElementById('lsLoginCode').value = ${JSON.stringify(mock.CAPTCHA_TEXT)};
+      document.getElementById('lsLoginGo').click();
+      for (let i = 0; i < 200; i++) {
+        await sleep(500);
+        const r = await window.api.leishen.accounts();
+        const acc = (r.list || []).find((x) => x.id === id);
+        if (acc && acc.loggedIn) return true;
+        const note = document.getElementById('lsLoginNote').textContent;
+        if (/失败|错误|超时/.test(note) && i > 6) return note;
+      }
+      return 'timeout';
+    };
+
+    const ra = await doLogin(a.id);
+    const rb = await doLogin(b.id);
+    await lsLoadAccounts();
+    return { a: ra, b: rb, accounts: LS.accounts.length, rows: document.querySelectorAll('#lsAccounts .ls-acc').length, aId: a.id, bId: b.id };
+  })()`);
+  if (!login || login.error) return fail('登录：' + JSON.stringify(login));
+  if (login.a !== true || login.b !== true) return fail('两个账号没都登录上：' + JSON.stringify(login));
+  if (login.accounts !== 2 || login.rows !== 2) return fail('账号列表：' + JSON.stringify(login));
+
+  // 2) 打开提交框：账号 A 的项目只能是它参与的
+  const dialog = await run(`(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    S.reportMd = ${JSON.stringify(MD)};
+    S.images = ${JSON.stringify(images)};
+    window.__lsdbg = { accounts: (typeof LS !== 'undefined' ? LS.accounts.length : -1), accountId: (typeof LS !== 'undefined' ? LS.accountId : '?'), hasBtn: !!document.getElementById('btnSubmit') };
+    await lsOpenSubmit();
+
+    for (let i = 0; i < 100; i++) { await sleep(200); const m = document.getElementById('lsSubmitModal'); if (m && !m.hidden) break; }
+    if (document.getElementById('lsSubmitModal').hidden) return { error: '提交框没打开：' + document.getElementById('lsSubmitNote').textContent, dbg: window.__lsdbg, err: window.__err };
+    await sleep(800);
+    const opts = (sel) => Array.from(document.getElementById(sel).options).map((o) => o.value).filter(Boolean);
+    const pick = async (id) => {
+      document.getElementById('lsAccount').value = id;
+      document.getElementById('lsAccount').dispatchEvent(new Event('change', { bubbles: true }));
+      await sleep(1500);
+    };
+    const ids = Array.from(document.getElementById('lsAccount').options).map((o) => o.value).filter(Boolean);
+    await pick(ids[0]);
+    const aProjects = opts('lsProjectSel');
+    const aGrades = opts('lsGrade');
+    await pick(ids[1]);
+    const bProjects = opts('lsProjectSel');
+    await pick(ids[0]);
+    return { aProjects, bProjects, aGrades, currentProject: document.getElementById('lsProjectSel').value, note: document.getElementById('lsSubmitNote').textContent };
+  })()`);
+  if (!dialog || dialog.error) return fail('提交框：' + JSON.stringify(dialog));
+  if (!dialog.aProjects.includes('11665') || !dialog.aProjects.includes('11655')) return fail('A 的项目不对：' + JSON.stringify(dialog.aProjects));
+  if (dialog.aProjects.includes('11653')) return fail('已结束的项目不该出现：' + JSON.stringify(dialog.aProjects));
+  if (dialog.bProjects.includes('11655')) return fail('B 不该看到 11655：' + JSON.stringify(dialog.bProjects));
+  if (!dialog.bProjects.includes('11665')) return fail('B 看不到 11665：' + JSON.stringify(dialog.bProjects));
+  if (dialog.aGrades.length < 2) return fail('A 的等级没拉到：' + JSON.stringify(dialog.aGrades));
+
+  // 3) 连点两下只能发一次
   const race = await run(`(async () => {
     const payload = {
       draft: true,
+      accountId: ${JSON.stringify(login.aId)},
       reportMarkdown: '标题\\n\\n正文一段',
       fields: { title: '并发测试', grade: 'high', bugtype: 'SQL注入', projectId: '11665', url: 'https://x/y?id=1', describe: '描述', danger: '危害', detailHtml: '正文', repair: '修复', judgeBasis: '依据' },
       images: [],
@@ -96,30 +143,26 @@ app.whenReady().then(async () => {
     } catch (e) {
       return { threw: String((e && e.message) || e) };
     }
-    return { okCount: out.filter((x) => x && x.ok).length, blocked: out.filter((x) => x && /别重复点|还在提交/.test(x.error || '')).length, errors: out.map((x) => x && x.error), out };
+    return { okCount: out.filter((x) => x && x.ok).length, blocked: out.filter((x) => x && /别重复点|还在提交/.test(x.error || '')).length, errors: out.map((x) => x && x.error) };
   })()`);
   if (!race || race.okCount !== 1 || race.blocked !== 1) return fail('连点保护：' + JSON.stringify(race));
 
+  // 4) 正常提交
   const submit = await run(`(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    S.reportMd = ${JSON.stringify(MD)};
-    S.images = ${JSON.stringify(images)};
-    document.getElementById('btnSubmit').click();
-    for (let i = 0; i < 80; i++) { await sleep(200); const m = document.getElementById('lsSubmitModal'); if (m && !m.hidden) break; }
-    if (document.getElementById('lsSubmitModal').hidden) return { error: '提交框没打开：' + document.getElementById('lsSubmitNote').textContent };
-    const grades = Array.from(document.getElementById('lsGrade').options).map((o) => o.value);
-    const projectOptions = Array.from(document.querySelectorAll('#lsProjectOptions option')).map((o) => ({ id: o.value, name: o.textContent }));
-    const types = Array.from(document.getElementById('lsType').options).map((o) => o.value).filter(Boolean);
+    document.getElementById('lsProjectSel').value = '11665';
+    document.getElementById('lsProjectSel').dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(800);
     document.getElementById('lsSubmitCode').value = ${JSON.stringify(mock.CAPTCHA_TEXT)};
     document.getElementById('lsSubmitBtn').click();
     let note = '';
     for (let i = 0; i < 120; i++) {
       await sleep(500);
       note = document.getElementById('lsSubmitNote').textContent;
-      if (document.getElementById('lsSubmitModal').hidden) return { ok: true, grades, types, projectOptions };
-      if (note && !/提交中|上传|生成 docx/.test(note)) return { ok: false, error: note, grades, types };
+      if (document.getElementById('lsSubmitModal').hidden) return { ok: true };
+      if (note && !/提交中|上传|生成 docx/.test(note)) return { ok: false, error: note };
     }
-    return { ok: false, error: '超时：' + note, grades, types };
+    return { ok: false, error: '超时：' + note };
   })()`);
   if (!submit || !submit.ok) return fail('提交：' + JSON.stringify(submit));
 
@@ -134,13 +177,12 @@ app.whenReady().then(async () => {
   if (!detail.startsWith('[[\u00a7p\u00a7]]')) problems.push('正文编码不对');
   if (!detail.includes('[[\u00a7img src=')) problems.push('正文里没有图片');
   if (!sent.judgeBasis) problems.push('没有自评依据');
-  const picked = (submit.projectOptions || []).map((x) => x.id);
-  if (!picked.includes('11665')) problems.push('项目候选里没有 11665：' + picked.join(','));
-  if (picked.includes('11653')) problems.push('已结束的项目不该出现在候选里');
   if (!sent.checkCode) problems.push('没有验证码');
+  if (String(sent.projectid) !== '11665') problems.push('项目 id 不对：' + sent.projectid);
   if (problems.length) return fail(problems.join('；'));
 
-  console.log('E2E 通过：登录 → 类型 ' + login.types + ' 个 → 项目等级 ' + submit.grades.join('/') +
-    ' → 传图 2 张 → docx 报告 ' + sent.holeReport + ' → 提交成功（' + String(sent.holetitle).slice(0, 20) + '…）');
+  console.log('E2E 通过：两个账号 → A 登录 → A 项目 ' + dialog.aProjects.join('/') +
+    ' → B 项目 ' + dialog.bProjects.join('/') + ' → 等级 ' + dialog.aGrades.join('/') +
+    ' → 传图 2 张 → docx 报告 → 提交成功（' + String(sent.holetitle).slice(0, 16) + '…）');
   app.exit(0);
 });

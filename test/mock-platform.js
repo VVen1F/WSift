@@ -17,6 +17,12 @@ const PORT = Number(process.env.MOCK_PORT || 8199);
 const IMAP_PORT = Number(process.env.MOCK_IMAP_PORT || 9993);
 const PASSWORD = process.env.MOCK_PASSWORD || 'mock-password';
 const TOKEN = 'mock-' + 'token-123';
+const TOKEN_B = 'mock-' + 'token-456';
+// 账号 -> 参与的项目（只有参与过的项目才查得到等级）
+const ACCOUNTS = {
+  [TOKEN]: { email: 'a@qq.com', projects: [11665, 11655] },
+  [TOKEN_B]: { email: 'b@qq.com', projects: [11665] }
+};
 const CAPTCHA_TEXT = process.env.MOCK_CAPTCHA || '1234';
 
 const state = {
@@ -40,7 +46,11 @@ function json(res, payload, code = 200) {
 
 function authOk(req) {
   const t = req.headers.authorization || '';
-  return t === TOKEN;
+  return !!ACCOUNTS[t];
+}
+
+function accountOf(req) {
+  return ACCOUNTS[req.headers.authorization || ''] || null;
 }
 
 function readBody(req) {
@@ -97,7 +107,8 @@ const server = http.createServer(async (req, res) => {
     if (String(data.checkcode || '') !== state.mailCode) {
       return json(res, { errcode: '200', errmsg: '邮箱验证码错误' });
     }
-    return json(res, { errcode: '0', errmsg: 'success', ret: { token: TOKEN, email: data.email } });
+    const tok = String(data.email || '').startsWith('b@') ? TOKEN_B : TOKEN;
+    return json(res, { errcode: '0', errmsg: 'success', ret: { token: tok, email: data.email } });
   }
 
   // 以下都要登录
@@ -115,7 +126,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p.startsWith('/setHole/getHoleLevel/')) {
-    if (!authOk(req)) return json(res, { errcode: '200', errmsg: '权限鉴定失败' });
+    const acc = accountOf(req);
+    if (!acc) return json(res, { errcode: '200', errmsg: '权限鉴定失败' });
+    const pid = Number(p.split('/').pop());
+    if (!acc.projects.includes(pid)) return json(res, { errcode: 200, errmsg: '无权操作', ret: null });
     // 真平台成功就是 errcode 0 +「成功」；没参与的账号会回 200 +「无权操作」
     return json(res, {
       errcode: '0',
@@ -129,17 +143,15 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p === '/project/getpersonalprojectList') {
-    if (!authOk(req)) return json(res, { errcode: '200', errmsg: '权限鉴定失败' });
-    return json(res, {
-      errcode: '0',
-      ret: {
-        total: 2,
-        data: [
-          { id: '11665', name: '测试项目（进行中）', states: 'doing' },
-          { id: '11653', name: '已结束的项目', states: 'finish' }
-        ]
-      }
-    });
+    const acc = accountOf(req);
+    if (!acc) return json(res, { errcode: '200', errmsg: '权限鉴定失败' });
+    const rows = acc.projects.map((id) => ({
+      id: String(id),
+      name: id === 11665 ? '测试项目（进行中）' : '账号 ' + acc.email + ' 参与的项目 ' + id,
+      states: 'doing'
+    }));
+    rows.push({ id: '11653', name: '已结束的项目', states: 'stop' });
+    return json(res, { errcode: '0', errmsg: '成功', ret: { total: rows.length, data: rows } });
   }
 
   if (p === '/project/getProjectdetail') {

@@ -740,18 +740,100 @@ function lsNote(event, note) {
   if (event && !event.sender.isDestroyed()) event.sender.send(LS_PROGRESS, { note });
 }
 
+/* ---------------- 雷神众测：账号 ---------------- */
+
+/** 账号列表。老版本只有一个账号，第一次读时迁移过来。 */
+function lsAccounts() {
+  const cfg = lsCfg();
+  let list = Array.isArray(cfg.accounts) ? cfg.accounts.filter((a) => a && a.email) : [];
+  if (!list.length && cfg.email) {
+    list = [{
+      id: 'acc-legacy',
+      email: cfg.email,
+      password: cfg.password || '',
+      imapCode: cfg.imapCode || '',
+      token: cfg.token || '',
+      tokenAt: cfg.tokenAt || '',
+      grades: cfg.grades || {}
+    }];
+    lsSave({ accounts: list, email: '', password: '', imapCode: '', token: '', tokenAt: '', grades: {} });
+  }
+  return list;
+}
+
+function lsAccount(id) {
+  const list = lsAccounts();
+  if (!list.length) return null;
+  if (!id) return list.find((a) => a.id === lsCfg().lastAccountId) || list[0];
+  return list.find((a) => a.id === id) || null;
+}
+
+function lsAnyToken() {
+  const acc = lsAccounts().find((a) => a.token);
+  return acc ? acc.token : '';
+}
+
+function lsUpdateAccount(id, patch) {
+  const list = lsAccounts();
+  const idx = list.findIndex((a) => a.id === id);
+  if (idx < 0) return null;
+  list[idx] = Object.assign({}, list[idx], patch || {});
+  lsSave({ accounts: list });
+  return list[idx];
+}
+
+function lsPublic(acc) {
+  return {
+    id: acc.id,
+    email: acc.email,
+    imapCode: acc.imapCode || '',
+    password: acc.password || '',
+    loggedIn: !!acc.token,
+    tokenAt: acc.tokenAt || ''
+  };
+}
+
+ipcMain.handle('leishen:accounts', () => {
+  const list = lsAccounts();
+  return { ok: true, list: list.map(lsPublic), lastAccountId: lsCfg().lastAccountId || (list[0] && list[0].id) || '' };
+});
+
+ipcMain.handle('leishen:account:save', (_e, payload) => {
+  const p = payload || {};
+  const email = String(p.email || '').trim();
+  if (!email) return { ok: false, error: '邮箱不能为空' };
+  const list = lsAccounts();
+  const exist = p.id ? list.find((a) => a.id === p.id) : list.find((a) => a.email === email);
+  if (exist) {
+    lsUpdateAccount(exist.id, {
+      email,
+      password: p.password !== undefined ? String(p.password) : exist.password,
+      imapCode: p.imapCode !== undefined ? String(p.imapCode) : exist.imapCode
+    });
+    return { ok: true, id: exist.id, updated: true };
+  }
+  const id = 'acc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  list.push({ id, email, password: String(p.password || ''), imapCode: String(p.imapCode || ''), token: '', tokenAt: '', grades: {} });
+  lsSave({ accounts: list, lastAccountId: id });
+  return { ok: true, id, created: true };
+});
+
+ipcMain.handle('leishen:account:remove', (_e, id) => {
+  const list = lsAccounts().filter((a) => a.id !== id);
+  lsSave({ accounts: list });
+  if (lsCfg().lastAccountId === id) lsSave({ lastAccountId: (list[0] && list[0].id) || '' });
+  return { ok: true };
+});
+
 ipcMain.handle('leishen:cfg', () => {
   const c = lsCfg();
+  const list = lsAccounts();
   return {
     ok: true,
-    email: c.email || '',
-    password: c.password || '',
-    imapCode: c.imapCode || '',
-    token: c.token || '',
-    tokenAt: c.tokenAt || '',
-    projectId: c.projectId || '',
     bugtype: c.bugtype || '',
-    loggedIn: !!c.token
+    projectId: c.projectId || '',
+    lastAccountId: c.lastAccountId || (list[0] && list[0].id) || '',
+    accounts: list.map(lsPublic)
   };
 });
 
@@ -760,9 +842,10 @@ ipcMain.handle('leishen:save', (_e, patch) => {
   return { ok: true };
 });
 
-ipcMain.handle('leishen:logout', () => {
-  lsSave({ token: '', tokenAt: '' });
-  lsTypesCache = { at: 0, token: '', list: [] };
+ipcMain.handle('leishen:logout', (_e, accountId) => {
+  const acc = lsAccount(accountId);
+  if (acc) lsUpdateAccount(acc.id, { token: '', tokenAt: '' });
+  lsTypesCache = { at: 0, list: [] };
   return { ok: true };
 });
 
@@ -777,12 +860,13 @@ ipcMain.handle('leishen:captcha', async () => {
 
 async function lsDoLogin(event, payload) {
   const p = payload || {};
-  const cfg = lsCfg();
-  const email = String(p.email || cfg.email || '').trim();
-  const password = String(p.password || cfg.password || '');
-  const imapCode = String(p.imapCode || cfg.imapCode || '');
-  if (!email || !password) return { ok: false, error: '先在设置里填平台账号和密码' };
-  if (!imapCode) return { ok: false, error: '还要填 QQ 邮箱授权码（邮箱设置里生成）' };
+  const acc = lsAccount(p.accountId);
+  if (!acc) return { ok: false, error: '先添加一个账号' };
+  const email = String(acc.email || '').trim();
+  const password = String(acc.password || '');
+  const imapCode = String(acc.imapCode || '');
+  if (!email || !password) return { ok: false, error: '这个账号还没填密码' };
+  if (!imapCode) return { ok: false, error: '这个账号还没填 QQ 邮箱授权码' };
   if (!p.code || !p.text) return { ok: false, retry: true, error: '图形验证码没填' };
   try {
     lsNote(event, '取邮箱里最新一封');
@@ -796,11 +880,12 @@ async function lsDoLogin(event, payload) {
     });
     lsNote(event, '换 token');
     const token = await leishen.loginWithCode({ email, password, checkcode: mailCode });
-    lsSave({ email, password, imapCode, token, tokenAt: new Date().toISOString() });
+    lsUpdateAccount(acc.id, { token, tokenAt: new Date().toISOString() });
+    lsSave({ lastAccountId: acc.id });
     lsNote(event, '登录成功');
-    return { ok: true, token };
+    return { ok: true, token, accountId: acc.id };
   } catch (e) {
-    if (e.code === 'AUTH') lsSave({ token: '' });
+    if (e.code === 'AUTH') lsUpdateAccount(acc.id, { token: '' });
     return { ok: false, error: e.message, retry: e.code === 'LOGIN' || e.code === 'CAPTCHA' };
   }
 }
@@ -839,78 +924,81 @@ ipcMain.handle('leishen:loginAuto', async (event, payload) => {
 
 ipcMain.handle('leishen:types', async (_e, opts) => {
   const force = !!(opts && opts.force);
-  const cfg = lsCfg();
-  if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };
+  const token = lsAnyToken();
+  if (!token) return { ok: false, auth: true, error: '先登录雷神众测' };
   if (!force && lsTypesCache.list.length && Date.now() - lsTypesCache.at < 10 * 60 * 1000) {
     return { ok: true, list: lsTypesCache.list, cached: true };
   }
   try {
-    const list = await leishen.bugTypes(cfg.token);
-    lsTypesCache = { at: Date.now(), token: cfg.token, list };
+    const list = await leishen.bugTypes(token);
+    lsTypesCache = { at: Date.now(), list };
     return { ok: true, list };
   } catch (e) {
     if (e.code === 'AUTH') {
-      lsSave({ token: '' });
+      const acc = lsAccounts().find((a) => a.token === token);
+      if (acc) lsUpdateAccount(acc.id, { token: '', tokenAt: '' });
       return { ok: false, auth: true, error: '登录已失效，重新登录' };
     }
     return { ok: false, error: e.message };
   }
 });
 
-ipcMain.handle('leishen:projects', async () => {
-  const cfg = lsCfg();
-  if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };
+/** 这个账号参与中、能提交的项目（只看 apply/doing）。 */
+ipcMain.handle('leishen:projects', async (_e, accountId) => {
+  const acc = lsAccount(accountId);
+  if (!acc) return { ok: false, error: '还没有账号' };
+  if (!acc.token) return { ok: false, auth: true, error: '这个账号还没登录' };
   try {
-    const list = await leishen.myProjects(cfg.token).catch(() => []);
-    return { ok: true, list };
+    const list = await leishen.myProjects(acc.token);
+    return { ok: true, accountId: acc.id, list };
   } catch (e) {
     if (e.code === 'AUTH') {
-      lsSave({ token: '' });
+      lsUpdateAccount(acc.id, { token: '', tokenAt: '' });
       return { ok: false, auth: true, error: '登录已失效，重新登录' };
     }
     return { ok: false, error: e.message };
   }
 });
 
-ipcMain.handle('leishen:project', async (_e, projectId) => {
-  const cfg = lsCfg();
-  if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };
-  const id = String(projectId || '').trim();
+ipcMain.handle('leishen:project', async (_e, payload) => {
+  const p = payload || {};
+  const acc = lsAccount(p.accountId);
+  const id = String(p.projectId || '').trim();
+  if (!acc) return { ok: false, error: '还没有账号' };
+  if (!acc.token) return { ok: false, auth: true, error: '这个账号还没登录' };
   if (!id) return { ok: false, error: '项目 ID 是空的' };
   try {
     // 项目详情可能查不到（没参与），但等级只要账号参与过就能查，所以分开来
     let detail = { name: '', template: '' };
     try {
-      detail = await leishen.projectDetail(cfg.token, id);
+      detail = await leishen.projectDetail(acc.token, id);
     } catch (e) {
       if (e.code === 'AUTH') throw e;
     }
-    const cache = (cfg.grades && cfg.grades[id]) || null;
+    const cache = (acc.grades && acc.grades[id]) || null;
     const fresh = cache && Date.now() - Number(cache.at || 0) < 6 * 3600 * 1000;
     let levels = fresh ? cache.rows || [] : [];
     let fromCache = levels.length > 0;
     let levelsError = '';
     if (!levels.length) {
       try {
-        levels = await leishen.projectLevels(cfg.token, id);
+        levels = await leishen.projectLevels(acc.token, id);
       } catch (e) {
         if (e.code === 'AUTH') throw e;
         levels = [];
         levelsError = e.message || '';
       }
       if (levels.length) {
-        const grades = Object.assign({}, cfg.grades || {}, { [id]: { rows: levels, at: Date.now() } });
-        lsSave({ grades });
+        lsUpdateAccount(acc.id, { grades: Object.assign({}, acc.grades || {}, { [id]: { rows: levels, at: Date.now() } }) });
       } else if (cache && cache.rows && cache.rows.length) {
-        // 项目已结束会返回「无权操作」，这时用上次缓存
         levels = cache.rows;
         fromCache = true;
       }
     }
-    return { ok: true, name: detail.name, template: detail.template, levels, fromCache, levelsError };
+    return { ok: true, name: detail.name, template: detail.template, levels, fromCache, levelsError, accountId: acc.id };
   } catch (e) {
     if (e.code === 'AUTH') {
-      lsSave({ token: '' });
+      lsUpdateAccount(acc.id, { token: '', tokenAt: '' });
       return { ok: false, auth: true, error: '登录已失效，重新登录' };
     }
     return { ok: false, error: e.message };
@@ -941,8 +1029,9 @@ let lsSubmitting = false;
 
 ipcMain.handle('leishen:submit', async (event, payload) => {
   const p = payload || {};
-  const cfg = lsCfg();
-  if (!cfg.token) return { ok: false, auth: true, error: '先登录雷神众测' };
+  const acc = lsAccount(p.accountId);
+  if (!acc) return { ok: false, error: '先添加一个账号' };
+  if (!acc.token) return { ok: false, auth: true, error: '这个账号还没登录' };
   const fields = leishen.makeFields(p.fields || {});
   if (!fields.holetitle) return { ok: false, error: '标题不能为空' };
   if (!fields.bugtype) return { ok: false, error: '没选漏洞类型' };
@@ -970,16 +1059,16 @@ ipcMain.handle('leishen:submit', async (event, payload) => {
       return { ok: false, error: '没有报告正文，先生成报告再提交' };
     }
     lsNote(event, (p.draft ? '存草稿' : '提交') + '：上传正文图片');
-    const body = await leishen.buildDetail(cfg.token, fields, p.images || [], { reportBytes, reportName });
+    const body = await leishen.buildDetail(acc.token, fields, p.images || [], { reportBytes, reportName });
     body.checkCode = String(p.captcha.text);
     body.code = String(p.captcha.code);
     lsNote(event, p.draft ? '存草稿中' : '提交中');
-    const res = await leishen.submit(cfg.token, body, !!p.draft);
-    lsSave({ projectId: fields.projectid, bugtype: fields.bugtype });
-    return { ok: true, draft: !!p.draft, payload: { errcode: res.errcode, errmsg: res.errmsg } };
+    const res = await leishen.submit(acc.token, body, !!p.draft);
+    lsSave({ projectId: fields.projectid, bugtype: fields.bugtype, lastAccountId: acc.id });
+    return { ok: true, draft: !!p.draft, accountId: acc.id, payload: { errcode: res.errcode, errmsg: res.errmsg } };
   } catch (e) {
     if (e.code === 'AUTH') {
-      lsSave({ token: '' });
+      lsUpdateAccount(acc.id, { token: '', tokenAt: '' });
       return { ok: false, auth: true, error: '登录已失效，重新登录' };
     }
     const msg = String(e.message || '提交失败');

@@ -42,14 +42,17 @@ const DEFAULTS = {
   report: { author: '', platform: '通用', language: 'zh' },
   // 雷神众测：登录态 + 提交默认值（token 会过期，登录后自动写回）
   leishen: {
+    accounts: [],       // [{ id, email, password, imapCode, token, tokenAt, grades }]
+    lastAccountId: '',
+    projectId: '',
+    bugtype: '',
+    // 下面几个是单账号时代的字段，只在迁移老数据时用
     email: '',
     password: '',
     imapCode: '',
     token: '',
     tokenAt: '',
-    projectId: '',
-    bugtype: '',
-    grades: {}          // 项目 id -> { rows: [{code,name}], at }，6 小时过期
+    grades: {}
   },
   ui: {
     theme: 'system',

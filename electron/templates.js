@@ -43,8 +43,18 @@ function saveAll(list) {
   return list;
 }
 
-function list() {
+/**
+ * 第一次运行（还没有 templates.json）时把内置模板写进去。
+ * 之后即使用户删掉了也不补，尊重用户的选择。
+ */
+function ensurePresets() {
+  if (fs.existsSync(file())) return loadAll();
+  saveAll(PRESETS.map((t) => ({ ...t })));
   return loadAll();
+}
+
+function list() {
+  return ensurePresets();
 }
 
 function upsert(tpl) {

@@ -59,6 +59,7 @@ const DEFAULTS = {
     shotWidth: 1600,
     shotDir: '',
     autoShot: false,
+    replayShot: true,   // 生成报告截图时，没有响应原文就重放一次数据包
     protocol: 'auto',
     remotePort: 8765,
     proxy: '',

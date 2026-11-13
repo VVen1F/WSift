@@ -740,6 +740,7 @@ ipcMain.handle('report:autoShots', async (event, payload) => {
   const md = String((payload && payload.markdown) || '');
   const material = String((payload && payload.material) || '');
   const width = Number(payload && payload.width) || 1600;
+  const allowReplay = !payload || payload.allowReplay !== false;
   const lines = md.split('\n');
   const blocks = report.packetBlocks(lines);
   if (!blocks.length) return { ok: true, files: [], md, count: 0 };
@@ -767,9 +768,18 @@ ipcMain.handle('report:autoShots', async (event, payload) => {
     // 正文里没有响应，就去材料（用户粘贴的原文）里找第一段 HTTP 响应
     if (!response && responses.length) response = responses[i] || responses[0];
     let ms = 0;
-    if (!response && /^(GET|HEAD|OPTIONS)$/.test(method)) {
+    // 没有响应原文时重放一次：GET/HEAD/OPTIONS 一直重放；其他方法看设置（默认也重放，
+    // 否则 POST 的截图只有请求没有响应，等于报告缺了一半证据）
+    const replayable = /^(GET|HEAD|OPTIONS)$/.test(method) || allowReplay;
+    if (!response && replayable) {
       try {
-        const r = await http.send(raw, { timeout: 30 });
+        const m = /^Host:\s*([^\r\n]+)/im.exec(raw);
+        const host = (m ? m[1] : '').trim();
+        const port = (/^[^:]+:(\d+)$/.exec(host) || [])[1];
+        let scheme = 'https';
+        if (/^(localhost|127\.0\.0\.1|\[::1\])/i.test(host)) scheme = 'http';
+        else if (port && ['80', '8080', '8000', '8888', '3000', '5000'].includes(port)) scheme = 'http';
+        const r = await http.send(raw, { timeout: 30, scheme });
         response = r.text || '';
         ms = r.ms || 0;
       } catch (e) {

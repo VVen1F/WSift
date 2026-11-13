@@ -1191,7 +1191,9 @@ textarea.inp {
 .task-del:hover { color: var(--danger); }
 .task-clear {
   flex: 0 0 auto;
-  margin: 2px 6px 6px;
+  /* 和列表行同一条左边界和宽度，不再是个飘着的小胶囊 */
+  margin: 4px 8px 8px 16px;
+  align-self: stretch;
   border: 0;
   background: none;
   text-align: left;

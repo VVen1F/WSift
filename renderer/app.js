@@ -969,6 +969,7 @@ async function autoShootTask(task, markdown) {
     const r = await window.api.autoShots({
       markdown: text,
       material: (task && task.detail) || '',
+      allowReplay: !S.settings.ui || S.settings.ui.replayShot !== false,
       width: Number(S.settings.ui && S.settings.ui.shotWidth) || 1600
     });
     if (!r || !r.ok || !r.files || !r.files.length) return null;
@@ -2599,6 +2600,7 @@ async function bindSettingsPage(ri) {
 
   $('#setWidth').value = ui.shotWidth || 1600;
   sw('setAutoShot', ui.autoShot !== false);
+  sw('setReplayShot', ui.replayShot !== false);
   $('#setProtocol').value = ui.protocol || 'auto';
   sw('setConfirmQuit', !!ui.confirmQuit);
   sw('setWithKeys', !!bk.withKeys);
@@ -2632,6 +2634,7 @@ async function bindSettingsPage(ri) {
     paintShotDir();
   }
   bindSwitch('setAutoShot', (on) => { S.settings.ui.autoShot = on; });
+  bindSwitch('setReplayShot', (on) => { S.settings.ui.replayShot = on; });
   $('#setProtocol').addEventListener('change', (e) => {
     S.settings.ui.protocol = e.target.value;
     $('#protocol').value = e.target.value;

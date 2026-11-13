@@ -726,6 +726,7 @@ ipcMain.handle('templates:presets', () => templates.PRESETS);
 ipcMain.handle('templates:upsert', (_e, t) => templates.upsert(t));
 ipcMain.handle('templates:remove', (_e, id) => templates.remove(id));
 ipcMain.handle('templates:reset', () => templates.reset());
+ipcMain.handle('templates:restore', () => templates.restorePresets());
 
 ipcMain.handle('tasks:list', () => tasks.load());
 ipcMain.handle('tasks:save', (_e, list) => tasks.saveAll(list));

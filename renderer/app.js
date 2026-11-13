@@ -2799,6 +2799,24 @@ function bindPerm() {
     await refreshPerm();
     toast('权限：' + $('#permText').textContent);
   });
+
+  const restore = $('#btnTplRestore');
+  if (restore) {
+    restore.addEventListener('click', () => {
+      openConfirm({
+        title: '恢复默认模板',
+        text: '内置的雷神众测模板会恢复成初始内容，你改过的部分会被覆盖。自己新建或导入的模板不受影响。',
+        ok: '恢复',
+        run: async () => {
+          await window.api.templates.restore();
+          S.templates = await window.api.templates.list();
+          if (typeof renderTplList === 'function') renderTplList();
+          if (typeof fillTemplateSelect === 'function') fillTemplateSelect();
+          toast('已恢复内置模板');
+        }
+      });
+    });
+  }
   const go = $('#permGo');
   if (go) {
     go.addEventListener('click', async () => {

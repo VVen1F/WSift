@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('api', {
     upsert: (t) => ipcRenderer.invoke('templates:upsert', t),
     remove: (id) => ipcRenderer.invoke('templates:remove', id),
     reset: () => ipcRenderer.invoke('templates:reset'),
+    restore: () => ipcRenderer.invoke('templates:restore'),
     check: (body) => ipcRenderer.invoke('templates:check', body),
     presets: () => ipcRenderer.invoke('templates:presets')
   },

@@ -82,6 +82,15 @@ function ok(name, cond, extra) {
     // 用户删掉之后不再自动补回来
     templates.remove('preset-leishen');
     ok('删掉内置模板后不再自动补', templates.list().length === 0);
+    templates.upsert({ id: 'mine', name: '我的模板', platform: '自定义', body: '漏洞标题' });
+    templates.upsert({ id: 'preset-leishen', name: '雷神众测', platform: '雷神众测', body: '被改坏的正文' });
+    const restored = templates.restorePresets();
+    const back = restored.find((t) => t.id === 'preset-leishen');
+    const keptMine = restored.find((t) => t.id === 'mine');
+    ok('恢复默认模板只重置内置模板', !!back && templates.PRESETS[0].body === back.body);
+    ok('恢复默认模板不动自定义模板', !!keptMine && keptMine.name === '我的模板');
+    const uiHtml = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'index.html'), 'utf8');
+    ok('设置里有恢复默认模板', uiHtml.includes('id="btnTplRestore"') && uiHtml.includes('恢复默认模板'));
   {
     const rpt = require(path.join(__dirname, '..', 'electron', 'report.js'));
     ok('模板模式要求照抄字段名', /漏洞标题/.test(rpt.FOLLOW_TEMPLATE) && /自评依据/.test(rpt.FOLLOW_TEMPLATE) && /紧急/.test(rpt.FOLLOW_TEMPLATE));
@@ -284,7 +293,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('品牌与 appId 是 WSift', pkg.productName === 'WSift' && pkg.build.productName === 'WSift' && pkg.build.appId === 'com.wenyifan.wsift');
-  ok('版本 0.8.8', pkg.version === '0.8.8');
+  ok('版本 0.8.9', pkg.version === '0.8.9');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');

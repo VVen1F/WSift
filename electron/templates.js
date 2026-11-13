@@ -83,6 +83,13 @@ function reset() {
   return saveAll([]);
 }
 
+/** 恢复内置模板：只重置 preset-* 那几条，用户自己建/导入的不动。 */
+function restorePresets() {
+  const mine = loadAll().filter((t) => !String(t.id || '').startsWith('preset-'));
+  saveAll(mine.concat(PRESETS.map((t) => ({ ...t }))));
+  return loadAll();
+}
+
 const KNOWN_VARS = [
   'title', 'type', 'level', 'url', 'date', 'description', 'steps',
   'impact', 'fix', 'account', 'author', 'product'
@@ -116,4 +123,4 @@ function checkVars(body) {
   return { ok: !unclosed && unknown.length === 0, unclosed, unknown: [...new Set(unknown)] };
 }
 
-module.exports = { list, upsert, remove, reset, checkVars, KNOWN_VARS, nameFromFile, file, PRESETS };
+module.exports = { list, upsert, remove, reset, restorePresets, checkVars, KNOWN_VARS, nameFromFile, file, PRESETS };

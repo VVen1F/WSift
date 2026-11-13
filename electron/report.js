@@ -130,6 +130,22 @@ function toPlain(markdown) {
   s = s.replace(/^\|(.+)\|\s*$/gm, (_, inner) => inner.split('|').map((c) => c.trim()).filter(Boolean).join('  '));
   // 模型爱在「自评依据」开头再写一遍等级（中危：…），跟上面的等级行重复，这里去掉
   s = s.replace(/((?:漏洞)?等级自评依据\s*[:：]?[ \t]*\n?[ \t]*)(紧急|严重|高危|中危|低危)[ \t]*[:：][ \t]*/g, '$1');
+  // 模板里的说明文字/占位符被模型原样抄进报告，导出前整行删掉
+  const BOILER = [
+    /^描述\*?\s*[：:]?\s*请明确(的)?写出/,        // 「描述* 请明确的写出…」
+    /^请明确(的)?写出.*重现该漏洞/,
+    /^请记住[，,]\s*您提供的详细信息/,
+    /^\[添加[^\]]*\]$/,                            // 只删整行占位符
+    /^【[^】]*】$/,
+    /^提示\s*[：:]\s*准确输入自评依据/,
+    /^格式参考\s*[：:]/,
+    /^格式要求\s*[：:]/,
+    /^漏洞提交模板$/,
+  ];
+  s = s.split('\n').filter((line) => {
+    const t = line.trim();
+    return !(t && BOILER.some((re) => re.test(t)));
+  }).join('\n');
   const lines = s.split('\n');
   if (lines[0]) lines[0] = lines[0].replace(/[\s]*复测\s*$/g, '').trim();
   s = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -177,6 +193,14 @@ function packetBlocks(lines) {
   return blocks;
 }
 
+/** 去掉正文里已有的图片占位行（重复导出时不会叠两层）。 */
+function stripImageLinks(md) {
+  return String(md || '')
+    .split('\n')
+    .filter((line) => !/^!\[\]\(images\/[^)]+\)$/.test(line.trim()))
+    .join('\n');
+}
+
 /** 每张图插到对应数据包下面；包不够就把剩下的排在文末。 */
 function placeImages(md, names) {
   const links = (names || []).map((n) => `![](images/${n})`);
@@ -212,7 +236,7 @@ function bundle({ markdown, images = [], title = '' }) {
     files.push({ name: `${root}/images/${name}`, data: fs.readFileSync(src) });
   }
 
-  const body = toPlain(String(markdown || '').replace(/\n*## 截图[\s\S]*$/, ''));
+  const body = toPlain(stripImageLinks(String(markdown || '').replace(/\n*## 截图[\s\S]*$/, '')));
   const md = (names.length ? placeImages(body, names) : body).replace(/\s+$/, '') + '\n';
   files.unshift({ name: `${root}/report.md`, data: Buffer.from(md, 'utf8') });
   return { root, markdown: md, files, names };
@@ -258,6 +282,7 @@ function save({ markdown, images = [], title = '', baseDir }) {
 
 module.exports = {
   placeImages,
+  stripImageLinks,
   packetBlocks,
   SYSTEM_PROMPT,
   FOLLOW_TEMPLATE,

@@ -1,7 +1,7 @@
 {
   "name": "wsift",
   "productName": "WSift",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "WSift — Security Testing Workspace：本地漏洞复测、证据管理与报告交付工作台",
   "main": "electron/main.js",
   "author": "WenYifan",

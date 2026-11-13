@@ -102,6 +102,8 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   saveReport: (payload) => ipcRenderer.invoke('report:save', payload),
+  autoShots: (payload) => ipcRenderer.invoke('report:autoShots', payload),
+  onProgress: (fn) => ipcRenderer.on('report:progress', (_e, p) => fn(p)),
   tasks: {
     list: () => ipcRenderer.invoke('tasks:list'),
     save: (list) => ipcRenderer.invoke('tasks:save', list)

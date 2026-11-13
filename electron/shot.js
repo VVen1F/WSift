@@ -39,12 +39,17 @@ async function capture({ request, response, width = 1600, out, ms }) {
     await win.webContents.executeJavaScript(
       `window.render(${JSON.stringify({ request: request || '', response: body, ms: realMs, bytes })})`
     );
+    // 没有响应（例如 POST 不重放）就只渲染请求面板，别留一半空白
+    const solo = !body.trim();
+    if (solo) await win.webContents.executeJavaScript("document.body.classList.add('solo')");
 
     const height = await win.webContents.executeJavaScript(
       'Math.ceil(document.documentElement.getBoundingClientRect().height)'
     );
-    // 高度有上下限：短响应不留一条窄图，长 body 也不整段铺开
-    const h = Math.max(MIN_HEIGHT, Math.min(Number(height) || MIN_HEIGHT, MAX_HEIGHT));
+    // 高度有上下限：短响应不留一条窄图，长 body 也不整段铺开；只有请求时按内容高度裁
+    const lo = solo ? 240 : MIN_HEIGHT;
+    const hi = solo ? 900 : MAX_HEIGHT;
+    const h = Math.max(lo, Math.min(Number(height) || lo, hi));
     win.setContentSize(width, h);
     // 定高之后让窗口撑满，状态栏贴底
     await win.webContents.executeJavaScript("document.body.classList.add('fitted')");

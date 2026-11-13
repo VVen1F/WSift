@@ -403,21 +403,37 @@ function mdTitle(md) {
   const lines = String(md || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   const clean = (line) => line
     .replace(/^#+\s*/, '')
-    // 模型爱把字段名写进标题，去掉这些前缀
     .replace(/^(漏洞名称|报告名称|标题|名称)\s*[:：]\s*/, '')
     .replace(/[\s]*复测\s*$/g, '')
     .replace(/[\\/:*?"<>|]/g, '')
     .trim()
     .slice(0, 80);
-  // 模板一般有「漏洞名称：xxx」，直接用它，别再拿「漏洞报告」这种小标题当文件名
+  const LABEL = /^(漏洞标题|漏洞名称|报告名称|标题|名称)\s*[:：]?\s*$/;
+  const generic = /^(漏洞报告|漏洞详情|报告|复测|漏洞|详情|漏洞提交模板)$/;
+  // 优先取「漏洞标题」后面的那行（模板里标题和值是分行的）
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^(漏洞标题|漏洞名称|报告名称|标题|名称)\s*[:：]?\s*$/.test(lines[i])) continue;
+    const next = lines[i + 1];
+    if (next && !LABEL.test(next) && !generic.test(next)) {
+      const t = clean(next);
+      if (t) return t;
+    }
+  }
   const named = lines.find((l) => /^(漏洞名称|报告名称|标题|名称)\s*[:：]\s*\S/.test(l));
   if (named) {
     const t = clean(named);
     if (t) return t;
   }
-  const generic = /^(漏洞报告|漏洞详情|报告|复测|漏洞|详情)$/;
-  const first = lines.map((l) => l.replace(/^#+\s*/, '')).find((l) => l && !generic.test(l)) || '';
+  const first = lines
+    .map((l) => l.replace(/^#+\s*/, ''))
+    .find((l) => l && !generic.test(l) && !LABEL.test(l)) || '';
   return clean(first) || '报告';
+}
+
+/** 任务名是不是「漏洞标题」这类占位词，是的话导出时改用报告里的真实标题。 */
+function isPlaceholderTitle(t) {
+  const s = String(t || '').trim();
+  return !s || /^(漏洞标题|漏洞名称|报告名称|标题|名称|漏洞提交模板|报告|未命名)$/.test(s);
 }
 
 const runs = new Map();
@@ -923,12 +939,33 @@ async function saveReport() {
   if (!S.reportMd) return toast('先生成报告', true);
   const task = currentTask();
   if (task) readFormInto(task, false);
-  const title = (task && task.title) || mdTitle(S.reportMd);
-  if (task) await attachPacketShots(task);
-  const imgs = (S.images && S.images.length ? S.images : (task && task.images) || []).filter(Boolean);
+  const own = task && !isPlaceholderTitle(task.title) ? task.title : '';
+  const title = own || mdTitle(S.reportMd);
+  let md = S.reportMd;
+  let imgs = (S.images && S.images.length ? S.images : (task && task.images) || []).filter(Boolean);
+  // 正文里有数据包但一张图都没有：导出时自动截一张贴到包下面
+  if (!imgs.length && /^\s*(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+\S+\s+HTTP\//m.test(md)) {
+    try {
+      toast('正在给数据包截图…');
+      const r = await window.api.autoShots({ markdown: md, width: Number(S.settings.ui && S.settings.ui.shotWidth) || 1600 });
+      if (r && r.ok && r.files && r.files.length) {
+        md = r.md || md;
+        imgs = r.files;
+        S.reportMd = md;
+        S.images = imgs;
+        if (task) { task.images = imgs; task.markdown = md; }
+        const preview = $('#mdPreview');
+        if (preview) preview.innerHTML = mdToHtml(md);
+      }
+    } catch (e) {
+      // 截图失败不影响导出
+    }
+  }
+  // 自动截图已经贴好就不再走「按详情里的包补图」的旧路径，避免一张包两张图
+  if (task && !imgs.length) await attachPacketShots(task);
+  imgs = (S.images && S.images.length ? S.images : (task && task.images) || []).filter(Boolean);
   // 图片链接由 report.bundle() 按包位插好，这里再拼一次会出现重复的 ![](images/NN.png)
-  const md = S.reportMd.replace(/\s+$/, '');
-  const r = await window.api.saveReport({ markdown: md, images: imgs, title });
+  const r = await window.api.saveReport({ markdown: md.replace(/\s+$/, ''), images: imgs, title });
   S.reportDir = (r && (r.zip || r.dir)) || '';
   if (task) {
     task.exported = S.reportDir;

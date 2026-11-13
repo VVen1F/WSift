@@ -729,6 +729,57 @@ ipcMain.handle('templates:reset', () => templates.reset());
 ipcMain.handle('tasks:list', () => tasks.load());
 ipcMain.handle('tasks:save', (_e, list) => tasks.saveAll(list));
 
+/**
+ * 导出前给正文里的每个数据包配一张截图：
+ * 1) 正文后面若跟着响应（HTTP/1.x 开头），直接用这段响应渲染，不发包；
+ * 2) 没有响应时，只对 GET/HEAD/OPTIONS 重放一次拿真实响应；
+ * 3) 其余方法（POST/PUT/…）不重放，只渲染请求，避免重复写操作。
+ */
+ipcMain.handle('report:autoShots', async (event, payload) => {
+  const md = String((payload && payload.markdown) || '');
+  const width = Number(payload && payload.width) || 1600;
+  const lines = md.split('\n');
+  const blocks = report.packetBlocks(lines);
+  if (!blocks.length) return { ok: true, files: [], md, count: 0 };
+  const files = [];
+  for (let i = 0; i < blocks.length && i < 8; i++) {
+    const b = blocks[i];
+    const raw = lines.slice(b.start, b.end + 1).join('\n');
+    const method = (raw.split(/\s+/)[0] || '').toUpperCase();
+    // 正文里紧跟的响应块
+    let response = '';
+    let j = b.end + 1;
+    while (j < lines.length && !lines[j].trim()) j++;
+    if (j < lines.length && /^HTTP\/1\.[01]\s+\d{3}/.test(lines[j].trim())) {
+      const start = j;
+      while (j < lines.length && lines[j].trim() !== '') j++;
+      response = lines.slice(start, j).join('\n');
+    }
+    let ms = 0;
+    if (!response && /^(GET|HEAD|OPTIONS)$/.test(method)) {
+      try {
+        const r = await http.send(raw, { timeout: 30 });
+        response = r.text || '';
+        ms = r.ms || 0;
+      } catch (e) {
+        response = `HTTP/1.1 0 CONNECTION_ERROR\r\n\r\n${e.message}`;
+      }
+    }
+    if (event && event.sender && !event.sender.isDestroyed()) {
+      try { event.sender.send('report:progress', { note: `截图 ${i + 1}/${Math.min(blocks.length, 8)}` }); } catch (err) {}
+    }
+    const out = path.join(shotDir(), `${Date.now()}-pkt${i + 1}.png`);
+    try {
+      const r = await shot.capture({ request: raw, response, width, out, ms });
+      if (r && r.path) files.push(r.path);
+    } catch (e) {
+      // 单张失败不影响导出
+    }
+  }
+  const withLinks = report.placeImages(report.stripImageLinks(md), files.map((f) => path.basename(f)));
+  return { ok: true, files, md: withLinks, count: files.length };
+});
+
 ipcMain.handle('report:save', (_e, payload) => report.save(payload));
 ipcMain.handle('report:compose', (_e, payload) => report.buildMessages(payload));
 ipcMain.handle('report:chat', (_e, payload) => report.buildChatMessages(payload));

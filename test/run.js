@@ -282,7 +282,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('品牌与 appId 是 WSift', pkg.productName === 'WSift' && pkg.build.productName === 'WSift' && pkg.build.appId === 'com.wenyifan.wsift');
-  ok('版本 0.8.2', pkg.version === '0.8.2');
+  ok('版本 0.8.3', pkg.version === '0.8.3');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -565,6 +565,15 @@ function ok(name, cond, extra) {
   ok('管道续行不死循环', out.includes('python3') && out.includes('段落'));
   ok('普通表格仍能渲染', mdFn('| a | b |\n| --- | --- |\n| 1 | 2 |').includes('<table>'));
   ok('自评依据开头的等级被去掉', report.toPlain('漏洞等级\n中危\n\n漏洞等级自评依据\n中危：影响有限。').includes('漏洞等级自评依据\n影响有限。'));
+  {
+    const dirty = ['漏洞提交模板', '漏洞标题', '某站未授权访问', '', '漏洞详情', '描述* 请明确的写出，我们该如何重现该漏洞？请用相关细节替换下面的所有[方形]部分。', '请记住，您提供的详细信息越多，我们就越容易进行分类和快速响应，因此请务必花时间填写报告！', '[添加我们如何重现问题的详细信息]', '【填写修复建议】', '##POC：', 'GET /x HTTP/1.1', '', '修复建议', '加鉴权。'].join('\n');
+    const clean = report.toPlain(dirty);
+    ok('导出时去掉模板说明文字', !clean.includes('请明确的写出') && !clean.includes('请记住') && !clean.includes('[添加我们如何重现'));
+    ok('导出时去掉【】占位行和模板标题', !clean.includes('【填写修复建议】') && !clean.includes('漏洞提交模板'));
+    ok('正文内容仍然保留', clean.includes('##POC：') && clean.includes('GET /x HTTP/1.1') && clean.includes('加鉴权'));
+    const withLink = clean + '\n\n![](images/01.png)\n';
+    ok('重复导出不会叠图片链接', !report.stripImageLinks(withLink).includes('![](images/01.png)'));
+  }
   ok('界面不打招呼', !/早上好|下午好|晚上好|帮你|帮忙|星标|★|☆/.test(ui));
 
   console.log(`\n结果：${pass} 通过，${fail} 失败\n`);

@@ -12,6 +12,7 @@ const S = {
   reportMd: '',
   reportDir: '',
   images: [],
+  imageMap: {},
   pendingShots: [],
   updating: null,
   info: null
@@ -128,16 +129,21 @@ function highlight(text) {
 
 /* ---------------- 极简 Markdown 渲染 ---------------- */
 
-function inline(s) {
+function inline(s, imgMap) {
   let t = esc(s);
   t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
   t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  t = t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" />');
+  t = t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (m, alt, src) => {
+    const key = String(src).replace(/^images\//, '');
+    const real = imgMap && imgMap[key];
+    const url = real ? (window.api.imageUrl ? window.api.imageUrl(real) : 'file://' + real) : src;
+    return `<img alt="${alt}" src="${url}" />`;
+  });
   t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
   return t;
 }
 
-function mdToHtml(md) {
+function mdToHtml(md, imgMap) {
   const lines = String(md || '').split(/\r?\n/);
   const out = [];
   let i = 0;
@@ -157,7 +163,7 @@ function mdToHtml(md) {
     const h = /^(#{1,4})\s+(.*)$/.exec(line);
     if (h) {
       const lv = h[1].length;
-      out.push(`<h${lv}>${inline(h[2])}</h${lv}>`);
+      out.push(`<h${lv}>${inline(h[2], imgMap)}</h${lv}>`);
       i++;
       continue;
     }
@@ -171,8 +177,8 @@ function mdToHtml(md) {
         i++;
       }
       out.push(
-        '<table><thead><tr>' + head.map((c) => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>' +
-        rows.map((r) => '<tr>' + r.map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>').join('') +
+        '<table><thead><tr>' + head.map((c) => `<th>${inline(c, imgMap)}</th>`).join('') + '</tr></thead><tbody>' +
+        rows.map((r) => '<tr>' + r.map((c) => `<td>${inline(c, imgMap)}</td>`).join('') + '</tr>').join('') +
         '</tbody></table>'
       );
       continue;
@@ -186,7 +192,7 @@ function mdToHtml(md) {
         i++;
       }
       const tag = ordered ? 'ol' : 'ul';
-      out.push(`<${tag}>` + items.map((t) => `<li>${inline(t)}</li>`).join('') + `</${tag}>`);
+      out.push(`<${tag}>` + items.map((t) => `<li>${inline(t, imgMap)}</li>`).join('') + `</${tag}>`);
       continue;
     }
 
@@ -197,7 +203,7 @@ function mdToHtml(md) {
     // 以 | 开头但又不是表格的行（比如 shell 管道的续行）会让上面一行都收不进来，
     // 不兜底就是死循环 + 内存爆掉
     if (!para.length) para.push(lines[i++]);
-    out.push(`<p>${inline(para.join(' '))}</p>`);
+    out.push(`<p>${inline(para.join(' '), imgMap)}</p>`);
   }
   return out.join('\n');
 }
@@ -896,12 +902,14 @@ async function generateReport() {
           if (live && live.title && $('#rTitle')) $('#rTitle').value = live.title;
           const preview = $('#mdPreview');
           const status = $('#genStatus');
-          if (preview) preview.innerHTML = md ? mdToHtml(md) : '<div class="empty">模型没有返回正文</div>';
+          if (preview) preview.innerHTML = md ? mdToHtml(md, S.imageMap) : '<div class="empty">模型没有返回正文</div>';
           if (status) status.textContent = md ? '已生成 · ' + md.length + ' 字' : '没有正文';
         });
       }
       finish();
       saveTasksNow();
+      // 生成完立刻给数据包配图，预览和提交都能直接看到
+      if (md) void autoShootAfterGen(taskId);
     },
     onError: (msg, code) => {
       const stopped = code === 'ABORT' || msg === '已停止';
@@ -935,6 +943,44 @@ function imagesSection(list) {
   return '\n\n' + imgs.map((_, i) => `![](images/${String(i + 1).padStart(2, '0')}.png)`).join('\n\n') + '\n';
 }
 
+/**
+ * 给正文里的数据包自动出图，并把图贴到包下面。
+ * 返回 { md, files } 或 null。生成后、导出前、提交前都走这一条路径。
+ */
+async function autoShootTask(task, markdown) {
+  const text = String(markdown || '');
+  if (!/^\s*(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+\S+\s+HTTP\//m.test(text)) return null;
+  try {
+    const r = await window.api.autoShots({
+      markdown: text,
+      material: (task && task.detail) || '',
+      width: Number(S.settings.ui && S.settings.ui.shotWidth) || 1600
+    });
+    if (!r || !r.ok || !r.files || !r.files.length) return null;
+    const md = r.md || text;
+    const map = {};
+    r.files.forEach((f, i) => { map[String(i + 1).padStart(2, '0') + '.png'] = f; });
+    S.images = r.files;
+    S.imageMap = map;
+    S.reportMd = md;
+    if (task) { task.images = r.files; task.markdown = md; }
+    const preview = $('#mdPreview');
+    if (preview && currentTask() === task) preview.innerHTML = mdToHtml(md, map);
+    saveTasksSoon();
+    return { md, files: r.files };
+  } catch (e) {
+    return null;
+  }
+}
+
+/** 生成完成后自动补图；不阻塞界面。 */
+async function autoShootAfterGen(taskId) {
+  const task = TASKS.list.find((t) => t.id === taskId);
+  if (!task || !task.markdown) return;
+  const r = await autoShootTask(task, task.markdown);
+  if (r && r.files.length) toast(`已自动截 ${r.files.length} 张图，贴在对应数据包下面`);
+}
+
 async function saveReport() {
   if (!S.reportMd) return toast('先生成报告', true);
   const task = currentTask();
@@ -943,23 +989,10 @@ async function saveReport() {
   const title = own || mdTitle(S.reportMd);
   let md = S.reportMd;
   let imgs = (S.images && S.images.length ? S.images : (task && task.images) || []).filter(Boolean);
-  // 正文里有数据包但一张图都没有：导出时自动截一张贴到包下面
-  if (!imgs.length && /^\s*(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+\S+\s+HTTP\//m.test(md)) {
-    try {
-      toast('正在给数据包截图…');
-      const r = await window.api.autoShots({ markdown: md, width: Number(S.settings.ui && S.settings.ui.shotWidth) || 1600 });
-      if (r && r.ok && r.files && r.files.length) {
-        md = r.md || md;
-        imgs = r.files;
-        S.reportMd = md;
-        S.images = imgs;
-        if (task) { task.images = imgs; task.markdown = md; }
-        const preview = $('#mdPreview');
-        if (preview) preview.innerHTML = mdToHtml(md);
-      }
-    } catch (e) {
-      // 截图失败不影响导出
-    }
+  if (!imgs.length) {
+    toast('正在给数据包截图…');
+    const shot = await autoShootTask(task, md);
+    if (shot) { md = shot.md; imgs = shot.files; }
   }
   // 自动截图已经贴好就不再走「按详情里的包补图」的旧路径，避免一张包两张图
   if (task && !imgs.length) await attachPacketShots(task);
@@ -1103,7 +1136,7 @@ function applyTask(t) {
   S.reportMd = t.markdown || '';
   S.reportDir = t.exported || '';
   S.images = Array.isArray(t.images) ? t.images : (t.images = []);
-  $('#mdPreview').innerHTML = S.reportMd ? mdToHtml(S.reportMd) : '<div class="empty">生成后显示在这里</div>';
+  $('#mdPreview').innerHTML = S.reportMd ? mdToHtml(S.reportMd, S.imageMap) : '<div class="empty">生成后显示在这里</div>';
   $('#genStatus').textContent = S.reportMd ? '已生成 · ' + S.reportMd.length + ' 字' : '未生成';
   const reveal = $('#btnReveal');
   if (reveal) reveal.disabled = !S.reportDir;
@@ -3854,7 +3887,12 @@ async function lsSendSubmit(draft) {
   if (!basis) return lsNote('#lsSubmitNote', '平台必填「漏洞等级自评依据」，从判断标准里复制一项填上', true);
   if (!text) return lsNote('#lsSubmitNote', '填验证码', true);
   if (!LS.submitCap) return lsRefreshSubmitCap();
-  const images = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
+  let images = (S.images && S.images.length ? S.images : (currentTask() && currentTask().images) || []).filter(Boolean);
+  if (!images.length) {
+    const task = currentTask();
+    const shot = await autoShootTask(task, S.reportMd);
+    if (shot) images = shot.files;
+  }
   const payload = {
     draft: !!draft,
     accountId,

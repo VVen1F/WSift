@@ -5,6 +5,7 @@ const fs = require('fs');
 
 const http = require('./http');
 const store = require('./store');
+const { dataDir } = require('./paths');
 const templates = require('./templates');
 const report = require('./report');
 const llm = require('./llm');
@@ -278,7 +279,7 @@ ipcMain.handle('shot:capture', async (_e, payload) => {
 const shotDir = () => {
   let custom = '';
   try { custom = String((store.load().ui || {}).shotDir || '').trim(); } catch (e) { custom = ''; }
-  const dir = custom || path.join(app.getPath('userData'), 'shots');
+  const dir = custom || path.join(dataDir(), 'shots');
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 };
@@ -737,10 +738,18 @@ ipcMain.handle('tasks:save', (_e, list) => tasks.saveAll(list));
  */
 ipcMain.handle('report:autoShots', async (event, payload) => {
   const md = String((payload && payload.markdown) || '');
+  const material = String((payload && payload.material) || '');
   const width = Number(payload && payload.width) || 1600;
   const lines = md.split('\n');
   const blocks = report.packetBlocks(lines);
   if (!blocks.length) return { ok: true, files: [], md, count: 0 };
+  // 材料里的响应块按顺序收集，多包时按序号对应，避免所有包都用同一段响应
+  const responses = [];
+  {
+    const re = /(?:^|\n)\s*(HTTP\/1\.[01]\s+\d{3}[^\n]*\n[\s\S]*?)(?=\n(?:GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+\S+\s+HTTP\/|$)/g;
+    let m;
+    while ((m = re.exec(material))) responses.push(m[1].replace(/\s+$/, ''));
+  }
   const files = [];
   for (let i = 0; i < blocks.length && i < 8; i++) {
     const b = blocks[i];
@@ -755,6 +764,8 @@ ipcMain.handle('report:autoShots', async (event, payload) => {
       while (j < lines.length && lines[j].trim() !== '') j++;
       response = lines.slice(start, j).join('\n');
     }
+    // 正文里没有响应，就去材料（用户粘贴的原文）里找第一段 HTTP 响应
+    if (!response && responses.length) response = responses[i] || responses[0];
     let ms = 0;
     if (!response && /^(GET|HEAD|OPTIONS)$/.test(method)) {
       try {
@@ -776,7 +787,10 @@ ipcMain.handle('report:autoShots', async (event, payload) => {
       // 单张失败不影响导出
     }
   }
-  const withLinks = report.placeImages(report.stripImageLinks(md), files.map((f) => path.basename(f)));
+  // 只把「包下面原本没有图」的包补上新图：已有图的包保持不动
+  // 链接名必须和导出时的 01.png/02.png 一致，预览才能解析到真实文件
+  const names = files.map((f, i) => String(i + 1).padStart(2, '0') + '.png');
+  const withLinks = report.placeImages(report.stripImageLinks(md), names);
   return { ok: true, files, md: withLinks, count: files.length };
 });
 

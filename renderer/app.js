@@ -13,6 +13,7 @@ const S = {
   reportDir: '',
   images: [],
   imageMap: {},
+  wsMenuId: '',
   pendingShots: [],
   updating: null,
   info: null
@@ -1282,23 +1283,140 @@ function ensureWorkspaces() {
 
 function workspaceHtml() {
   ensureWorkspaces();
-  const folderOpen = typeof icon === 'function' ? icon('folder-open', 16) : '';
-  const folderShut = typeof icon === 'function' ? icon('folder-close', 16) : '';
+  const ico = (name, size) => (typeof icon === 'function' ? icon(name, size || 16) : '');
+  const folderOpen = ico('folder-open');
+  const folderShut = ico('folder-close');
+  const arrow = ico('chevron-down-outline', 12);
   return TASKS.workspaces.map((w) => {
     const mine = activeTasks().filter((t) => (t.workspaceId || 'ws-default') === w.id);
     const open = w.open !== false;
-    // 展开指示器只在选中/hover/有子项时出现；位置始终占着，避免文字左右跳
-    const chev = `<span class="ws-chev${open ? ' open' : ''}${mine.length ? '' : ' none'}" aria-hidden="true">` +
-      `${typeof icon === 'function' ? icon('chevron-down-outline', 12) : ''}</span>`;
-    const folder = open ? folderOpen : folderShut;
+    const isDefault = w.id === 'ws-default';
     // 选中和展开是两个状态：sel 只代表文件夹自己被选中，open 只代表展开
     const sel = TASKS.focus === 'ws' && w.id === TASKS.wsId;
-    let block = `<div class="ws${sel ? ' sel' : ''}${open ? ' open' : ''}" data-ws="${esc(w.id)}" role="button" tabindex="0">` +
-      `${chev}${folder}<span class="ws-name">${esc(w.name)}</span>` +
-      `<button class="icon-btn ws-add" type="button" data-ws-new="${esc(w.id)}" aria-label="新建任务">${typeof icon === 'function' ? icon('plus-outline', 16) : ''}</button></div>`;
+    const menuOpen = S.wsMenuId === w.id;
+    // 左边一个 16px 槽位：平时是文件夹图标，hover / 菜单打开时换成展开箭头（不在旁边再占一格）
+    let block = `<div class="ws${sel ? ' sel' : ''}${open ? ' open' : ''}${menuOpen ? ' menu-open' : ''}" data-ws="${esc(w.id)}" role="treeitem" aria-expanded="${open ? 'true' : 'false'}" tabindex="0">` +
+      `<span class="ws-slot ws-folder" aria-hidden="true">${open ? folderOpen : folderShut}</span>` +
+      `<span class="ws-slot ws-arrow${open ? ' open' : ''}" aria-hidden="true">${arrow}</span>` +
+      `<span class="ws-name">${esc(w.name)}</span>` +
+      `<span class="ws-actions">` +
+        `<button class="icon-btn ws-more" type="button" data-ws-menu="${esc(w.id)}" aria-label="「${esc(w.name)}」的操作" aria-haspopup="menu" aria-expanded="${menuOpen ? 'true' : 'false'}">${ico('ellipsis-outline')}</button>` +
+        `<button class="icon-btn ws-add" type="button" data-ws-new="${esc(w.id)}" aria-label="在「${esc(w.name)}」中新建任务">${ico('plus-outline')}</button>` +
+      `</span></div>`;
     if (open) block += mine.map((t) => taskRow(t, false)).join('');
     return block;
   }).join('');
+}
+
+/** 工作区三点菜单：新建会话 / 重命名 / 复制名称 / 展开折叠 / 删除 */
+function openWsMenu(id, x, y, anchor) {
+  const menu = $('#wsMenu');
+  const ws = TASKS.workspaces.find((w) => w.id === id);
+  if (!menu || !ws) return;
+  ensureWorkspaces();
+  const open = ws.open !== false;
+  const isDefault = ws.id === 'ws-default';
+  const count = activeTasks().filter((t) => (t.workspaceId || 'ws-default') === ws.id).length;
+  const ico = (name) => (typeof icon === 'function' ? icon(name, 16) : '');
+  const rows = [
+    { id: 'new', icon: 'new-chat-outline', label: '新建会话' },
+    { id: 'rename', icon: 'edit-outline', label: '重命名' },
+    { id: 'copy', icon: 'copy-outline', label: '复制名称' },
+    { id: 'toggle', icon: 'chevron-down-outline', label: open ? '折叠' : '展开' },
+    { sep: true },
+    { id: 'del', icon: 'trash-outline', label: isDefault ? '删除工作区（默认）' : (count ? `删除工作区（${count} 份报告移走）` : '删除工作区'), danger: true, disabled: isDefault }
+  ];
+  menu.innerHTML = rows.map((item) => item.sep
+    ? '<div class="sep"></div>'
+    : `<button type="button" role="menuitem" data-ws-act="${item.id}" class="${item.danger ? 'danger' : ''}"${item.disabled ? ' disabled' : ''}>${ico(item.icon)}<span>${esc(item.label)}</span></button>`
+  ).join('');
+  S.wsMenuId = id;
+  const row = $(`.ws[data-ws="${CSS.escape(id)}"]`);
+  if (row) row.classList.add('menu-open');
+  menu.hidden = false;
+  menu.classList.remove('out');
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  const rect = menu.getBoundingClientRect();
+  const ax = x == null ? (row ? row.getBoundingClientRect().right - rect.width : 12) : x;
+  const ay = y == null ? (row ? row.getBoundingClientRect().bottom + 4 : 12) : y;
+  menu.style.left = Math.max(12, Math.min(ax, window.innerWidth - rect.width - 12)) + 'px';
+  menu.style.top = Math.max(12, Math.min(ay, window.innerHeight - rect.height - 12)) + 'px';
+  menu.onclick = (e) => {
+    const btn = e.target.closest('[data-ws-act]');
+    if (!btn || btn.disabled) return;
+    e.stopPropagation();
+    const act = btn.dataset.wsAct;
+    closeWsMenu();
+    if (act === 'new') {
+      TASKS.wsId = id;
+      ws.open = true;
+      saveTasksNow();
+      requestNewTask();
+      renderTaskList();
+      return;
+    }
+    if (act === 'rename') return renameWorkspace(id);
+    if (act === 'copy') {
+      const text = ws.name;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('已复制：' + text), () => toast('复制失败', true));
+      return;
+    }
+    if (act === 'toggle') {
+      ws.open = !open;
+      saveTasksNow();
+      renderTaskList();
+      return;
+    }
+    if (act === 'del') return deleteWorkspace(id);
+  };
+  if (anchor) anchor.setAttribute('aria-expanded', 'true');
+}
+
+function closeWsMenu() {
+  const menu = $('#wsMenu');
+  const id = S.wsMenuId;
+  S.wsMenuId = '';
+  if (id) {
+    const row = $(`.ws[data-ws="${CSS.escape(id)}"]`);
+    if (row) {
+      row.classList.remove('menu-open');
+      const btn = row.querySelector('[data-ws-menu]');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+  if (!menu || menu.hidden) return;
+  menu.classList.add('out');
+  clearTimeout(menu._t);
+  menu._t = setTimeout(() => { menu.hidden = true; menu.classList.remove('out'); }, 150);
+}
+
+/** 删除工作区：报告先挪到默认工作区，绝不级联删除 */
+function deleteWorkspace(id) {
+  ensureWorkspaces();
+  const ws = TASKS.workspaces.find((w) => w.id === id);
+  if (!ws) return;
+  if (id === 'ws-default') return toast('默认工作区不能删除', true);
+  const target = TASKS.workspaces.find((w) => w.id === 'ws-default') || TASKS.workspaces.find((w) => w.id !== id);
+  if (!target) return;
+  const mine = TASKS.list.filter((t) => (t.workspaceId || 'ws-default') === id && !t.archived);
+  const text = mine.length
+    ? `「${ws.name}」里的 ${mine.length} 份报告会移到「${target.name}」，报告和截图都不会删。`
+    : `「${ws.name}」里没有报告，删除后只影响这个文件夹本身。`;
+  openConfirm({
+    title: '删除工作区',
+    text,
+    ok: '删除',
+    run: () => {
+      mine.forEach((t) => { t.workspaceId = target.id; });
+      TASKS.workspaces = TASKS.workspaces.filter((w) => w.id !== id);
+      if (TASKS.wsId === id) TASKS.wsId = target.id;
+      if (TASKS.focus === 'ws' && TASKS.wsId === target.id) TASKS.focus = 'ws';
+      saveTasksNow();
+      renderTaskList();
+      toast('已删除「' + ws.name + '」，报告已移到「' + target.name + '」');
+    }
+  });
 }
 
 function renderTaskList() {
@@ -1582,26 +1700,44 @@ function openTaskMenu(id, x, y) {
   };
 }
 
-function openWorkspaceDialog() {
+/** 新建 / 重命名工作区共用同一个弹窗；target 传工作区对象就是重命名。 */
+function openWorkspaceDialog(target) {
   const modal = $('#nameModal');
   const input = $('#nameInput');
   if (!modal || !input) return;
-  input.value = '';
+  const editing = !!(target && target.id);
+  const title = $('#nameTitle');
+  const okBtn = $('#nameOk');
+  if (title) title.textContent = editing ? '重命名工作区' : '新建工作区';
+  if (okBtn) okBtn.textContent = editing ? '保存' : '创建';
+  input.value = editing ? String(target.name || '') : '';
   clearTimeout(modal._t);
   modal.classList.remove('out');
   modal.hidden = false;
-  setTimeout(() => input.focus(), 30);
+  setTimeout(() => { input.focus(); input.select(); }, 30);
   const close = () => {
     modal.classList.add('out');
     modal._t = setTimeout(() => { modal.hidden = true; modal.classList.remove('out'); }, 160);
+    input.onkeydown = null;
   };
   const ok = () => {
     const name = input.value.trim();
-    if (!name) return;
+    if (!name) {
+      // 空名字不提交，也不关闭弹窗，避免把原名弄丢
+      input.focus();
+      toast('名称不能为空', true);
+      return;
+    }
     ensureWorkspaces();
-    const id = 'ws' + Date.now().toString(36);
-    TASKS.workspaces.unshift({ id, name, open: true, createdAt: Date.now() });
-    TASKS.wsId = id;
+    if (editing) {
+      const ws = TASKS.workspaces.find((w) => w.id === target.id);
+      if (!ws) return close();
+      ws.name = name;
+    } else {
+      const id = 'ws' + Date.now().toString(36);
+      TASKS.workspaces.unshift({ id, name, open: true, createdAt: Date.now() });
+      TASKS.wsId = id;
+    }
     saveTasksNow();
     renderTaskList();
     close();
@@ -1610,9 +1746,27 @@ function openWorkspaceDialog() {
   $('#nameCancel').onclick = close;
   $('#nameX').onclick = close;
   input.onkeydown = (e) => {
-    if (e.key === 'Enter') ok();
-    if (e.key === 'Escape') close();
+    const wsKey = e.target.closest && e.target.closest('.ws');
+    if (wsKey && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      const space = TASKS.workspaces.find((w) => w.id === wsKey.dataset.ws);
+      if (!space) return;
+      TASKS.focus = 'ws';
+      TASKS.wsId = space.id;
+      space.open = space.open === false;
+      saveTasksNow();
+      renderTaskList();
+      return;
+    }
+    if (e.key === 'Enter') { e.preventDefault(); ok(); }
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
   };
+}
+
+function renameWorkspace(id) {
+  const ws = TASKS.workspaces.find((w) => w.id === id);
+  if (!ws) return;
+  openWorkspaceDialog(ws);
 }
 
 function openConfirm(opts) {
@@ -1660,6 +1814,13 @@ function bindTasks() {
     if (e.target.closest('[data-arch-toggle]')) {
       TASKS.showArchived = !TASKS.showArchived;
       renderTaskList();
+      return;
+    }
+    const moreBtn = e.target.closest('[data-ws-menu]');
+    if (moreBtn) {
+      e.stopPropagation();
+      const r = moreBtn.getBoundingClientRect();
+      openWsMenu(moreBtn.dataset.wsMenu, r.left, r.bottom + 4, moreBtn);
       return;
     }
     const addHere = e.target.closest('[data-ws-new]');
@@ -1732,6 +1893,13 @@ function bindTasks() {
   box.addEventListener('mouseover', (e) => placeArchTip(e.target.closest('.task-arch')));
   box.addEventListener('mouseleave', () => placeArchTip(null));
   box.addEventListener('contextmenu', (e) => {
+    const wsRow = e.target.closest('.ws');
+    if (wsRow) {
+      e.preventDefault();
+      e.stopPropagation();
+      openWsMenu(wsRow.dataset.ws, e.clientX, e.clientY);
+      return;
+    }
     const row = e.target.closest('.task');
     if (!row) return;
     e.preventDefault();
@@ -1741,9 +1909,10 @@ function bindTasks() {
     bindTasks._menuDoc = true;
     document.addEventListener('pointerdown', (e) => {
       if (!e.target.closest || !e.target.closest('#taskMenu')) closeTaskMenu();
+      if (!e.target.closest || !e.target.closest('#wsMenu')) closeWsMenu();
     }, true);
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeTaskMenu();
+      if (e.key === 'Escape') { closeTaskMenu(); closeWsMenu(); }
     });
   }
   box.addEventListener('keydown', (e) => {

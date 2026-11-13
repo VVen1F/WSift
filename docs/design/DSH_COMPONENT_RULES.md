@@ -86,6 +86,17 @@
 | 展开 | 文件夹 Hover | 只有该文件夹变 `--hover` |
 | 折叠 | 文件夹选中 | 文件夹单独有 `--sel-bg` |
 
+### 工作区行结构（对齐 DSH）
+
+参考 `packages/client/ui-workspace/src/client/rows/Rows.tsx` 的 `ProjectRow`：
+
+- 左边只有**一个 16px 槽位**：平时放文件夹图标，`:hover` / 菜单打开时换成展开箭头（DSH 是 `.projectRow:hover .folder{display:none}` + `.chevron{display:inline-flex}`），不在旁边再占第二格
+- 标题 `flex:1; min-width:0` + 省略号，按钮出现时只压缩宽度，文本左边界不动
+- 右侧动作区默认 `display:none`，`:hover` / `.menu-open` / `:focus-within` 时显示（DSH 的 `.rowActions`）
+- 动作顺序：三点菜单 → 新建会话
+- 三点菜单项：新建会话 / 重命名 / 复制名称 / 展开折叠 / 删除工作区（默认工作区禁用，危险色）
+- 删除策略：报告先并入默认工作区，确认框写明数量，绝不级联删除
+
 ### 视觉细节点
 
 | 状态 | 展开箭头 | 文件夹 | 加号 |

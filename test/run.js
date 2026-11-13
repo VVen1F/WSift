@@ -293,7 +293,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('品牌与 appId 是 WSift', pkg.productName === 'WSift' && pkg.build.productName === 'WSift' && pkg.build.appId === 'com.wenyifan.wsift');
-  ok('版本 0.8.9', pkg.version === '0.8.9');
+  ok('版本 0.9.0', pkg.version === '0.9.0');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -344,7 +344,9 @@ function ok(name, cond, extra) {
   ok('打开就是表单', ui.includes('id="reportCol"') && !ui.includes('id="reportEmpty"'));
   ok('浏览器页已去掉', !ui.includes('id="page-browser"') && ui.includes('function stopRun'));
   ok('清空要二次确认', ui.includes('id="confirmAck"') && ui.includes('我已了解'));
-  ok('侧栏新建是图标', ui.includes('aria-label="新建任务"') && ui.includes('id="taskMenu"') && ui.includes('data-theme-choice="system"'));
+  ok('侧栏新建是图标', ui.includes('aria-label="在「${esc(w.name)}」中新建任务"') && ui.includes('id="taskMenu"') && ui.includes('data-theme-choice="system"'));
+  ok('工作区行有操作菜单', ui.includes('data-ws-menu=') && ui.includes('id="wsMenu"') && ui.includes('ws-actions'));
+  ok('工作区不再有常驻箭头占位', !ui.includes('ws-chev'));
   ok('网关显示本机', ui.includes('127.0.0.1'));
   const spaces = tasksMod.saveAll({ tasks: [{ id: 'in', title: '在工作区', detail: 'd', workspaceId: 'ws1' }], workspaces: [{ id: 'ws1', name: '麦当劳' }] });
   ok('工作区能读回', spaces.workspaces[0].name === '麦当劳' && tasksMod.load().workspaces[0].name === '麦当劳' && tasksMod.load().tasks[0].workspaceId === 'ws1');

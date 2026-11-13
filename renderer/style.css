@@ -524,6 +524,8 @@ textarea.inp {
   pointer-events: none;
 }
 .icon-btn:hover::after { opacity: 1; }
+/* 菜单打开时不要再叠一个 tooltip */
+.icon-btn[aria-expanded="true"]::after { display: none !important; }
 .ctx {
   position: fixed; z-index: 1100;
   min-width: 180px; max-width: 280px;
@@ -546,6 +548,8 @@ textarea.inp {
 }
 .ctx button:hover { background: var(--hover); }
 .ctx button.danger { color: var(--danger); }
+.ctx button:disabled { opacity: .45; cursor: default; }
+.ctx button:disabled:hover { background: transparent; }
 .ctx .sep { height: 0; margin: 3px 4px; border-top: 0.5px solid var(--line); }
 @keyframes modalLeave { to { opacity: 0; } }
 .modal.out, .modal.out .modal-card { animation: modalLeave 160ms var(--ds-ease-in-out) forwards; }
@@ -1117,23 +1121,30 @@ textarea.inp {
 }
 .ws:hover { background: var(--hover); }
 .ws.sel, .ws.sel:hover { background: var(--sel-bg); }
-.ws > svg { width: 16px; height: 16px; flex: none; color: var(--muted); transition: color var(--ds-transition-duration-fast) var(--ds-ease-in-out); }
-.ws:hover > svg { color: var(--text); }
-.ws.open > svg, .ws.sel > svg { color: var(--brand-primary); }
-.ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ws-chev {
-  width: 12px; height: 12px; flex: none;
+/* 一个 16px 槽位：平时文件夹，hover 时换成展开箭头，不再额外占一格 */
+.ws-slot {
+  flex: none; width: 16px; height: 16px;
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--caption); opacity: 0;
-  transform: rotate(-90deg);
-  transition: opacity var(--ds-transition-duration-fast) var(--ds-ease-in-out), transform var(--ds-transition-duration-fast) var(--ds-ease-in-out);
 }
-.ws-chev svg { width: 12px; height: 12px; }
-.ws-chev.open { transform: rotate(0deg); }
-.ws-chev.none { visibility: hidden; }
-.ws:hover .ws-chev, .ws.sel .ws-chev, .ws.open .ws-chev, .ws:focus-within .ws-chev { opacity: 1; }
-.ws-add { opacity: 0; }
-.ws:hover .ws-add, .ws.sel .ws-add, .ws:focus-within .ws-add { opacity: 1; }
+.ws-slot svg { width: 16px; height: 16px; }
+.ws-folder { color: var(--muted); transition: color var(--ds-transition-duration-fast) var(--ds-ease-in-out); }
+.ws:hover .ws-folder { color: var(--text); }
+.ws.open .ws-folder, .ws.sel .ws-folder { color: var(--brand-primary); }
+.ws-arrow {
+  display: none;
+  color: var(--caption);
+  transform: rotate(-90deg);
+  transition: transform var(--ds-transition-duration-fast) var(--ds-ease-in-out);
+}
+.ws-arrow svg { width: 12px; height: 12px; }
+.ws-arrow.open { transform: rotate(0deg); }
+.ws:hover .ws-folder, .ws.menu-open .ws-folder, .ws:focus-within .ws-folder { display: none; }
+.ws:hover .ws-arrow, .ws.menu-open .ws-arrow, .ws:focus-within .ws-arrow { display: inline-flex; }
+.ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-actions { flex: none; display: none; align-items: center; gap: 2px; }
+.ws:hover .ws-actions, .ws.menu-open .ws-actions, .ws:focus-within .ws-actions { display: inline-flex; }
+.ws-more, .ws-add { width: 24px; height: 24px; border-radius: var(--dsw-radius-xs); }
+.ws-more[aria-expanded="true"] { background: var(--hover); color: var(--text); }
 .name-body { padding: 0 24px; }
 .task-arch {
   position: static;

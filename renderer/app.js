@@ -1399,7 +1399,8 @@ function deleteWorkspace(id) {
   if (id === 'ws-default') return toast('默认工作区不能删除', true);
   const target = TASKS.workspaces.find((w) => w.id === 'ws-default') || TASKS.workspaces.find((w) => w.id !== id);
   if (!target) return;
-  const mine = TASKS.list.filter((t) => (t.workspaceId || 'ws-default') === id && !t.archived);
+  // 归档的报告也一起挪走，否则会留下指向已删除工作区的悬空 workspaceId
+  const mine = TASKS.list.filter((t) => (t.workspaceId || 'ws-default') === id);
   const text = mine.length
     ? `「${ws.name}」里的 ${mine.length} 份报告会移到「${target.name}」，报告和截图都不会删。`
     : `「${ws.name}」里没有报告，删除后只影响这个文件夹本身。`;

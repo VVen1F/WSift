@@ -248,6 +248,17 @@ async function doSend() {
   if (S.settings.ui.autoShot) doShot();
 }
 
+/** 请求编辑区是 textarea，颜色由下面那层 pre 画出来，滚动要跟着同步。 */
+function paintReq() {
+  const ta = $('#req');
+  const pre = $('#reqHl');
+  if (!ta || !pre) return;
+  const v = ta.value || '';
+  pre.innerHTML = v ? highlight(v) : '';
+  pre.scrollTop = ta.scrollTop;
+  pre.scrollLeft = ta.scrollLeft;
+}
+
 async function doShot() {
   if (!S.lastRes) return toast('先发送一次请求', true);
   $('#shotPath').textContent = '截图中…';
@@ -262,14 +273,18 @@ async function doShot() {
     S.settings.stats.shots = (S.settings.stats.shots || 0) + 1;
     persist();
     renderStats();
-    $('#shotPath').textContent = '已保存 ' + r.path.split('/').pop();
-    toast('截图已保存');
+    // 只给文件名找不到图，直接给绝对路径 + 一键打开目录
+    $('#shotPath').textContent = '已保存 ' + r.path;
+    $('#shotPath').title = r.path;
+    toast('截图已保存：' + r.path, false, { label: '打开文件夹', run: () => window.api.shots.show() });
   } catch (e) {
     $('#shotPath').textContent = '';
     toast('截图失败：' + e.message, true);
   }
 }
 
+$('#req').addEventListener('input', paintReq);
+$('#req').addEventListener('scroll', paintReq);
 $('#btnSend').addEventListener('click', doSend);
 $('#btnShot').addEventListener('click', doShot);
 
@@ -4042,6 +4057,7 @@ async function boot() {
   S.templates = await window.api.templates.list();
 
   $('#req').value = SAMPLE;
+  paintReq();
   $('#res').innerHTML = '<div class="empty">发送后显示响应</div>';
   $('#scheme').value = 'https';
 

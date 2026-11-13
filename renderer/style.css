@@ -287,6 +287,13 @@ select.inp:focus, input.inp:focus, textarea.inp:focus { border-color: var(--focu
 .split > .col + .col { border-left: 0.5px solid var(--line); padding-left: 16px; }
 .split > .col:first-child { padding-right: 16px; }
 
+.editor-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
+.editor-wrap > .editor { position: absolute; inset: 0; width: 100%; height: 100%; }
+.req-hl { pointer-events: none; overflow: hidden; color: var(--text); }
+#req { color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--text); background: transparent; }
+#req::selection { background: var(--sel); }
+#shotPath { max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#req::-webkit-input-placeholder { color: var(--caption); -webkit-text-fill-color: var(--caption); }
 .editor {
   flex: 1;
   min-height: 0;
@@ -316,18 +323,18 @@ pre.code {
   word-break: break-word;
   background: transparent;
 }
-pre.code .hn { color: #000080; }
-pre.code .cv { color: #800000; }
-pre.code .jk { color: #000080; }
-pre.code .js { color: #0a7a2f; }
-pre.code .jn { color: #1a1acc; }
-pre.code .l1 { color: var(--text); }
+pre.code .hn, .req-hl .hn { color: #000080; }
+pre.code .cv, .req-hl .cv { color: #800000; }
+pre.code .jk, .req-hl .jk { color: #000080; }
+pre.code .js, .req-hl .js { color: #0a7a2f; }
+pre.code .jn, .req-hl .jn { color: #1a1acc; }
+pre.code .l1, .req-hl .l1 { color: var(--text); }
 
-html[data-ds-dark-theme] pre.code .hn { color: #8ab4ff; }
-html[data-ds-dark-theme] pre.code .cv { color: #ff9d9d; }
-html[data-ds-dark-theme] pre.code .jk { color: #8ab4ff; }
-html[data-ds-dark-theme] pre.code .js { color: #6fd08c; }
-html[data-ds-dark-theme] pre.code .jn { color: #9db6ff; }
+html[data-ds-dark-theme] pre.code .hn, html[data-ds-dark-theme] .req-hl .hn { color: #8ab4ff; }
+html[data-ds-dark-theme] pre.code .cv, html[data-ds-dark-theme] .req-hl .cv { color: #ff9d9d; }
+html[data-ds-dark-theme] pre.code .jk, html[data-ds-dark-theme] .req-hl .jk { color: #8ab4ff; }
+html[data-ds-dark-theme] pre.code .js, html[data-ds-dark-theme] .req-hl .js { color: #6fd08c; }
+html[data-ds-dark-theme] pre.code .jn, html[data-ds-dark-theme] .req-hl .jn { color: #9db6ff; }
 
 .status {
   min-height: 40px; flex: 0 0 auto;

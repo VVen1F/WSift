@@ -19,7 +19,6 @@ const S = {
 };
 
 const TASKS = { list: [], workspaces: [], wsId: null, id: null, busyId: null, showArchived: false, focus: 'task' };
-let clearArmed = false;
 let clearTimer = 0;
 let saveChain = Promise.resolve();
 
@@ -1311,12 +1310,9 @@ function renderTaskList() {
   const focusId = focused ? focused.dataset.id : '';
   const tasks = activeTasks();
   const archived = archivedTasks();
-  const clearBtn = $('#btnTasksClear');
-  if (clearBtn) clearBtn.hidden = tasks.length === 0;
   ensureWorkspaces();
   if (!tasks.length && TASKS.workspaces.length <= 1) {
     box.innerHTML = workspaceHtml() + '<div class="task-empty">还没有报告</div>';
-    setClearArm(false);
     return;
   }
   // 归档的任务只在「归档管理」里出现，侧栏不再单列一组
@@ -1508,20 +1504,6 @@ function removeTask(id) {
   toast('已删除');
 }
 
-function clearTasks() {
-  const viewing = currentTask();
-  TASKS.list.forEach((t) => {
-    if (t.archived || !hasContent(t)) return;
-    stopRun(t.id);
-    t.archived = true;
-  });
-  setClearArm(false);
-  TASKS.showArchived = true;
-  if (!viewing || !viewing.archived) blankForm();
-  else renderTaskList();
-  saveTasksNow();
-  toast('已放入已归档会话');
-}
 
 function closeTaskMenu() {
   const menu = $('#taskMenu');
@@ -1670,14 +1652,6 @@ function openConfirm(opts) {
   $('#confirmX').onclick = close;
 }
 
-function setClearArm(on) {
-  clearArmed = !!on;
-  const b = $('#btnTasksClear');
-  if (!b) return;
-  b.textContent = clearArmed ? '确认清空' : '清空';
-  b.classList.toggle('arm', clearArmed);
-}
-
 function bindTasks() {
   const box = $('#taskList');
   if (!box || box._bound) return;
@@ -1798,23 +1772,6 @@ function bindTasks() {
   if (wsNew) wsNew.addEventListener('click', () => openWorkspaceDialog());
   const label = $('#btnReports');
   if (label) label.addEventListener('click', () => go('report'));
-
-  const clr = $('#btnTasksClear');
-  if (clr) {
-    clr.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (!activeTasks().length) return;
-      openConfirm({
-        title: '清空报告',
-        text: '未归档的报告会放进已归档会话。正在生成的那一份会停掉。',
-        ok: '归档',
-        run: clearTasks
-      });
-    });
-  }
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest || !e.target.closest('#btnTasksClear')) setClearArm(false);
-  });
 
   ['rTitle', 'rCred', 'rDetail', 'rExtra'].forEach((id) => {
     const el = document.getElementById(id);

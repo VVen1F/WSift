@@ -35,7 +35,6 @@
         </button>
       </div>
       <div class="task-scroll" id="taskList"></div>
-      <button class="task-clear" id="btnTasksClear" type="button" hidden>清空</button>
       <div class="task-fill"></div>
     </div>
 
@@ -544,14 +543,14 @@
 <div class="modal" id="confirmModal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="modal-head">
-      <b id="confirmTitle">清空报告</b>
+      <b id="confirmTitle">确认操作</b>
       <button class="modal-x" id="confirmX" type="button" aria-label="关闭" data-icon="close-outline" data-size="16"></button>
     </div>
     <p class="modal-sub" id="confirmText">未归档的报告会从列表消失。</p>
     <label class="ack"><input type="checkbox" id="confirmAck" /> 我已了解</label>
     <div class="row actions">
       <button class="btn" id="confirmCancel" type="button">取消</button>
-      <button class="btn primary" id="confirmOk" type="button" disabled>清空</button>
+      <button class="btn primary" id="confirmOk" type="button" disabled>确定</button>
     </div>
   </div>
 </div>

@@ -1189,36 +1189,6 @@ textarea.inp {
 .task:hover .task-del,
 .task:focus-within .task-del { opacity: 1; }
 .task-del:hover { color: var(--danger); }
-.task-clear {
-  flex: 0 0 auto;
-  /* 和列表行同一条左边界和宽度，不再是个飘着的小胶囊 */
-  margin: 4px 8px 8px 16px;
-  align-self: stretch;
-  border: 0;
-  background: none;
-  text-align: left;
-  color: var(--muted);
-  font-size: 12px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  border-radius: var(--dsw-radius-sm);
-  transition: background .15s var(--ease), color .15s var(--ease);
-}
-.task-clear:hover { background: var(--hover); color: var(--text); }
-.task-clear.arm { color: var(--text); }
-#page-report { overflow: auto; }
-.report-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  color: var(--muted);
-  font-size: 13px;
-}
 .report-empty p { margin: 0; }
 .report-col {
   width: 100%;

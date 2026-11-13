@@ -282,7 +282,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('品牌与 appId 是 WSift', pkg.productName === 'WSift' && pkg.build.productName === 'WSift' && pkg.build.appId === 'com.wenyifan.wsift');
-  ok('版本 0.8.6', pkg.version === '0.8.6');
+  ok('版本 0.8.7', pkg.version === '0.8.7');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');
@@ -326,7 +326,7 @@ function ok(name, cond, extra) {
   const ui = ['renderer/index.html', 'renderer/app.js', 'renderer/style.css']
     .map((f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8'))
     .join('\n');
-  ok('侧栏有报告列表', ui.includes('id="taskList"') && ui.includes('>清空<') && ui.includes('确认清空'));
+  ok('侧栏有报告列表且没有清空按钮', ui.includes('id="taskList"') && !ui.includes('btnTasksClear') && !ui.includes('>清空<'));
   ok('侧栏是新建任务', ui.includes('新建任务') && !ui.includes('data-page="browser"') && !ui.includes('id="page-home"'));
   ok('设置按项分开', ui.includes('function showSettingsSection') && ui.includes('id="sect-network" hidden'));
   ok('悬停归档', ui.includes('归档任务') && ui.includes('data-arch'));

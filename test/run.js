@@ -293,7 +293,7 @@ function ok(name, cond, extra) {
   const tasksMod = require('../electron/tasks.js');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   ok('品牌与 appId 是 WSift', pkg.productName === 'WSift' && pkg.build.productName === 'WSift' && pkg.build.appId === 'com.wenyifan.wsift');
-  ok('版本 0.9.1', pkg.version === '0.9.1');
+  ok('版本 0.9.2', pkg.version === '0.9.2');
   ok('主题默认跟随系统', store.DEFAULTS.ui.theme === 'system');
   ok('截图目录默认为空', store.DEFAULTS.ui.shotDir === '');
   const llmMod = require('../electron/llm.js');

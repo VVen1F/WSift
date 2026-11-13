@@ -1144,6 +1144,17 @@ textarea.inp {
 .ws-actions { flex: none; display: none; align-items: center; gap: 2px; }
 .ws:hover .ws-actions, .ws.menu-open .ws-actions, .ws:focus-within .ws-actions { display: inline-flex; }
 .ws-more, .ws-add { width: 24px; height: 24px; border-radius: var(--dsw-radius-xs); }
+/* 侧栏滚动容器会裁掉绝对定位的 tooltip，这两个按钮改用 body 级的浮层 */
+.ws-more::after, .ws-add::after { display: none !important; }
+.ws-tip {
+  position: fixed; z-index: 1300;
+  padding: 3px 7px; border-radius: var(--dsw-radius-sm);
+  background: var(--tip-bg); color: #fff;
+  font-size: 13px; line-height: 20px; white-space: nowrap;
+  max-width: 70vw; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+.ws-tip[hidden] { display: none; }
 .ws-more[aria-expanded="true"] { background: var(--hover); color: var(--text); }
 .name-body { padding: 0 24px; }
 .task-arch {

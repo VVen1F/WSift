@@ -1308,8 +1308,37 @@ function workspaceHtml() {
   }).join('');
 }
 
+/** 工作区按钮的 tooltip 用 body 级元素，避免被侧栏滚动容器裁掉 */
+function showWsTip(btn) {
+  const text = btn && btn.getAttribute('aria-label');
+  if (!text) return;
+  let tip = document.getElementById('wsTip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'wsTip';
+    tip.className = 'ws-tip';
+    tip.setAttribute('role', 'tooltip');
+    document.body.appendChild(tip);
+  }
+  tip.textContent = text;
+  tip.hidden = false;
+  const r = btn.getBoundingClientRect();
+  const box = tip.getBoundingClientRect();
+  const left = Math.max(8, Math.min(r.left + r.width / 2 - box.width / 2, window.innerWidth - box.width - 8));
+  let top = r.bottom + 6;
+  if (top + box.height > window.innerHeight - 8) top = Math.max(8, r.top - box.height - 6);
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+
+function hideWsTip() {
+  const tip = document.getElementById('wsTip');
+  if (tip) tip.hidden = true;
+}
+
 /** 工作区三点菜单：新建会话 / 重命名 / 复制名称 / 展开折叠 / 删除 */
 function openWsMenu(id, x, y, anchor) {
+  hideWsTip();
   const menu = $('#wsMenu');
   const ws = TASKS.workspaces.find((w) => w.id === id);
   if (!menu || !ws) return;
@@ -1421,6 +1450,7 @@ function deleteWorkspace(id) {
 }
 
 function renderTaskList() {
+  hideWsTip();
   const box = $('#taskList');
   if (!box) return;
   const focused = document.activeElement && document.activeElement.closest
@@ -1811,6 +1841,20 @@ function bindTasks() {
   const box = $('#taskList');
   if (!box || box._bound) return;
   box._bound = true;
+  box.addEventListener('pointerover', (e) => {
+    const btn = e.target.closest && e.target.closest('.ws-more, .ws-add');
+    if (btn) showWsTip(btn);
+  });
+  box.addEventListener('pointerout', (e) => {
+    const btn = e.target.closest && e.target.closest('.ws-more, .ws-add');
+    if (btn && !btn.contains(e.relatedTarget)) hideWsTip();
+  });
+  box.addEventListener('focusin', (e) => {
+    const btn = e.target.closest && e.target.closest('.ws-more, .ws-add');
+    if (btn) showWsTip(btn);
+  });
+  box.addEventListener('focusout', hideWsTip);
+  box.addEventListener('scroll', hideWsTip, true);
   box.addEventListener('click', (e) => {
     if (e.target.closest('[data-arch-toggle]')) {
       TASKS.showArchived = !TASKS.showArchived;
